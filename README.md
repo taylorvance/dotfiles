@@ -1,4 +1,4 @@
-# Taylor's dotfiles
+# Taylor's dotfiles [WIP]
 
 These are my dotfiles. There are many like them, but these are mine.
 
