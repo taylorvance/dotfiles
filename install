@@ -1,27 +1,28 @@
 #!/bin/bash
 
+DESTINATIONDIR=$HOME
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 BACKUPDIR=$BASEDIR/backups/"$(date +%Y-%m-%d_%H%M%S)"
-DESTINATIONDIR=$HOME
 
 # Create a backup subdirectory for any conflicting files.
 if [ -d "$BACKUPDIR" ]; then
 	echo "Backup directory ${BACKUPDIR} already exists. Please wait literally one second and try again."
-	return
+	exit
 fi
 mkdir -p $BACKUPDIR
 
-# Set up symlinks for all files/folders in the dotfiles home folder.
-files="`ls -a $BASEDIR/home`"
+# Get a list of files/folders to symlink.
+while IFS= read -r filepath
+do
+	echo
 
-for filename in $files; do
-	# Ignore . and ..
-	if [ "$filename" = "." ] || [ "$filename" = ".." ]; then
+	oldfile=$DESTINATIONDIR/$filepath
+	newfile=$BASEDIR/home/$filepath
+
+	if [ ! -e $newfile ]; then
+		echo "$newfile does not exist"
 		continue
 	fi
-
-	oldfile=$DESTINATIONDIR/$filename
-	newfile=$BASEDIR/home/$filename
 
 	# If the file is already correctly symlinked, skip.
 	if [ "$(readlink $oldfile)" = "$newfile" ]; then
@@ -29,15 +30,16 @@ for filename in $files; do
 		continue
 	fi
 
-	# If a file with this name exists, move it to the backup folder to avoid overwriting.
+	# If a file with this name already exists, move it to the backup folder to avoid overwriting.
 	if [ -e $oldfile ]; then
-		echo "Moving existing $filename to backup folder"
+		echo "Moving existing $filepath to backup folder"
 		mv $oldfile $BACKUPDIR
 	fi
 
-	echo "Creating symlink for $filename"
-	ln -Ffs $newfile $DESTINATIONDIR
-done
+	echo "Creating symlink for $filepath"
+	mkdir -p $(dirname $oldfile)
+	ln -Ffs $newfile $oldfile
+done < $BASEDIR/config
 
 # Remove the new backup dir if nothing was added to it.
 rmdir $BACKUPDIR >/dev/null 2>&1
