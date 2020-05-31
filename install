@@ -17,7 +17,8 @@ do
 	echo
 
 	oldfile=$DESTINATIONDIR/$filepath
-	newfile=$BASEDIR/home/$filepath
+	newfile=$BASEDIR/home-away-from-HOME/$filepath
+	#remove trailing slash if necessary??
 
 	if [ ! -e $newfile ]; then
 		echo "$newfile does not exist"
