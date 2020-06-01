@@ -35,24 +35,26 @@ There are two steps needed to add a new dotfile.
 ```
 |-- dotfiles
     |-- home-away-from-HOME
-        |-- .my-single-dotfile
         |-- .my-whole-directory
         |   |-- file1.cfg
         |   |-- file2.cfg
         |-- .vim
-            |-- colors
-                |-- mycolorscheme.vim
+        |   |-- colors
+        |       |-- mycolorscheme.vim
+        |-- .vimrc
 ```
 
 2. Add a line to `dotfiles/config`. You can link specific files or whole directories.
 
 ```
-.my-single-dotfile
 .my-whole-directory
 .vim/colors/mycolorscheme.vim
+.vimrc
 ```
 
-## Project Structure
+## Usage
+
+Use at your own risk.
 
 ```
 |-- dotfiles
@@ -69,9 +71,27 @@ There are two steps needed to add a new dotfile.
     |-- install
 ```
 
-## Usage
+#### Backups
 
-Use at your own risk.
+When you run the install script, there may be files in your home directory that would be overwritten by symlinking. Any file with the same name as one configured to be symlinked will be moved to `dotfiles/backups/`, under a subdirectory named after the current date/time.
+
+#### Config
+
+`dotfiles/config` is a text file tells the install script which files you want symlinked in your home directory. It works hand in hand with `dotfiles/home-away-from-HOME/`. You can link specific files or whole directories.
+
+##### Specific files
+
+Enter the file's relative path from `dotfiles/home-away-from-HOME/`. This will be the same path relative to `~/` after installation.
+
+Example: `.vim/colors/mycolorscheme.vim` will link that file at `~/.vim/colors/mycolorscheme.vim` while leaving the rest of `~/.vim` intact.
+
+##### Whole directories
+
+Similar to specific files, enter the directory's relative path from `dotfiles/home-away-from-HOME/`. Trailing slash is unnecessary.
+
+Example: `.my-whole-directory` will link that directory and all of its contents (recursively) at `~/.my-whole-directory/`.
+
+NOTE: Any files that are in `~/.my-whole-directory/` but not in `dotfiles/home-away-from-HOME/.my-whole-directory/` will be moved to the backup folder during installation. If you wish to maintain untracked files in `~/.my-whole-directory/`, you must configure specific files rather than the whole directory. Instead of `.my-whole-directory`, enter `.my-whole-directory/file1.cfg` and `.my-whole-directory/file2.cfg`, etc.
 
 ### Forking
 
