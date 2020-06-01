@@ -13,6 +13,8 @@ Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 Plug 'airblade/vim-gitgutter'
 Plug 'tpope/vim-surround'
+Plug 'preservim/nerdcommenter'
+Plug 'honza/vim-snippets'
 call plug#end()
 
 
@@ -23,7 +25,7 @@ set encoding=utf-8
 
 " << UI >> {{{
 
-"colorscheme 4bit
+colorscheme 4bit
 set background=dark			" use dark background (duh)
 set number					" show line number of current line...
 set relativenumber			" ...and relative line number of other lines
@@ -267,6 +269,6 @@ function! SynGrp()
 		\ . "FG:" . synIDattr(synIDtrans(l:synid),"fg#")
 endfunc
 " TEMP set colorscheme to mine
-nnoremap <leader>c :color colortv<cr>
+"nnoremap <leader>c :color colortv<cr>
 
 " }}}
