@@ -8,9 +8,9 @@ I'm reinventing the wheel with this dotfile management solution. There are many 
 
 The [bare git repo](https://www.atlassian.com/git/tutorials/dotfiles) approach is indeed elegant, but I have two gripes. You have to use an alias instead of using the git command (like `config diff`); and it doesn't allow you to store a README in the repo directory. I don't want to clutter my home with helper files that are specific to dotfile management.
 
-[Dotbot](https://www.anishathalye.com/2014/08/03/managing-your-dotfiles/) was attractive--in fact, my solution is based on my understanding of its philosophy--but I want to do things MY WAY dammit.
+[Dotbot](https://www.anishathalye.com/2014/08/03/managing-your-dotfiles/) was attractive--in fact, my solution is based on my cursory understanding of its philosophy--but I want to do things MY WAY dammit.
 
-#### My Way
+### My Way
 
 The essence of my solution is this. Load up `dotfiles/home-away-from-HOME/` with all of your dotfiles, named and organized exactly as you want them to appear relative to your actual home directory (aka `~/`). Then `install` to create symlinks automatically.
 
@@ -24,7 +24,7 @@ Simply clone the repo and run the install script.
 git clone git@github.com:taylorvance/dotfiles.git && ./dotfiles/install
 ```
 
-This will create symlinks in your home directory for everything located in `dotfiles/home-away-from-HOME/` and configured in `dotfiles/config`. If there are any conflicts, your original files will automatically be backed up in `dotfiles/backups/`.
+This will create symlinks in your home directory for everything located in `dotfiles/home-away-from-HOME/` and configured in `dotfiles/config`. If there are any conflicts, your original files will be backed up in `dotfiles/backups/`.
 
 ### Adding new dotfiles
 
@@ -70,3 +70,9 @@ There are two steps needed to add a new dotfile.
 ```
 
 ## Usage
+
+Use at your own risk.
+
+### Forking
+
+All of the content that is specific to my setup is in `dotfiles/home-away-from-HOME/` and `config`. If you want to start fresh, empty out both of those and insert your own files.

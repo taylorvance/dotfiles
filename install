@@ -2,26 +2,28 @@
 
 DESTINATIONDIR=$HOME
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-BACKUPDIR=$BASEDIR/backups/"$(date +%Y-%m-%d_%H%M%S)"
+BACKUPDIR=$BASEDIR/backups/"$(date +%Y-%m-%d_%H-%M-%S)"
 
-# Create a backup subdirectory for any conflicting files.
+# This run's backup directory name is based on the current datetime.
 if [ -d "$BACKUPDIR" ]; then
 	echo "Backup directory ${BACKUPDIR} already exists. Please wait literally one second and try again."
 	exit
 fi
-mkdir -p $BACKUPDIR
 
 # Get a list of files/folders to symlink.
 while IFS= read -r filepath
 do
+	# Remove trailing slash (not sure if this is necessary)
+	filepath=${filepath%/}
+
 	echo
+	echo "Working on $filepath"
 
 	oldfile=$DESTINATIONDIR/$filepath
 	newfile=$BASEDIR/home-away-from-HOME/$filepath
-	#remove trailing slash if necessary??
 
 	if [ ! -e $newfile ]; then
-		echo "$newfile does not exist"
+		echo "$newfile could not be found"
 		continue
 	fi
 
@@ -34,6 +36,7 @@ do
 	# If a file with this name already exists, move it to the backup folder to avoid overwriting.
 	if [ -e $oldfile ]; then
 		echo "Moving existing $filepath to backup folder"
+		mkdir -p $BACKUPDIR
 		mv $oldfile $BACKUPDIR
 	fi
 
@@ -41,6 +44,3 @@ do
 	mkdir -p $(dirname $oldfile)
 	ln -Ffs $newfile $oldfile
 done < $BASEDIR/config
-
-# Remove the new backup dir if nothing was added to it.
-rmdir $BACKUPDIR >/dev/null 2>&1
