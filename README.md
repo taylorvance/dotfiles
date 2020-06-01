@@ -77,7 +77,7 @@ When you run the install script, there may be files in your home directory that 
 
 #### Config
 
-`dotfiles/config` is a text file tells the install script which files you want symlinked in your home directory. It works hand in hand with `dotfiles/home-away-from-HOME/`. You can link specific files or whole directories.
+`dotfiles/config` is a text file that tells the install script which files you want symlinked in your home directory. It works hand in hand with `dotfiles/home-away-from-HOME/`. You can link specific files or whole directories.
 
 ##### Specific files
 
