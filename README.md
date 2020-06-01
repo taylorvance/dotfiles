@@ -21,7 +21,7 @@ The essence of my solution is this. Load up `dotfiles/home-away-from-HOME/` with
 Simply clone the repo and run the install script.
 
 ```
-git clone git@github.com:taylorvance/dotfiles.git && ./dotfiles/install
+git clone https://github.com/taylorvance/dotfiles.git && ./dotfiles/install
 ```
 
 This will create symlinks in your home directory for everything located in `dotfiles/home-away-from-HOME/` and configured in `dotfiles/config`. If there are any conflicts, your original files will be backed up in `dotfiles/backups/`.
