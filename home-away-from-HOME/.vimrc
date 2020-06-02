@@ -11,10 +11,10 @@ endif
 call plug#begin('~/.vim/plugged')
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
-Plug 'airblade/vim-gitgutter'
-Plug 'tpope/vim-surround'
 Plug 'preservim/nerdcommenter'
+Plug 'airblade/vim-gitgutter'
 Plug 'honza/vim-snippets'
+Plug 'tpope/vim-surround'
 call plug#end()
 
 
@@ -104,6 +104,8 @@ let g:gitgutter_diff_args = '-w'
 " make gitgutter less of a resource hog
 let g:gitgutter_realtime = 0
 let g:gitgutter_eager = 0
+" but make sure it updates after a write
+autocmd BufWritePost * GitGutter
 " }}}
 
 " }}}
