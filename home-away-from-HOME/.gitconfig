@@ -1,0 +1,10 @@
+[alias]
+    st = status
+    di = diff
+    ci = commit
+    br = branch
+    co = checkout
+    g = grep --break --heading --line-number
+    lg = log --color --graph --pretty=format:'%Cred%h%Creset - %s %C(yellow)%d%Creset %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+[core]
+    editor = vim
