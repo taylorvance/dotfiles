@@ -35,9 +35,10 @@ do
 
 	# If a file with this name already exists, move it to the backup folder to avoid overwriting.
 	if [ -e $oldfile ]; then
-		echo "Moving existing $filepath to backup folder"
+		echo "Copying existing $filepath to backup folder"
 		mkdir -p $BACKUPDIR
-		mv $oldfile $BACKUPDIR
+		cp -RL $oldfile $BACKUPDIR
+		rm -rf $oldfile
 	fi
 
 	echo "Creating symlink for $filepath"
