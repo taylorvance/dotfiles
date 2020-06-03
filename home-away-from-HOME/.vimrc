@@ -243,6 +243,8 @@ set history=1000                        " cmd-line history
 if !isdirectory($HOME."/.vim/swapfiles")
     call mkdir($HOME."/.vim/swapfiles", "p")
 endif
+" ^= prepends, so it's the highest priority
+" // stores the path in the filename, to avoid conflicts
 set directory^=$HOME/.vim/swapfiles//
 
 " centralized persistent undo files

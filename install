@@ -4,13 +4,12 @@ DESTINATIONDIR=$HOME
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 BACKUPDIR=$BASEDIR/backups/"$(date +%Y-%m-%d_%H-%M-%S)"
 
-# This run's backup directory name is based on the current datetime.
 if [ -d "$BACKUPDIR" ]; then
-	echo "Backup directory ${BACKUPDIR} already exists. Please wait literally one second and try again."
+	echo "Backup directory $BACKUPDIR already exists. Please wait literally one second and try again."
 	exit
 fi
 
-# Get a list of files/folders to symlink.
+# Loop through the files and folders listed in $BASEDIR/config
 while IFS= read -r filepath
 do
 	# Remove trailing slash (not sure if this is necessary)
@@ -33,10 +32,11 @@ do
 		continue
 	fi
 
-	# If a file with this name already exists, move it to the backup folder to avoid overwriting.
+	# If a file with this name already exists, copy it to the backup folder to avoid overwriting.
 	if [ -e $oldfile ]; then
 		echo "Copying existing $filepath to backup folder"
 		mkdir -p $BACKUPDIR
+		# Make a deep, recursive copy, removing symlinks.
 		cp -RL $oldfile $BACKUPDIR
 		rm -rf $oldfile
 	fi

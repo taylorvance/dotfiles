@@ -54,7 +54,7 @@ Installation is [idempotent](https://en.wikipedia.org/wiki/Idempotence), which i
 
 ## Usage
 
-Use at your own risk.
+Use at your own risk. I encourage you to peruse the install script. It's like 30 lines of code.
 
 ```
 |-- dotfiles
@@ -91,7 +91,7 @@ Similar to specific files, enter the directory's relative path from `dotfiles/ho
 
 Example: `.my-whole-directory` will link that directory and all of its contents (recursively) at `~/.my-whole-directory/`.
 
-NOTE: Any files that are in `~/.my-whole-directory/` but not in `dotfiles/home-away-from-HOME/.my-whole-directory/` will be copied to the backup folder during installation. If you wish to maintain untracked files in `~/.my-whole-directory/`, you must configure specific files rather than the whole directory. Instead of `.my-whole-directory`, enter `.my-whole-directory/file1.cfg` and `.my-whole-directory/file2.cfg`, etc.
+NOTE: Any files that are in `~/.my-whole-directory/` but not in `dotfiles/home-away-from-HOME/.my-whole-directory/` will be backed up and removed during installation. If you wish to maintain untracked files in `~/.my-whole-directory/`, you must configure specific files rather than the whole directory. Instead of `.my-whole-directory`, enter `.my-whole-directory/file1.cfg` and `.my-whole-directory/file2.cfg`, for example.
 
 ### Forking
 
