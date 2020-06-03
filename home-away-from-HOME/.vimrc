@@ -174,7 +174,6 @@ noremap gm `
 
 set autoindent                          " use the current line's indent
 set backspace=indent,eol,start          " allow backspacing
-set runtimepath+=~/.vim/my-snippets/    " make sure vim sees my custom snippets
 
 " quick save/quit
 nnoremap <leader>w :w<cr>
@@ -238,10 +237,20 @@ inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
 
 set hidden                              " hide buffers instead of closing them
 set ttyfast                             " indicates fast terminal connection
-set directory^=$HOME/.vim/swapfiles//   " keep swap files in a centralized location
-set undodir^=$HOME/.vim/undodir//       " keep undo files in a centralized location
-set undofile                            " persistent undo tree
 set history=1000                        " cmd-line history
+
+" centralized swap files
+if !isdirectory($HOME."/.vim/swapfiles")
+    call mkdir($HOME."/.vim/swapfiles", "p")
+endif
+set directory^=$HOME/.vim/swapfiles//
+
+" centralized persistent undo files
+if !isdirectory($HOME."/.vim/undodir")
+    call mkdir($HOME."/.vim/undodir", "p")
+endif
+set undodir^=$HOME/.vim/undodir//
+set undofile
 
 " quickly edit and reload vimrc
 nnoremap <leader>ev :e $MYVIMRC<cr>
