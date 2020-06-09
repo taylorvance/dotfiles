@@ -9,39 +9,42 @@ if [ -d "$BACKUPDIR" ]; then
 	exit
 fi
 
+printf "Installing dotfiles...\n"
+
 # Loop through the files and folders listed in $BASEDIR/config
 while IFS= read -r filepath
 do
 	# Remove trailing slash (not sure if this is necessary)
 	filepath=${filepath%/}
 
-	echo
-	echo "Working on $filepath"
+	printf "\n${filepath}:  "
 
 	oldfile=$DESTINATIONDIR/$filepath
 	newfile=$BASEDIR/home-away-from-HOME/$filepath
 
 	if [ ! -e $newfile ]; then
-		echo "$newfile could not be found"
+		printf "$newfile not found"
 		continue
 	fi
 
 	# If the file is already correctly symlinked, skip.
 	if [ "$(readlink $oldfile)" = "$newfile" ]; then
-		echo "Symlink already exists for $oldfile"
+		printf "already installed"
 		continue
 	fi
 
 	# If a file with this name already exists, copy it to the backup folder to avoid overwriting.
 	if [ -e $oldfile ]; then
-		echo "Copying existing $filepath to backup folder"
 		mkdir -p $BACKUPDIR
 		# Make a deep, recursive copy, removing symlinks.
 		cp -RL $oldfile $BACKUPDIR
 		rm -rf $oldfile
+		printf "existing file backed up; "
 	fi
 
-	echo "Creating symlink for $filepath"
 	mkdir -p $(dirname $oldfile)
 	ln -Ffs $newfile $oldfile
+	printf "installed"
 done < $BASEDIR/config
+
+printf "\n\nInstallation complete!\n"
