@@ -64,11 +64,12 @@ PROMPT+=' $(vi_prompt_info)'
 PROMPT+=$'\n'
 PROMPT+='%F{blue}└─%f'
 # green or red % prompt
-PROMPT+=' %F{%(?.green.red)}%#%f '
+PROMPT+=' %(?.%F{green}%#%f.%F{red}%#%f) '
 
 # Reset prompt when switching modes
 function zle-line-init zle-keymap-select {
 	zle reset-prompt
+	zle -R
 }
 zle -N zle-line-init
 zle -N zle-keymap-select
