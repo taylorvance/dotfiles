@@ -11,8 +11,9 @@ endif
 call plug#begin('~/.vim/plugged')
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
-Plug 'preservim/nerdcommenter'
 Plug 'airblade/vim-gitgutter'
+Plug 'nanotech/jellybeans.vim'
+Plug 'preservim/nerdcommenter'
 Plug 'honza/vim-snippets'
 Plug 'tpope/vim-surround'
 call plug#end()
@@ -25,7 +26,7 @@ set encoding=utf-8
 
 " << UI >> {{{
 
-colorscheme 4bit
+colorscheme jellybeans
 set background=dark         " use dark background (duh)
 set number                  " show line number of current line...
 set relativenumber          " ...and relative line number of other lines
