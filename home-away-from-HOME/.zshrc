@@ -19,14 +19,15 @@ antigen use oh-my-zsh
 
 # Load other plugins
 antigen bundle zsh-users/zsh-syntax-highlighting
+antigen bundle zsh-users/zsh-autosuggestions
 
 antigen apply
 
 
 # Use vi keys
 bindkey -v
-# Lower latency between modes
-export KEYTIMEOUT=1
+# Lower latency when switching modes
+export KEYTIMEOUT=10
 
 # Filter command history
 bindkey "^[[A" up-line-or-beginning-search
@@ -38,6 +39,10 @@ bindkey -M vicmd j down-line-or-beginning-search
 bindkey "^?" backward-delete-char
 # Enable forward delete - https://stackoverflow.com/a/41885766/1718474
 bindkey "^[[3~" delete-char
+
+# Use jk or kj to exit INSERT (as with my .vimrc)
+bindkey -M viins 'jk' vi-cmd-mode
+bindkey -M viins 'kj' vi-cmd-mode
 
 
 # CUSTOM THEME
@@ -58,8 +63,8 @@ ZSH_THEME_GIT_PROMPT_DIRTY="*"
 PROMPT+='$(git_prompt_info)'
 # vi mode
 ZSH_THEME_VI_PROMPT_INSERT=""
-ZSH_THEME_VI_PROMPT_NORMAL="%F{blue}[%f%F{cyan}%B-- NORMAL --%b%f%F{blue}]%f"
-PROMPT+=' $(vi_prompt_info)'
+ZSH_THEME_VI_PROMPT_NORMAL=" %B%F{cyan}-- NORMAL --%f%b"
+PROMPT+='$(vi_prompt_info)'
 # newline and down-right line thing
 PROMPT+=$'\n'
 PROMPT+='%F{blue}└─%f'
