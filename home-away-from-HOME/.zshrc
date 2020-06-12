@@ -52,8 +52,13 @@ function vi_prompt_info {
 	echo "${${KEYMAP/vicmd/$ZSH_THEME_VI_PROMPT_NORMAL}/(main|viins)/$ZSH_THEME_VI_PROMPT_INSERT}"
 }
 
+# hostname or nickname
+function hostnickname {
+	echo "$([ -z "$HOSTNICKNAME" ] && echo "$(hostname)" || echo "$HOSTNICKNAME")"
+}
+
 # user@host
-PROMPT='%F{blue}[%f%F{magenta}%n%f%F{blue}@%f%F{magenta}%m%f%F{blue}]%f'
+PROMPT='%F{blue}[%f%F{magenta}%n%f%F{blue}@%f%F{magenta}$(hostnickname)%f%F{blue}]%f'
 # ~/path/from/home
 PROMPT+='%F{blue} [%f%F{cyan}%~%f%F{blue}]%f'
 # git branch
