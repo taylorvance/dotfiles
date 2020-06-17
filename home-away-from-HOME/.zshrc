@@ -52,11 +52,12 @@ function vi_prompt_info {
 	echo "${${KEYMAP/vicmd/$ZSH_THEME_VI_PROMPT_NORMAL}/(main|viins)/$ZSH_THEME_VI_PROMPT_INSERT}"
 }
 
-# hostname or nickname
+# hostname or nickname (set this up in ~/.zprofile)
 function hostnickname {
 	echo "$([ -z "$HOSTNICKNAME" ] && echo "$(hostname)" || echo "$HOSTNICKNAME")"
 }
 
+# Left prompt
 # user@host
 PROMPT='%F{blue}[%f%F{magenta}%n%f%F{blue}@%f%F{magenta}$(hostnickname)%f%F{blue}]%f'
 # ~/path/from/home
@@ -76,6 +77,15 @@ PROMPT+='%F{blue}└─%f'
 # green or red % prompt
 PROMPT+=' %(?.%F{green}%#%f.%F{red}%#%f) '
 
+# Secondary prompt arrow
+PROMPT2='   %F{cyan}>%f '
+
+# Right prompt
+# previous command, if failed
+RPROMPT='%(?..%F{red}$ZSH_THEME_PROMPT_CMD%f)'
+# green √ or red X beside timestamp of previous command
+RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b $ZSH_THEME_PROMPT_CMD_TIME'
+
 # Reset prompt when switching modes
 function zle-line-init zle-keymap-select {
 	zle reset-prompt
@@ -83,3 +93,10 @@ function zle-line-init zle-keymap-select {
 }
 zle -N zle-line-init
 zle -N zle-keymap-select
+
+# Before executing a command, store these variables for the prompt
+ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
+preexec () {
+	ZSH_THEME_PROMPT_CMD=$(echo "$1" | tr '\n' ' ')
+	ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
+}
