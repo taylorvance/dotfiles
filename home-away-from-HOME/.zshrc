@@ -26,7 +26,7 @@ antigen apply
 
 # Use vi keys
 bindkey -v
-# Lower latency when switching modes
+# Lower latency (for switching modes etc)
 export KEYTIMEOUT=10
 
 # Filter command history
@@ -58,8 +58,9 @@ function hostnickname {
 }
 
 # Left prompt
+PROMPT=''
 # user@host
-PROMPT='%F{blue}[%f%F{magenta}%n%f%F{blue}@%f%F{magenta}$(hostnickname)%f%F{blue}]%f'
+PROMPT+='%F{blue}[%f%F{magenta}%n%f%F{blue}@%f%F{magenta}$(hostnickname)%f%F{blue}]%f'
 # ~/path/from/home
 PROMPT+='%F{blue} [%f%F{cyan}%~%f%F{blue}]%f'
 # git branch
@@ -81,10 +82,11 @@ PROMPT+=' %(?.%F{green}%#%f.%F{red}%#%f) '
 PROMPT2='   %F{cyan}>%f '
 
 # Right prompt
-# previous command, if failed
-RPROMPT='%(?..%F{red}$ZSH_THEME_PROMPT_CMD%f)'
-# green √ or red X beside timestamp of previous command
-RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b $ZSH_THEME_PROMPT_CMD_TIME'
+RPROMPT=''
+# green √ or red X (last cmd's status)
+RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b'
+# timestamp of previous command
+RPROMPT+=' $ZSH_THEME_PROMPT_CMD_TIME'
 
 # Reset prompt when switching modes
 function zle-line-init zle-keymap-select {
@@ -97,6 +99,5 @@ zle -N zle-keymap-select
 # Before executing a command, store these variables for the prompt
 ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
 preexec () {
-	ZSH_THEME_PROMPT_CMD=$(echo "$1" | tr '\n' ' ')
 	ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
 }
