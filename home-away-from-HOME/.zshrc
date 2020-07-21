@@ -24,9 +24,14 @@ antigen bundle zsh-users/zsh-autosuggestions
 antigen apply
 
 
+# Aliases
+alias ytv="youtube-dl --recode-video mp4"
+alias yta="youtube-dl --extract-audio --audio-format mp3"
+
+
 # Use vi keys
 bindkey -v
-# Lower latency when switching modes
+# Lower latency (for switching modes etc)
 export KEYTIMEOUT=10
 
 # Filter command history
@@ -57,6 +62,13 @@ function hostnickname {
 	echo "$([ -z "$HOSTNICKNAME" ] && echo "$(hostname)" || echo "$HOSTNICKNAME")"
 }
 
+# the previous command's execution time, if 1 second or more
+function exec_time_prompt_info {
+	if [ "$ZSH_THEME_PROMPT_EXEC_TIME" -ge 1 ]; then
+		echo "(${ZSH_THEME_PROMPT_EXEC_TIME}s)"
+	fi
+}
+
 # Left prompt
 # user@host
 PROMPT='%F{blue}[%f%F{magenta}%n%f%F{blue}@%f%F{magenta}$(hostnickname)%f%F{blue}]%f'
@@ -81,10 +93,15 @@ PROMPT+=' %(?.%F{green}%#%f.%F{red}%#%f) '
 PROMPT2='   %F{cyan}>%f '
 
 # Right prompt
+RPROMPT=''
 # previous command, if failed
-RPROMPT='%(?..%F{red}$ZSH_THEME_PROMPT_CMD%f)'
-# green √ or red X beside timestamp of previous command
-RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b $ZSH_THEME_PROMPT_CMD_TIME'
+#RPROMPT+='%(?..%F{red}$ZSH_THEME_PROMPT_CMD%f)'
+# prev cmd's execution time, if over 1s
+#RPROMPT+='$(exec_time_prompt_info) '
+# green √ or red X (last cmd's status)
+RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b'
+# timestamp of previous command
+RPROMPT+=' $ZSH_THEME_PROMPT_TIME'
 
 # Reset prompt when switching modes
 function zle-line-init zle-keymap-select {
@@ -94,9 +111,16 @@ function zle-line-init zle-keymap-select {
 zle -N zle-line-init
 zle -N zle-keymap-select
 
-# Before executing a command, store these variables for the prompt
-ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
+# Before executing a command, calc these variables for the prompt
+ZSH_THEME_PROMPT_TIME=$(date +"%H:%M:%S")
 preexec () {
-	ZSH_THEME_PROMPT_CMD=$(echo "$1" | tr '\n' ' ')
-	ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
+	#ZSH_THEME_PROMPT_CMD=$(echo "$1" | tr '\n' ' ')
+	ZSH_THEME_PROMPT_TIME=$(date +"%H:%M:%S")
+	timer=${timer:-$SECONDS}
+}
+precmd () {
+	if [ $timer ]; then
+		ZSH_THEME_PROMPT_EXEC_TIME=$(($SECONDS-$timer))
+		unset timer
+	fi
 }
