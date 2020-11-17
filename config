@@ -1,4 +1,5 @@
 .gitconfig
+.tmux.conf
 .vim/colors/4bit.vim
 .vim/colors/colortv.vim
 .vimrc
