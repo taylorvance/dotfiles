@@ -13,8 +13,9 @@ Plug 'tpope/vim-fugitive'
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 Plug 'airblade/vim-gitgutter'
-Plug 'nanotech/jellybeans.vim'
+Plug 'morhetz/gruvbox'
 Plug 'preservim/nerdcommenter'
+Plug 'sheerun/vim-polyglot'
 Plug 'honza/vim-snippets'
 Plug 'tpope/vim-surround'
 call plug#end()
@@ -27,7 +28,7 @@ set encoding=utf-8
 
 " << UI >> {{{
 
-colorscheme jellybeans
+colorscheme gruvbox
 set background=dark         " use dark background (duh)
 set number                  " show line number of current line...
 set relativenumber          " ...and relative line number of other lines
