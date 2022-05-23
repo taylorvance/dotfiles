@@ -9,15 +9,14 @@ if empty(glob('~/.vim/autoload/plug.vim'))
 endif
 
 call plug#begin('~/.vim/plugged')
-Plug 'tpope/vim-fugitive'
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
+Plug 'tpope/vim-fugitive'
 Plug 'airblade/vim-gitgutter'
 Plug 'morhetz/gruvbox'
 Plug 'preservim/nerdcommenter'
-Plug 'sheerun/vim-polyglot'
-Plug 'honza/vim-snippets'
 Plug 'tpope/vim-surround'
+Plug 'ervandew/supertab'
 call plug#end()
 
 
@@ -43,7 +42,6 @@ set linebreak               " don't break words when wrapping
 set visualbell              " no beep
 set lazyredraw              " prevents redraw for macros, registers, and non-typed cmds
 set mouse=a                 " enable mouse in all modes
-set clipboard=unnamedplus   " use the system clipboard
 
 " < STATUSLINE > {{{
 set laststatus=2                " always show the status line
@@ -187,8 +185,8 @@ inoremap jk <ESC>
 inoremap kj <ESC>
 
 " stay in visual mode after left or right shift
-vnoremap [ <gv
-vnoremap ] >gv
+vnoremap < <gv
+vnoremap > >gv
 
 " make Y behave like C and D (yank from cursor to EOL)
 nnoremap Y y$
@@ -207,7 +205,7 @@ nnoremap <leader>O m`O<esc>``
 
 " If the unnamed register contains a newline, adjust indent of the pasted text to match the indent around it.
 " Else, do a normal paste.
-function! MyPaste(char)
+function! MyPaste(char) abort
     if a:char ==? "p"
         if matchstr(@", "\n") == "\n"
             execute "normal! " . a:char . "=']"
@@ -226,6 +224,9 @@ endif
 
 " insert current datetime in ISO format
 inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
+
+" show git diff in a split (via fugitive)
+nnoremap <leader>gd :Gvdiffsplit<cr>
 
 " reformat associative php array
 " expand into multiple lines
@@ -267,7 +268,7 @@ cnoreabbrev vh vert h
 
 "COLORSCHEME TESTING
 " show highlight groups under cursor
-function! SynGrp()
+function! SynGrp() abort
     let l:synid = synID(line("."), col("."), 1)
     return "hi<" . synIDattr(l:synid,"name") . "> "
         \ . "trans<" . synIDattr(synID(line("."),col("."),0),"name") . "> "
