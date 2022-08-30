@@ -15,6 +15,7 @@ Plug 'tpope/vim-fugitive'
 Plug 'airblade/vim-gitgutter'
 Plug 'morhetz/gruvbox'
 Plug 'preservim/nerdcommenter'
+Plug 'andrewradev/splitjoin.vim'
 Plug 'tpope/vim-surround'
 Plug 'ervandew/supertab'
 call plug#end()
@@ -114,6 +115,7 @@ autocmd BufWritePost * GitGutter
 
 " << SEARCH >> {{{
 
+set hlsearch						" highlight search
 set incsearch                       " search as chars are entered
 set ignorecase smartcase            " if search string is all lc, ignore case. else, case-sensitive.
 set wildmenu                        " enhance cmd-line completion
@@ -185,8 +187,8 @@ inoremap jk <ESC>
 inoremap kj <ESC>
 
 " stay in visual mode after left or right shift
-vnoremap < <gv
-vnoremap > >gv
+vnoremap [ <gv
+vnoremap ] >gv
 
 " make Y behave like C and D (yank from cursor to EOL)
 nnoremap Y y$
@@ -219,20 +221,29 @@ nnoremap <leader>P :call MyPaste("P")<cr>
 
 " better line joins
 if v:version > 703 || v:version == 703 && has('patch541')
-    set formatoptions+=j
+    "set formatoptions+=j
 endif
 
 " insert current datetime in ISO format
 inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
-
-" show git diff in a split (via fugitive)
-nnoremap <leader>gd :Gvdiffsplit<cr>
 
 " reformat associative php array
 " expand into multiple lines
 ":'<,'>s/\[/\[\r/|s/=>/ => /g|s/, /,\r/g|s/\]/,\r\]/
 " collapse into one line
 ":'<,'>s/\n\s*/ /g|s/ => /=>/g|s/, \]/\]/g
+
+" splitjoin settings
+let g:splitjoin_split_mapping = ''
+let g:splitjoin_join_mapping = ''
+" gj splits down and gk joins up
+nnoremap gj :SplitjoinSplit<cr>
+nnoremap gk :SplitjoinJoin<cr>
+let g:splitjoin_curly_brace_padding = 0
+let g:splitjoin_trailing_comma = 1
+let g:splitjoin_python_brackets_on_separate_lines = 1
+let g:splitjoin_html_attributes_bracket_on_new_line = 1
+let g:splitjoin_php_method_chain_full = 1
 
 " }}}
 

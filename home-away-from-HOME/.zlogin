@@ -1,9 +1,7 @@
+# https://www.fancytextpro.com/BigTextGenerator/Cyberlarge
 cat << EOF
-    _____                _
-   /__   \/\   /\_______| |__
-     / /\/\ \ / /_  / __|  _ \\
-    / /    \ V / / /\__ \ | | |
-    \/      \_/ /___|___/_| |_|
-
-https://tvprograms.tech
+ _______ _    _ _______ _     _
+    |     \  /  |______ |_____|
+    |      \/   ______| |     |
+https://www.tvprograms.tech
 EOF
