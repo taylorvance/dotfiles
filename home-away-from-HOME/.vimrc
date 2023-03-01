@@ -9,15 +9,18 @@ if empty(glob('~/.vim/autoload/plug.vim'))
 endif
 
 call plug#begin('~/.vim/plugged')
-Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
+"Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'github/copilot.vim'
+Plug 'junegunn/fzf', {'do': { -> fzf#install() }}
 Plug 'junegunn/fzf.vim'
 Plug 'tpope/vim-fugitive'
 Plug 'airblade/vim-gitgutter'
 Plug 'morhetz/gruvbox'
 Plug 'preservim/nerdcommenter'
+Plug 'tpope/vim-repeat'
 Plug 'andrewradev/splitjoin.vim'
 Plug 'tpope/vim-surround'
-Plug 'ervandew/supertab'
+Plug 'posva/vim-vue'
 call plug#end()
 
 
@@ -134,7 +137,7 @@ nnoremap / /\V
 
 " fzf
 " if in git repo, search git files; else, all files
-nnoremap <c-t> :execute system('git rev-parse --is-inside-work-tree') =~ 'true' ? 'GFiles' : 'Files'<cr>
+nnoremap <c-t> :execute system('git rev-parse --is-inside-work-tree') =~ 'true' ? 'GFiles --cached --others --exclude-standard' : 'Files'<cr>
 " find text in open files
 nnoremap <c-f> :Lines<cr>
 
@@ -149,6 +152,9 @@ set scrolloff=3         " keep a 3-line pad above and below the cursor
 nnoremap k gk
 nnoremap j gj
 
+" don't require shift for moving to the beginning of the next line (-/+ navigation without shift)
+nnoremap = +
+
 " center vertically when scroll jumping
 noremap <c-u> <c-u>zz
 noremap <c-d> <c-d>zz
@@ -157,7 +163,7 @@ noremap <c-d> <c-d>zz
 noremap H ^
 noremap L $
 
-" use tab to move to matching bracket
+" use tab to move to matching bracket in modes: Normal, Visual, Select, Operator-pending
 noremap <tab> %
 
 " list buffers
@@ -245,6 +251,14 @@ let g:splitjoin_python_brackets_on_separate_lines = 1
 let g:splitjoin_html_attributes_bracket_on_new_line = 1
 let g:splitjoin_php_method_chain_full = 1
 
+" CoC: enable github copilot
+"let g:coc_global_extensions = ['coc-copilot']
+" CoC: use j/k instead of n/p to navigate options - https://github.com/neoclide/coc.nvim/wiki/Completion-with-sources#use-tab-and-s-tab-to-navigate-the-completion-list
+"inoremap <expr> <c-j> coc#pum#visible() ? coc#pum#next(1) : "\<c-j>"
+"inoremap <expr> <c-k> coc#pum#visible() ? coc#pum#prev(1) : "\<c-k>"
+" CoC: tab selects and confirms the first option - https://github.com/neoclide/coc.nvim/wiki/Completion-with-sources#use-cr-to-confirm-completion
+"inoremap <silent><expr> <tab> coc#pum#visible() ? coc#_select_confirm() : "\<c-g>u\<tab>"
+
 " }}}
 
 
@@ -275,6 +289,9 @@ nnoremap <leader>sv :source $MYVIMRC<cr>
 
 " open help docs in vertical split
 cnoreabbrev vh vert h
+
+" disable keyword lookup
+nnoremap K <Nop>
 
 
 "COLORSCHEME TESTING
