@@ -10,7 +10,8 @@ endif
 
 call plug#begin('~/.vim/plugged')
 "Plug 'neoclide/coc.nvim', {'branch': 'release'}
-Plug 'github/copilot.vim'
+Plug 'Exafunction/codeium.vim'
+"Plug 'github/copilot.vim'
 Plug 'junegunn/fzf', {'do': { -> fzf#install() }}
 Plug 'junegunn/fzf.vim'
 Plug 'tpope/vim-fugitive'
@@ -32,11 +33,11 @@ set encoding=utf-8
 " << UI >> {{{
 
 colorscheme gruvbox
-set background=dark         " use dark background (duh)
+set background=dark         " dark mode
 set number                  " show line number of current line...
 set relativenumber          " ...and relative line number of other lines
 set cursorline              " highlight current line
-set synmaxcol=1000          " max column to syntax-highlight (for performance)
+set synmaxcol=1000          " max column to syntax-highlight (impacts performance)
 set showcmd                 " show prev cmd in bottom
 set showmode                " if in Insert, Replace, or Visual mode, show in bottom left
 set showmatch               " highlight matching bracket
@@ -46,27 +47,26 @@ set linebreak               " don't break words when wrapping
 set visualbell              " no beep
 set lazyredraw              " prevents redraw for macros, registers, and non-typed cmds
 set mouse=a                 " enable mouse in all modes
+set splitright				" open vertical split panes to the right
 
 " < STATUSLINE > {{{
-set laststatus=2                " always show the status line
+set laststatus=2	" always show the status line
 set statusline=
-set statusline+=%1*\ %y%*       " file type
-set statusline+=%2*\ \ %f%*     " relative filepath
-set statusline+=%3*\ \ %m%*     " modified flag
-"set statusline+=%{(synIDattr(synID(line("."),col("."),1),"name"))}
-"set statusline+=%{SynGrp()}        " TEMP syntax group under cursor
-set statusline+=%4*%=%*         " switch to right side
-set statusline+=%5*%c%V%*       " col num and virtual col num
-set statusline+=%6*\ \ %l/%L%*  " line num and total lines
-set statusline+=%7*\ (%p%%)%*   " percentage through file
+set statusline+=%2*%y%*									" file type
+set statusline+=%1*\ \ %f%*								" relative filepath
+set statusline+=%3*\ \ %{codeium#GetStatusString()}%*	" Codeium status
+set statusline+=%4*\ \ %m%*								" modified flag
+set statusline+=%1*%=%*									" switch to right side
+set statusline+=%1*%c%V%*								" col num and virtual col num
+set statusline+=%1*\ \ %l/%L%*							" line num and total lines
+set statusline+=%1*\ \ (%p%%)%*							" percentage through file
 " statusline coloring
-highlight User1 ctermbg=0 ctermfg=8
-highlight User2 ctermbg=0 ctermfg=7
-highlight User3 ctermbg=0 ctermfg=9 cterm=bold
-highlight User4 ctermbg=0
-highlight User5 ctermbg=0 ctermfg=12
-highlight User6 ctermbg=0 ctermfg=7
-highlight User7 ctermbg=0 ctermfg=8
+highlight User1 ctermbg=0 ctermfg=7					" silver
+highlight User2 ctermbg=0 ctermfg=8					" gray
+highlight User3 ctermbg=0 ctermfg=6					" cyan
+highlight User4 ctermbg=0 ctermfg=9 cterm=bold		" red
+" make the warning message more noticeable
+highlight WarningMsg ctermbg=167 ctermfg=235 cterm=bold
 " }}}
 
 " tabs are 4 columns wide, each indentation level is one tab
@@ -258,6 +258,14 @@ let g:splitjoin_php_method_chain_full = 1
 "inoremap <expr> <c-k> coc#pum#visible() ? coc#pum#prev(1) : "\<c-k>"
 " CoC: tab selects and confirms the first option - https://github.com/neoclide/coc.nvim/wiki/Completion-with-sources#use-cr-to-confirm-completion
 "inoremap <silent><expr> <tab> coc#pum#visible() ? coc#_select_confirm() : "\<c-g>u\<tab>"
+
+"let g:copilot_filetypes = {'yaml': v:true, 'yml': v:true}
+
+" Codeium
+imap <script><silent><nowait><expr> <C-g> codeium#Accept()
+imap <c-j> <Cmd>call codeium#CycleCompletions(1)<CR>
+imap <c-k> <Cmd>call codeium#CycleCompletions(-1)<CR>
+imap <c-x> <Cmd>call codeium#Clear()<CR>
 
 " }}}
 
