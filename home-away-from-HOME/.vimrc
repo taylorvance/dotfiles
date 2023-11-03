@@ -104,8 +104,6 @@ function! ToggleGutter()
         :GitGutterEnable
     endif
 endfunction
-" ignore whitespace changes
-let g:gitgutter_diff_args = '-w'
 " make gitgutter less of a resource hog
 let g:gitgutter_realtime = 0
 let g:gitgutter_eager = 0
@@ -190,7 +188,13 @@ nnoremap <leader>q :q<cr>
 
 " hit j and k (order doesn't matter) to escape insert mode
 inoremap jk <ESC>
+inoremap Jk <ESC>
+inoremap jK <ESC>
+inoremap JK <ESC>
 inoremap kj <ESC>
+inoremap Kj <ESC>
+inoremap kJ <ESC>
+inoremap KJ <ESC>
 
 " stay in visual mode after left or right shift
 vnoremap [ <gv
