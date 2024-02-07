@@ -124,7 +124,7 @@ set wildmode=list:longest,full      " list matches, tab-complete to longest comm
 set wildignore+=*/node_modules/*,*/vendor/*
 
 " quickly clear highlighted search terms
-nnoremap <silent> <leader><leader> :nohlsearch<cr>
+nnoremap <silent> <space><space> :nohlsearch<cr>
 
 " n always goes forward, N always goes backward
 nnoremap <expr> n (v:searchforward ? 'n' : 'N')
