@@ -124,7 +124,7 @@ set wildmode=list:longest,full      " list matches, tab-complete to longest comm
 set wildignore+=*/node_modules/*,*/vendor/*
 
 " quickly clear highlighted search terms
-nnoremap <silent> <leader><space> :noh<cr>
+nnoremap <silent> <leader><leader> :nohlsearch<cr>
 
 " n always goes forward, N always goes backward
 nnoremap <expr> n (v:searchforward ? 'n' : 'N')
@@ -157,9 +157,11 @@ nnoremap = +
 noremap <c-u> <c-u>zz
 noremap <c-d> <c-d>zz
 
-" go to beginning/end of line rather than the window (horizonal rather than vertical)
-noremap H ^
-noremap L $
+" ctrl-movement jumps
+noremap <c-h> ^
+noremap <c-j> <c-d>
+noremap <c-k> <c-u>
+noremap <c-l> $
 
 " use tab to move to matching bracket in modes: Normal, Visual, Select, Operator-pending
 noremap <tab> %
@@ -186,7 +188,7 @@ set backspace=indent,eol,start          " allow backspacing
 nnoremap <leader>w :w<cr>
 nnoremap <leader>q :q<cr>
 
-" hit j and k (order doesn't matter) to escape insert mode
+" hit j and k (order and case don't matter) to escape insert mode
 inoremap jk <ESC>
 inoremap Jk <ESC>
 inoremap jK <ESC>

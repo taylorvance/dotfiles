@@ -82,11 +82,11 @@ PROMPT+=' %(?.%F{green}%#%f.%F{red}%#%f) '
 PROMPT2='   %F{cyan}>%f '
 
 # Right prompt
-RPROMPT=''
+#RPROMPT=''
 # green √ or red X (last cmd's status)
-RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b'
+#RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b'
 # timestamp of previous command
-RPROMPT+=' $ZSH_THEME_PROMPT_CMD_TIME'
+#RPROMPT+=' $ZSH_THEME_PROMPT_CMD_TIME'
 
 # Reset prompt when switching modes
 function zle-line-init zle-keymap-select {
