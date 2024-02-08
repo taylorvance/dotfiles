@@ -159,8 +159,8 @@ noremap <c-d> <c-d>zz
 
 " ctrl-movement jumps
 noremap <c-h> ^
-noremap <c-j> <c-d>
-noremap <c-k> <c-u>
+noremap <c-j> <c-d>zz
+noremap <c-k> <c-u>zz
 noremap <c-l> $
 
 " use tab to move to matching bracket in modes: Normal, Visual, Select, Operator-pending
@@ -321,3 +321,10 @@ endfunc
 "nnoremap <leader>c :color colortv<cr>
 
 " }}}
+
+
+" TEMPORARY HABIT BREAKERS
+nnoremap H <nop>
+nnoremap L <nop>
+nnoremap <c-d> <nop>
+nnoremap <c-u> <nop>
