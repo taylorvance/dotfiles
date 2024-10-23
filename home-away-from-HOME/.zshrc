@@ -1,6 +1,9 @@
 # Taylor Vance
 
 
+# Use Homebrew before system default.
+export PATH=/usr/local/bin:$PATH
+
 # Auto-install Antigen
 if [[ ! -f $HOME/.zsh/antigen.zsh ]]; then
 	mkdir -p $HOME/.zsh
@@ -101,3 +104,20 @@ ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
 preexec () {
 	ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
 }
+
+
+# MISC
+alias python='python3'
+export PATH="/Users/taylorvance/.local/bin:$PATH"
+#poetry completions zsh > ~/.zfunc/_poetry
+#fpath+=~/.zfunc
+#autoload -Uz compinit && compinit
+
+
+# These lines were added by serverless framework setup (I opted for tab completion).
+# tabtab source for packages
+# uninstall by removing these lines
+[[ -f ~/.config/tabtab/__tabtab.zsh ]] && . ~/.config/tabtab/__tabtab.zsh || true
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+export FZF_DEFAULT_OPTS='--multi'

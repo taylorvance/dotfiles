@@ -9,9 +9,8 @@ if empty(glob('~/.vim/autoload/plug.vim'))
 endif
 
 call plug#begin('~/.vim/plugged')
-"Plug 'neoclide/coc.nvim', {'branch': 'release'}
-Plug 'Exafunction/codeium.vim'
-"Plug 'github/copilot.vim'
+"Plug 'Exafunction/codeium.vim'
+Plug 'github/copilot.vim'
 Plug 'junegunn/fzf', {'do': { -> fzf#install() }}
 Plug 'junegunn/fzf.vim'
 Plug 'tpope/vim-fugitive'
@@ -21,7 +20,11 @@ Plug 'preservim/nerdcommenter'
 Plug 'tpope/vim-repeat'
 Plug 'andrewradev/splitjoin.vim'
 Plug 'tpope/vim-surround'
-Plug 'posva/vim-vue'
+Plug 'yuezk/vim-js' " recommended by vim-jsx-pretty
+Plug 'mbbill/undotree'
+Plug 'HerringtonDarkholme/yats.vim' " adds TSX support to vim-jsx-pretty
+" or Plug 'leafgarland/typescript-vim' " alternative to yats.vim
+Plug 'maxmellon/vim-jsx-pretty'
 call plug#end()
 
 
@@ -54,7 +57,7 @@ set laststatus=2	" always show the status line
 set statusline=
 set statusline+=%2*%y%*									" file type
 set statusline+=%1*\ \ %f%*								" relative filepath
-set statusline+=%3*\ \ %{codeium#GetStatusString()}%*	" Codeium status
+"set statusline+=%3*\ \ %{codeium#GetStatusString()}%*	" Codeium status
 set statusline+=%4*\ \ %m%*								" modified flag
 set statusline+=%1*%=%*									" switch to right side
 set statusline+=%1*%c%V%*								" col num and virtual col num
@@ -123,7 +126,7 @@ set wildmenu                        " enhance cmd-line completion
 set wildmode=list:longest,full      " list matches, tab-complete to longest common string, then tab through matches
 set wildignore+=*/node_modules/*,*/vendor/*
 
-" quickly clear highlighted search terms
+" clear highlighted search term
 nnoremap <silent> <space><space> :nohlsearch<cr>
 
 " n always goes forward, N always goes backward
@@ -139,6 +142,19 @@ nnoremap <c-t> :execute system('git rev-parse --is-inside-work-tree') =~ 'true' 
 " find text in open files
 nnoremap <c-f> :Lines<cr>
 
+" git grep the word under the cursor
+function! GrepCword()
+	" Get the word under the cursor.
+	let l:searchtext = expand('<cword>')
+	" Set the search pattern to match the whole word.
+	let @/ = '\V\<'.l:searchtext.'\>'
+	set hlsearch
+	" Run git grep.
+	execute 'G g '.shellescape(l:searchtext)
+endfunction
+nnoremap <silent> <leader>g :call GrepCword()<cr>n
+
+
 " }}}
 
 
@@ -153,10 +169,6 @@ nnoremap j gj
 " don't require shift for moving to the beginning of the next line (-/+ navigation without shift)
 nnoremap = +
 
-" center vertically when scroll jumping
-noremap <c-u> <c-u>zz
-noremap <c-d> <c-d>zz
-
 " ctrl-movement jumps
 noremap <c-h> ^
 noremap <c-j> <c-d>zz
@@ -170,11 +182,10 @@ noremap <tab> %
 nnoremap gb :Buffers<cr>
 " go to buffer last seen in this window (aka alternate file)
 nnoremap <c-b> <c-^>
-" unload current buffer
-nnoremap <leader>bd :bd<cr>
+" delete current buffer
+nnoremap <leader>bd :bdelete<cr>
 
-" go to mark (ain't nobody got time for backtick)
-noremap gm `
+nnoremap <c-u> :UndotreeToggle<cr>
 
 " }}}
 
@@ -189,14 +200,14 @@ nnoremap <leader>w :w<cr>
 nnoremap <leader>q :q<cr>
 
 " hit j and k (order and case don't matter) to escape insert mode
-inoremap jk <ESC>
-inoremap Jk <ESC>
-inoremap jK <ESC>
-inoremap JK <ESC>
-inoremap kj <ESC>
-inoremap Kj <ESC>
-inoremap kJ <ESC>
-inoremap KJ <ESC>
+inoremap jk <esc>
+inoremap Jk <esc>
+inoremap jK <esc>
+inoremap JK <esc>
+inoremap kj <esc>
+inoremap Kj <esc>
+inoremap kJ <esc>
+inoremap KJ <esc>
 
 " stay in visual mode after left or right shift
 vnoremap [ <gv
@@ -231,6 +242,9 @@ endfunction
 nnoremap <leader>p :call MyPaste("p")<cr>
 nnoremap <leader>P :call MyPaste("P")<cr>
 
+" better indenting for react
+autocmd FileType javascriptreact,typescriptreact setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+
 " better line joins
 if v:version > 703 || v:version == 703 && has('patch541')
     "set formatoptions+=j
@@ -238,6 +252,9 @@ endif
 
 " insert current datetime in ISO format
 inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
+
+" exclude $ from word boundaries
+autocmd FileType php setlocal iskeyword-=$
 
 " reformat associative php array
 " expand into multiple lines
@@ -257,21 +274,18 @@ let g:splitjoin_python_brackets_on_separate_lines = 1
 let g:splitjoin_html_attributes_bracket_on_new_line = 1
 let g:splitjoin_php_method_chain_full = 1
 
-" CoC: enable github copilot
-"let g:coc_global_extensions = ['coc-copilot']
-" CoC: use j/k instead of n/p to navigate options - https://github.com/neoclide/coc.nvim/wiki/Completion-with-sources#use-tab-and-s-tab-to-navigate-the-completion-list
-"inoremap <expr> <c-j> coc#pum#visible() ? coc#pum#next(1) : "\<c-j>"
-"inoremap <expr> <c-k> coc#pum#visible() ? coc#pum#prev(1) : "\<c-k>"
-" CoC: tab selects and confirms the first option - https://github.com/neoclide/coc.nvim/wiki/Completion-with-sources#use-cr-to-confirm-completion
-"inoremap <silent><expr> <tab> coc#pum#visible() ? coc#_select_confirm() : "\<c-g>u\<tab>"
-
-"let g:copilot_filetypes = {'yaml': v:true, 'yml': v:true}
-
 " Codeium
-imap <script><silent><nowait><expr> <C-g> codeium#Accept()
-imap <c-j> <Cmd>call codeium#CycleCompletions(1)<CR>
-imap <c-k> <Cmd>call codeium#CycleCompletions(-1)<CR>
-imap <c-x> <Cmd>call codeium#Clear()<CR>
+"imap <script><silent><nowait><expr> <C-g> codeium#Accept()
+"imap <c-j> <Cmd>call codeium#CycleCompletions(1)<CR>
+"imap <c-k> <Cmd>call codeium#CycleCompletions(-1)<CR>
+"imap <c-x> <Cmd>call codeium#Clear()<CR>
+
+" Github Copilot
+imap <c-j> <plug>(copilot-next)
+imap <c-k> <plug>(copilot-previous)
+imap <c-l> <plug>(copilot-accept-line)
+imap <c-c> <plug>(copilot-suggest)
+imap <c-x> <plug>(copilot-dismiss)
 
 " }}}
 
@@ -290,7 +304,7 @@ endif
 " // stores the path in the filename, to avoid conflicts
 set directory^=$HOME/.vim/swapfiles//
 
-" centralized persistent undo files
+" centralized undo files
 if !isdirectory($HOME."/.vim/undodir")
     call mkdir($HOME."/.vim/undodir", "p")
 endif
@@ -305,7 +319,7 @@ nnoremap <leader>sv :source $MYVIMRC<cr>
 cnoreabbrev vh vert h
 
 " disable keyword lookup
-nnoremap K <Nop>
+nnoremap K <nop>
 
 
 "COLORSCHEME TESTING
@@ -321,10 +335,3 @@ endfunc
 "nnoremap <leader>c :color colortv<cr>
 
 " }}}
-
-
-" TEMPORARY HABIT BREAKERS
-nnoremap H <nop>
-nnoremap L <nop>
-nnoremap <c-d> <nop>
-nnoremap <c-u> <nop>
