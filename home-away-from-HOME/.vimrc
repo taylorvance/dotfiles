@@ -18,10 +18,8 @@ Plug 'airblade/vim-gitgutter'
 Plug 'morhetz/gruvbox'
 Plug 'preservim/nerdcommenter'
 Plug 'tpope/vim-repeat'
-Plug 'andrewradev/splitjoin.vim'
 Plug 'tpope/vim-surround'
 Plug 'yuezk/vim-js' " recommended by vim-jsx-pretty
-Plug 'mbbill/undotree'
 Plug 'HerringtonDarkholme/yats.vim' " adds TSX support to vim-jsx-pretty
 " or Plug 'leafgarland/typescript-vim' " alternative to yats.vim
 Plug 'maxmellon/vim-jsx-pretty'

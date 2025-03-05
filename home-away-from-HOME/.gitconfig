@@ -1,15 +1,15 @@
 [alias]
-    st = status
-    di = diff
-    ci = commit
-    br = branch
-    co = checkout
-    g = grep --break --heading --line-number
-    lg = log --color --graph --pretty=format:'%Cred%h%Creset - %s %C(yellow)%d%Creset %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+	st = status
+	di = diff
+	ci = commit
+	br = branch
+	co = checkout
+	g = grep --break --heading --line-number
+	lg = log --graph --pretty=format:'%Cred%h%Creset - %s %Cgreen(%cr) %C(bold blue)<%an>%Creset %C(yellow)%d%Creset' --abbrev-commit
 [user]
-    name = Taylor Vance
+	name = Taylor Vance
 [grep]
-    extendRegexp = true
-    lineNumber = true
+	extendRegexp = true
+	lineNumber = true
 [core]
-    editor = vim
+	editor = nvim

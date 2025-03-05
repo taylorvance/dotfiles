@@ -2,7 +2,8 @@
 
 
 # Use Homebrew before system default.
-export PATH=/usr/local/bin:$PATH
+export PATH=/opt/homebrew/bin:$PATH
+#export PATH=/usr/local/bin:$PATH
 
 # Auto-install Antigen
 if [[ ! -f $HOME/.zsh/antigen.zsh ]]; then
