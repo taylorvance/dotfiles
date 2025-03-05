@@ -23,8 +23,8 @@ set foldlevelstart=10       " fold very nested indents by default
 set foldmethod=indent       " fold based on indent level
 " fold by marker for vim files
 augroup filetype_vim
-    autocmd!
-    autocmd FileType vim setlocal foldmethod=marker
+	autocmd!
+	autocmd FileType vim setlocal foldmethod=marker
 augroup END
 " toggle fold
 nnoremap <leader>f za
@@ -33,18 +33,19 @@ nnoremap <leader>f za
 " < GITGUTTER > {{{
 " refresh on save
 autocmd BufWritePost * GitGutter
+
 " toggle number and gitgutter columns (useful for copying text to paste)
 nnoremap <leader>nn <cmd>call ToggleGutter()<cr>
 function! ToggleGutter()
 	" if any of the gutters are enabled, disables all of them
 	" else, enables all of them
-    if &number || &relativenumber || g:gitgutter_enabled
-        set nonumber norelativenumber
-        :GitGutterDisable
-    else
-        set number relativenumber
-        :GitGutterEnable
-    endif
+	if &number || &relativenumber || g:gitgutter_enabled
+		set nonumber norelativenumber
+		execute 'GitGutterDisable'
+	else
+		set number relativenumber
+		execute 'GitGutterEnable'
+	endif
 endfunction
 " }}}
 
@@ -66,8 +67,18 @@ nnoremap <expr> N (v:searchforward ? 'N' : 'n')
 "nnoremap / /\V
 
 " find files
-" TODO if in a git repo, do Telescope git_files, else do Telescope find_files
-nnoremap <c-t> <cmd>Telescope find_files<cr>
+nnoremap <c-t> <cmd>call ProjectFiles()<cr>
+function! ProjectFiles()
+	" if in a git repo, search git files
+	" else search all files
+	let l:git_dir = finddir('.git', '.;')
+	if l:git_dir != ''
+		execute 'Telescope git_files'
+	else
+		" show hidden files, follow symlinks, exclude some files
+		execute 'Telescope find_files find_command=fd,--type,f,--hidden,--follow,--exclude,.git,--exclude,.DS_Store'
+	endif
+endfunction
 
 " git grep the word under the cursor
 function! GrepCword()

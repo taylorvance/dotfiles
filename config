@@ -1,6 +1,7 @@
 .config/nvim/README.md
 .config/nvim/init.vim
-.config/nvim/lua/
+.config/nvim/lua/config/lazy.lua
+.config/nvim/lua/plugins/init.lua
 .gitconfig
 .tmux.conf
 .vim/colors/4bit.vim

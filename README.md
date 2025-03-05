@@ -24,9 +24,11 @@ Simply clone the repo and run the install script.
 git clone https://github.com/taylorvance/dotfiles.git && ./dotfiles/install
 ```
 
-This will create symlinks in your home directory for everything located in `dotfiles/home-away-from-HOME/` and configured in `dotfiles/config`. If there are any conflicts, your original files will be backed up in `dotfiles/backups/`.
+This will create symlinks in your home directory for everything located in `dotfiles/home-away-from-HOME/` and configured in `dotfiles/config`. If there are any conflicts\*, your original files will be backed up in `dotfiles/backups/`.
 
 Installation is [idempotent](https://en.wikipedia.org/wiki/Idempotence), which is a [word](https://github.com/anishathalye/dotfiles) [that](https://medium.com/@webprolific/getting-started-with-dotfiles-43c3602fd789) [dotfile](https://umanovskis.se/blog/post/dotfiles/) [authors](https://www.geekytidbits.com/dotfiles/) [love](https://unhexium.net/dotfiles/the-dotfile-drama/) [to](https://bananamafia.dev/post/dotfile-deployment/) [flaunt](https://www.evanjones.ca/dotfiles-personal-software-configuration.html).
+
+*\* If the file has already been installed/symlinked, it will be skipped. You will not lose local changes to installed files.*
 
 ### Adding new dotfiles
 
