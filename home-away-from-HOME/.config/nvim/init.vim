@@ -117,7 +117,7 @@ noremap <c-l> $
 " use tab to move to matching bracket in modes: Normal, Visual, Select, Operator-pending
 noremap <tab> %
 
-" list open buffers
+" list open buffers (excluding current), sorted by most recently used
 nnoremap gb <cmd>Telescope buffers sort_mru=true ignore_current_buffer=true<cr>
 " jumplist (recently visited locations)
 nnoremap gj <cmd>Telescope jumplist<cr>
@@ -132,8 +132,6 @@ nnoremap <leader>bd <cmd>bdelete<cr>
 nnoremap gd <cmd>Telescope lsp_definitions<cr>
 " go to references
 nnoremap gr <cmd>Telescope lsp_references<cr>
-" diable diagnostics
-"lua vim.diagnostic.enable(false)
 
 " }}}
 

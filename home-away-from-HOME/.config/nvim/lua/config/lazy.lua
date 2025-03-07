@@ -18,7 +18,10 @@ vim.opt.rtp:prepend(lazypath)
 -- Setup lazy.nvim
 require("lazy").setup({
 	spec = {
-		{ import = "plugins" }, -- loads plugins/init.lua (and other files in plugins/ (?))
+		{ import = "plugins" }, -- loads plugins/init.lua (and other files in plugins/*.lua (?))
 	},
-	checker = { enabled = true },
+	checker = {
+		enabled = true,
+		notify = false,
+	},
 })

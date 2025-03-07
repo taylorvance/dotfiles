@@ -18,9 +18,14 @@ return {
 					},
 					'diff',
 					{'diagnostics',
-						on_click = function()
-							-- toggle diagnostics
-							vim.diagnostic.enable(not vim.diagnostic.is_enabled())
+						on_click = function(_, _, mod)
+							if mod:find('s') then
+								-- open telescope diagnostics
+								require('telescope.builtin').diagnostics()
+							else
+								-- toggle diagnostics
+								vim.diagnostic.enable(not vim.diagnostic.is_enabled())
+							end
 						end,
 					},
 				},
