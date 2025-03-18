@@ -191,7 +191,5 @@ nnoremap <space> <nop>
 " use c-j and c-k instead of c-n and c-p for menu navigation
 cnoremap <c-j> <c-n>
 cnoremap <c-k> <c-p>
-inoremap <expr> <c-j> pumvisible() ? "\<c-n>" : "\<c-j>"
-inoremap <expr> <c-k> pumvisible() ? "\<c-p>" : "\<c-k>"
 
 " }}}
