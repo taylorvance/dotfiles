@@ -1,5 +1,56 @@
 return {
-	'github/copilot.vim',
+	{'hrsh7th/nvim-cmp',
+		dependencies = {'hrsh7th/cmp-nvim-lsp', 'zbirenbaum/copilot-cmp'},
+		event = {'InsertEnter'},
+		config = function()
+			local cmp = require('cmp')
+			cmp.setup({
+				snippet = {
+					expand = function(args)
+						vim.snippet.expand(args.body)
+					end,
+				},
+				window = {
+					-- add borders to the cmp window
+					completion = cmp.config.window.bordered(),
+					-- show documentation in a separate window
+					documentation = cmp.config.window.bordered(),
+				},
+				mapping = cmp.mapping.preset.insert({
+					['<c-space>'] = cmp.mapping.complete(),
+					['<c-j>'] = cmp.mapping.select_next_item(),
+					['<c-k>'] = cmp.mapping.select_prev_item(),
+					['<cr>'] = cmp.mapping.confirm({ select=true }),
+					['<esc>'] = cmp.mapping.abort(),
+				}),
+				sources = cmp.config.sources({
+					{ name='copilot' },
+					{ name='nvim_lsp' },
+				}),
+			})
+		end,
+	},
+	{'zbirenbaum/copilot.lua',
+		cmd = 'Copilot',
+		event = 'InsertEnter',
+		config = function()
+			require('copilot').setup({
+				suggestion = {
+					auto_trigger = true,
+					keymap = {
+						accept = '<tab>',
+						accept_line = '<c-l>',
+					},
+				},
+			})
+		end,
+	},
+	{'zbirenbaum/copilot-cmp',
+		dependencies = {'hrsh7th/nvim-cmp', 'zbirenbaum/copilot.lua'},
+		config = function()
+			require('copilot_cmp').setup()
+		end,
+	},
 	'tpope/vim-fugitive',
 	'airblade/vim-gitgutter',
 	{'nvim-lualine/lualine.nvim',
@@ -37,9 +88,9 @@ return {
 	{'williamboman/mason.nvim',
 		dependencies = {'williamboman/mason-lspconfig.nvim','neovim/nvim-lspconfig'},
 		config = function()
-			-- Setup Mason (LSP installer)
+			-- Set up Mason (LSP installer)
 			require('mason').setup()
-			-- Setup Mason-LSPConfig bridge
+			-- Set up Mason-LSPConfig bridge
 			require('mason-lspconfig').setup({
 				--                   python    php            c#          vim     lua
 				ensure_installed = {'pyright','intelephense','omnisharp','vimls','lua_ls'},

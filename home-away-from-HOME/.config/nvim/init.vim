@@ -177,13 +177,6 @@ nnoremap <leader>O m`O<esc>``
 " insert current datetime
 inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
 
-" Github Copilot
-imap <c-j> <plug>(copilot-next)
-imap <c-k> <plug>(copilot-previous)
-imap <c-l> <plug>(copilot-accept-line)
-imap <c-c> <plug>(copilot-suggest)
-imap <c-x> <plug>(copilot-dismiss)
-
 " }}}
 
 
@@ -192,5 +185,13 @@ imap <c-x> <plug>(copilot-dismiss)
 " quickly edit and reload this file
 nnoremap <leader>ev <cmd>edit $MYVIMRC<cr>
 nnoremap <leader>sv <cmd>source $MYVIMRC<cr>
+
+nnoremap <space> <nop>
+
+" use c-j and c-k instead of c-n and c-p for menu navigation
+cnoremap <c-j> <c-n>
+cnoremap <c-k> <c-p>
+inoremap <expr> <c-j> pumvisible() ? "\<c-n>" : "\<c-j>"
+inoremap <expr> <c-k> pumvisible() ? "\<c-p>" : "\<c-k>"
 
 " }}}

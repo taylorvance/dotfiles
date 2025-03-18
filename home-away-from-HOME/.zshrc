@@ -108,6 +108,7 @@ preexec () {
 
 
 # MISC
+
 alias python='python3'
 export PATH="/Users/taylorvance/.local/bin:$PATH"
 #poetry completions zsh > ~/.zfunc/_poetry
@@ -116,6 +117,10 @@ export PATH="/Users/taylorvance/.local/bin:$PATH"
 
 # Show hidden files and ignore common directories
 alias tree2='tree -a -I "node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|*.git|*.DS_Store|*.venv|*.env|obj|bin|lib|include|share|var|tmp|temp|cache|log|logs|backup|backups|build|dist"'
+
+# Use nvim as default editor
+export EDITOR=nvim
+export VISUAL=nvim
 
 
 # These lines were added by serverless framework setup (I opted for tab completion).
