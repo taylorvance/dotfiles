@@ -100,7 +100,18 @@ return {
 			local lspconfig = require('lspconfig')
 			require('mason-lspconfig').setup_handlers({
 				function(server_name)
-					lspconfig[server_name].setup({})
+					lspconfig[server_name].setup({
+						settings = {
+							intelephense = {
+								stubs = {
+									-- 2025-03-20 defaults per https://github.com/bmewburn/intelephense-docs/blob/master/gettingStarted.md#environment
+									'apache','bcmath','bz2','calendar','com_dotnet','Core','ctype','curl','date','dba','dom','enchant','exif','FFI','fileinfo','filter','fpm','ftp','gd','gettext','gmp','hash','iconv','imap','intl','json','ldap','libxml','mbstring','meta','mysqli','oci8','odbc','openssl','pcntl','pcre','PDO','pdo_ibm','pdo_mysql','pdo_pgsql','pdo_sqlite','pgsql','Phar','posix','pspell','readline','Reflection','session','shmop','SimpleXML','snmp','soap','sockets','sodium','SPL','sqlite3','standard','superglobals','sysvmsg','sysvsem','sysvshm','tidy','tokenizer','xml','xmlreader','xmlrpc','xmlwriter','xsl','Zend OPcache','zip','zlib',
+									-- adding mongodb to resolve "Undefined class \MongoDB\..."
+									'mongodb',
+								},
+							},
+						},
+					})
 				end
 			})
 		end,
