@@ -42,6 +42,15 @@ return {
 						accept_line = '<c-l>',
 					},
 				},
+				filetypes = {
+					yaml = true,
+					markdown = true,
+					gitcommit = true,
+					sh = function()
+						-- disable for ".env*" files
+						return not string.match(vim.fs.basename(vim.api.nvim_buf_get_name(0)), '^%.env.*')
+					end,
+				},
 			})
 		end,
 	},
@@ -90,15 +99,18 @@ return {
 		config = function()
 			-- Set up Mason (LSP installer)
 			require('mason').setup()
+
 			-- Set up Mason-LSPConfig bridge
-			require('mason-lspconfig').setup({
+			local mason_lspconfig = require('mason-lspconfig')
+			mason_lspconfig.setup({
 				--                   python    php            c#          vim     lua
 				ensure_installed = {'pyright','intelephense','omnisharp','vimls','lua_ls'},
 				automatic_installation = true,
 			})
+
 			-- Configure LSP servers automatically when they are installed
 			local lspconfig = require('lspconfig')
-			require('mason-lspconfig').setup_handlers({
+			mason_lspconfig.setup_handlers({
 				function(server_name)
 					lspconfig[server_name].setup({
 						settings = {
