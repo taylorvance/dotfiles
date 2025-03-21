@@ -38,7 +38,7 @@ return {
 				suggestion = {
 					auto_trigger = true,
 					keymap = {
-						accept = '<tab>',
+						-- accept=tab is handled below
 						accept_line = '<c-l>',
 					},
 				},
@@ -52,6 +52,16 @@ return {
 					end,
 				},
 			})
+
+			-- <tab> accepts the copilot suggestion or inserts a tab character if none
+			vim.keymap.set("i", "<tab>", function()
+				local copilot_suggestion = require('copilot.suggestion')
+				if copilot_suggestion.is_visible() then
+					copilot_suggestion.accept()
+				else
+					return "\t"
+				end
+			end, {expr=true, silent=true})
 		end,
 	},
 	{'zbirenbaum/copilot-cmp',
