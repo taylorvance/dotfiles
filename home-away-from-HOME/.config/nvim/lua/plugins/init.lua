@@ -5,15 +5,13 @@ return {
 		config = function()
 			local cmp = require('cmp')
 			cmp.setup({
-				snippet = {
+				snippet = { -- "you must specify a snippet engine"
 					expand = function(args)
 						vim.snippet.expand(args.body)
 					end,
 				},
-				window = {
-					-- add borders to the cmp window
+				window = { -- add borders and show documentation
 					completion = cmp.config.window.bordered(),
-					-- show documentation in a separate window
 					documentation = cmp.config.window.bordered(),
 				},
 				mapping = cmp.mapping.preset.insert({
@@ -22,6 +20,9 @@ return {
 					['<c-k>'] = cmp.mapping.select_prev_item(),
 					['<cr>'] = cmp.mapping.confirm({ select=true }),
 					['<esc>'] = cmp.mapping.abort(),
+					-- disable tab to avoid conflicts with copilot
+					['<tab>'] = nil,
+					['<s-tab>'] = nil,
 				}),
 				sources = cmp.config.sources({
 					{ name='copilot' },
