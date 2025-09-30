@@ -17,6 +17,11 @@ set splitright              " open vertical split panes to the right
 set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
 " better indenting for react
 autocmd FileType javascriptreact,typescriptreact setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+" use spaces for C# (dotnet)
+autocmd FileType cs setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+
+" use Telescope UI as the default vim.ui.select (move to plugin init file?)
+lua require("telescope").load_extension("ui-select")
 
 " < FOLDING > {{{
 set foldlevelstart=10       " fold very nested indents by default
@@ -28,25 +33,6 @@ augroup filetype_vim
 augroup END
 " toggle fold
 nnoremap <leader>f za
-" }}}
-
-" < GITGUTTER > {{{
-" refresh on save
-autocmd BufWritePost * GitGutter
-
-" toggle number and gitgutter columns (useful for copying text to paste)
-nnoremap <leader>nn <cmd>call ToggleGutter()<cr>
-function! ToggleGutter()
-	" if any of the gutters are enabled, disables all of them
-	" else, enables all of them
-	if &number || &relativenumber || g:gitgutter_enabled
-		set nonumber norelativenumber
-		execute 'GitGutterDisable'
-	else
-		set number relativenumber
-		execute 'GitGutterEnable'
-	endif
-endfunction
 " }}}
 
 " }}}
@@ -73,12 +59,15 @@ function! ProjectFiles()
 	" else search all files
 	let l:git_dir = finddir('.git', '.;')
 	if l:git_dir != ''
-		execute 'Telescope git_files'
+		execute 'Telescope git_files show_untracked=true'
 	else
 		" show hidden files, follow symlinks, exclude some files
 		execute 'Telescope find_files find_command=fd,--type,f,--hidden,--follow,--exclude,.git,--exclude,.DS_Store'
 	endif
 endfunction
+
+" find code
+nnoremap <c-f> <cmd>Telescope live_grep<cr>
 
 " git grep the word under the cursor
 function! GrepCword()
@@ -117,8 +106,8 @@ noremap <c-l> $
 " use tab to move to matching bracket in modes: Normal, Visual, Select, Operator-pending
 noremap <tab> %
 
-" list open buffers (excluding current), sorted by most recently used
-nnoremap gb <cmd>Telescope buffers sort_mru=true ignore_current_buffer=true<cr>
+" list open buffers, sorted by most recently used
+nnoremap gb <cmd>Telescope buffers sort_mru=true<cr>
 " jumplist (recently visited locations)
 nnoremap gj <cmd>Telescope jumplist<cr>
 " go to buffer last seen in this window (aka alternate file)
@@ -126,14 +115,11 @@ nnoremap <c-b> <c-^>
 " delete current buffer
 nnoremap <leader>bd <cmd>bdelete<cr>
 
-" < LSP Navigation > {{{
-
-" go to definition
-nnoremap gd <cmd>Telescope lsp_definitions<cr>
-" go to references
-nnoremap gr <cmd>Telescope lsp_references<cr>
-
-" }}}
+" restore cursor position when opening a file
+autocmd BufReadPost * if line("'\"")>0 && line("'\"")<=line("$") | exe "normal! g`\"" | endif
+" restore cursor position when switching buffers
+autocmd BufLeave * let b:prev_pos = getpos(".")
+autocmd BufEnter * if exists("b:prev_pos") | call setpos('.', b:prev_pos) | endif
 
 " }}}
 
@@ -177,6 +163,40 @@ nnoremap <leader>O m`O<esc>``
 " insert current datetime
 inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
 
+" yank into system clipboard
+nnoremap <leader>y "+y
+vnoremap <leader>y "+y
+
+" save as (dup file)
+command! -nargs=1 DupFile execute 'saveas' expand('%:h') . '/' . <q-args>
+
+" }}}
+
+
+" << LSP >> {{{
+
+" go to references
+nnoremap gr <cmd>Telescope lsp_references<cr>
+" go to definition
+nnoremap gd <cmd>Telescope lsp_definitions<cr>
+" go to type definition
+nnoremap gt <cmd>Telescope lsp_type_definitions<cr>
+" go to implementations
+nnoremap gi <cmd>Telescope lsp_implementations<cr>
+" go to document symbols
+nnoremap gs <cmd>Telescope lsp_document_symbols<cr>
+" go to workspace symbols
+nnoremap gS <cmd>Telescope lsp_workspace_symbols<cr>
+
+" code actions
+nnoremap ca <cmd>lua vim.lsp.buf.code_action()<cr>
+
+" Trouble diagnostics
+nnoremap <leader>xx <cmd>Trouble diagnostics open focus=true<cr>
+
+" show virtual text (inline diagnostic messages)
+lua vim.diagnostic.config({virtual_text=true})
+
 " }}}
 
 
@@ -185,11 +205,30 @@ inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
 " quickly edit and reload this file
 nnoremap <leader>ev <cmd>edit $MYVIMRC<cr>
 nnoremap <leader>sv <cmd>source $MYVIMRC<cr>
+" and jump to plugins
+nnoremap <leader>ep <cmd>edit ~/.config/nvim/lua/plugins/init.lua<cr>
 
 nnoremap <space> <nop>
 
 " use c-j and c-k instead of c-n and c-p for menu navigation
 cnoremap <c-j> <c-n>
 cnoremap <c-k> <c-p>
+
+" open a terminal
+nnoremap <leader>t <cmd>terminal<cr>
+" close terminal
+tnoremap <esc> <c-\><c-n>
+
+" quicker shell access
+nnoremap ! :!
+" quicker terminal access
+nnoremap % <cmd>split \| terminal<cr>
+
+" open copilot chat
+nnoremap <c-c> <cmd>CopilotChatToggle<cr>
+
+" git mergetool
+nnoremap <leader>[ :diffget LOCAL<cr>
+nnoremap <leader>] :diffget REMOTE<cr>
 
 " }}}

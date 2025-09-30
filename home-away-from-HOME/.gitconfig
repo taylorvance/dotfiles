@@ -1,3 +1,6 @@
+[user]
+	name = Taylor Vance
+
 [alias]
 	st = status
 	di = diff
@@ -6,10 +9,21 @@
 	co = checkout
 	g = grep --break --heading --line-number
 	lg = log --graph --pretty=format:'%Cred%h%Creset - %s %Cgreen(%cr) %C(bold blue)<%an>%Creset %C(yellow)%d%Creset' --abbrev-commit
-[user]
-	name = Taylor Vance
+
+[diff]
+	tool = nvimdiff
+[merge]
+	tool = nvimdiff
+[mergetool]
+	keepBackup = false
+
+[core]
+	editor = nvim
+	excludesFile = ~/.gitignore
+
 [grep]
 	extendRegexp = true
 	lineNumber = true
-[core]
-	editor = nvim
+
+[credential]
+	helper = osxkeychain

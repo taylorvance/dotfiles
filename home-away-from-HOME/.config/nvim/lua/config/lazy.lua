@@ -17,10 +17,15 @@ vim.opt.rtp:prepend(lazypath)
 
 -- Setup lazy.nvim
 require("lazy").setup({
-	spec = {
-		{ import = "plugins" }, -- loads plugins/init.lua (and other files in plugins/*.lua (?))
+	--lazy_support = true,--.idk why auto-session was complaining about this...
+	change_detection = { -- ie changes to my config files, not the plugin repos
+		enabled = true,
+		notify = false,
 	},
-	checker = {
+	spec = {
+		{import="plugins"}, -- loads plugins/init.lua (and other files in plugins/*.lua (?))
+	},
+	checker = { -- check for updates to plugin repos
 		enabled = true,
 		notify = false,
 	},
