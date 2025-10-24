@@ -24,6 +24,7 @@ antigen use oh-my-zsh
 # Load other plugins
 antigen bundle zsh-users/zsh-syntax-highlighting
 antigen bundle zsh-users/zsh-autosuggestions
+antigen bundle mfaerevaag/wd
 
 antigen apply
 
