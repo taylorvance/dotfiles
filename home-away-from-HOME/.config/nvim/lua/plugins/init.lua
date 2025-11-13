@@ -1,9 +1,11 @@
 return {
 	{'hrsh7th/nvim-cmp',
-		dependencies = {'hrsh7th/cmp-nvim-lsp', 'zbirenbaum/copilot-cmp'},
+		dependencies = {'hrsh7th/cmp-nvim-lsp'},
 		event = {'InsertEnter'},
 		config = function()
 			local cmp = require('cmp')
+			local sources = { { name = 'nvim_lsp', priority = 80 } }
+
 			cmp.setup({
 				snippet = { -- "you must specify a snippet engine"
 					expand = function(args)
@@ -14,73 +16,46 @@ return {
 					completion = cmp.config.window.bordered(),
 					documentation = cmp.config.window.bordered(),
 				},
+				experimental = {ghost_text=true},
+				completion = {keyword_length=0},  -- Trigger even with no characters typed
 				mapping = cmp.mapping.preset.insert({
 					['<c-space>'] = cmp.mapping.complete(),
 					['<c-j>'] = cmp.mapping.select_next_item(),
 					['<c-k>'] = cmp.mapping.select_prev_item(),
 					['<cr>'] = cmp.mapping.confirm({ select=true }),
 					['<esc>'] = cmp.mapping.abort(),
-					-- disable tab to avoid conflicts with copilot
-					['<tab>'] = nil,
-					['<s-tab>'] = nil,
 				}),
-				sources = cmp.config.sources({
-					{ name='copilot' },
-					{ name='nvim_lsp' },
-				}),
-			})
-		end,
-	},
-	{'zbirenbaum/copilot.lua',
-		cmd = 'Copilot',
-		event = 'InsertEnter',
-		config = function()
-			require('copilot').setup({
-				suggestion = {
-					auto_trigger = true,
-					keymap = {
-						-- accept=tab is handled below
-						accept_line = '<c-l>',
-					},
-				},
-				filetypes = {
-					yaml = true,
-					markdown = true,
-					gitcommit = true,
-					sh = function()
-						-- disable for ".env*" files
-						return not string.match(vim.fs.basename(vim.api.nvim_buf_get_name(0)), '^%.env.*')
-					end,
+				sources = cmp.config.sources(sources),
+				performance = {
+					debounce = 150,
+					throttle = 60,
+					fetching_timeout = 3000,
 				},
 			})
-
-			-- <tab> accepts the copilot suggestion or inserts a tab character if none
-			vim.keymap.set("i", "<tab>", function()
-				local copilot_suggestion = require('copilot.suggestion')
-				if copilot_suggestion.is_visible() then
-					copilot_suggestion.accept()
-				else
-					return "\t"
-				end
-			end, {expr=true, silent=true})
 		end,
 	},
-	{'zbirenbaum/copilot-cmp',
-		dependencies = {'hrsh7th/nvim-cmp', 'zbirenbaum/copilot.lua'},
-		config = function()
-			require('copilot_cmp').setup()
-		end,
-	},
-	{'CopilotC-Nvim/CopilotChat.nvim',
-		dependencies = {'zbirenbaum/copilot.lua', {'nvim-lua/plenary.nvim',branch='master'}},
-		build = 'make tiktoken',
+	{'meeehdi-dev/bropilot.nvim', -- ollama-based code completion (copilot-style inline suggestions)
+		--[[
+		-- `brew install ollama` to install Ollama
+		-- `ollama pull [model]` to download a model
+		-- `ollama serve` to start the server
+		-- `ollama list` to see available models
+		--]]
+		dependencies = {'nvim-lua/plenary.nvim', 'j-hui/fidget.nvim'},
 		opts = {
-			model = 'gpt-4o',
+			provider = 'ollama',
+			--model = 'deepseek-coder-v2:latest',
+			model = 'qwen2.5-coder:1.5b',
+			--model = 'codellama:7b-code',
+			keymap = {
+				suggest = '<c-y>',
+				accept_word = '<right>',
+				accept_line = '<s-right>',
+				accept_block = '<tab>',
+			},
 		},
 	},
 	'tpope/vim-fugitive',
-	--'airblade/vim-gitgutter',
-	'lewis6991/gitsigns.nvim',
 	{'lewis6991/gitsigns.nvim',
 		config = function()
 			require('gitsigns').setup({
@@ -281,11 +256,30 @@ return {
 			})
 		end,
 	},
+	{'mfussenegger/nvim-lint',
+		event = {'BufReadPost','BufNewFile'},
+		dependencies = {
+			{"rshkarin/mason-nvim-lint", opts={ensure_installed={"eslint_d","ruff"}}},
+		},
+		config = function()
+			local lint = require('lint')
+			lint.linters_by_ft = {
+				python = {'ruff'},
+				javascript = {'eslint_d'},
+				javascriptreact = {'eslint_d'},
+				typescript = {'eslint_d'},
+				typescriptreact = {'eslint_d'},
+			}
+			vim.api.nvim_create_autocmd({'BufWritePost'}, {
+				callback = function() lint.try_lint() end,
+			})
+		end,
+	},
 	'preservim/nerdcommenter',
 	'tpope/vim-repeat',
 	'tpope/vim-surround',
 	{'nvim-telescope/telescope.nvim',
-		tag = '0.1.8',
+		branch = 'master',
 		dependencies = {
 			'nvim-lua/plenary.nvim',
 			{'nvim-telescope/telescope-fzf-native.nvim', build='make'},

@@ -224,9 +224,6 @@ nnoremap ! :!
 " quicker terminal access
 nnoremap % <cmd>split \| terminal<cr>
 
-" open copilot chat
-nnoremap <c-c> <cmd>CopilotChatToggle<cr>
-
 " git mergetool
 nnoremap <leader>[ :diffget LOCAL<cr>
 nnoremap <leader>] :diffget REMOTE<cr>
