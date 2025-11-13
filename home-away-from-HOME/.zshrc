@@ -4,6 +4,9 @@
 # Use Homebrew before system default.
 export PATH=/opt/homebrew/bin:$PATH
 #export PATH=/usr/local/bin:$PATH
+export PATH=/opt/homebrew/opt/python@3.12/libexec/bin:$PATH
+# Custom scripts
+export PATH=$HOME/.local/bin:$PATH
 
 # Auto-install Antigen
 if [[ ! -f $HOME/.zsh/antigen.zsh ]]; then
@@ -49,6 +52,9 @@ bindkey "^[[3~" delete-char
 bindkey -M viins 'jk' vi-cmd-mode
 bindkey -M viins 'kj' vi-cmd-mode
 
+# Terminal history search
+bindkey -M viins '^r' history-incremental-search-backward
+bindkey -M vicmd '^r' history-incremental-search-backward
 
 # CUSTOM THEME
 
@@ -110,11 +116,18 @@ preexec () {
 
 # MISC
 
+# `e` for "edit" (alias to nvim)
+alias e='nvim'
+# `r` for "read" (alias to bat/less)
+if command -v bat >/dev/null; then
+	alias r='bat'
+else
+	alias r='less'
+fi
+
 alias python='python3'
-export PATH="/Users/taylorvance/.local/bin:$PATH"
 #poetry completions zsh > ~/.zfunc/_poetry
 #fpath+=~/.zfunc
-#autoload -Uz compinit && compinit
 
 # Show hidden files and ignore common directories
 alias tree2='tree -a -I "node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|*.git|*.DS_Store|*.venv|*.env|obj|bin|lib|include|share|var|tmp|temp|cache|log|logs|backup|backups|build|dist"'
@@ -131,3 +144,12 @@ export VISUAL=nvim
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export FZF_DEFAULT_OPTS='--multi'
+
+
+# NVM install
+export NVM_DIR="$HOME/.nvm"
+[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
+[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+
+# Initialize completion system (must be after all fpath modifications)
+autoload -Uz compinit && compinit
