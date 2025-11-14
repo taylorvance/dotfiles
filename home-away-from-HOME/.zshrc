@@ -116,14 +116,13 @@ preexec () {
 
 # MISC
 
-# `e` for "edit" (alias to nvim)
-alias e='nvim'
 # `r` for "read" (alias to bat/less)
 if command -v bat >/dev/null; then
 	alias r='bat'
 else
 	alias r='less'
 fi
+# `e` for "edit" has a more sophisticated implementation in ~/.local/bin/e
 
 alias python='python3'
 #poetry completions zsh > ~/.zfunc/_poetry
@@ -152,4 +151,5 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 
 # Initialize completion system (must be after all fpath modifications)
-autoload -Uz compinit && compinit
+# Force rebuild of completion cache
+autoload -Uz compinit && compinit -i

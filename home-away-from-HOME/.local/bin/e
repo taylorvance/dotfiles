@@ -1,0 +1,178 @@
+#!/bin/sh
+# Enhanced editor wrapper for git-aware file opening
+
+set -e
+
+show_help() {
+	cat <<EOF
+Usage: e [OPTIONS] [FILES...]
+
+Enhanced editor wrapper for git-aware file opening.
+
+OPTIONS:
+    -m, --modified          Open modified git files
+    -u, --untracked         Include untracked files (use with -m)
+    -g, --grep PATTERN      Open files matching git grep pattern
+    -d, --diff [REF]        Open files from git diff (compares to default branch or REF)
+    -i, --interactive       Use fzf to select files interactively
+    -h, --help              Show this help message
+
+EXAMPLES:
+    e file.txt              Open file.txt
+    e -m                    Open all modified files
+    e -m -u                 Open all modified and untracked files
+    e -m -i                 Select from modified files with fzf
+    e -g "TODO"             Open files containing "TODO"
+    e -d                    Open files changed from default branch
+    e -d main               Open files changed from main branch
+
+EDITOR: Uses \$EDITOR (currently: ${EDITOR:-vi})
+EOF
+}
+
+die() {
+	echo "Error: $1" >&2
+	exit 1
+}
+
+# Detect default branch
+get_default_branch() {
+	# Try to get the default branch from origin/HEAD
+	local default_branch
+	default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+
+	if [ -n "$default_branch" ]; then
+		echo "$default_branch"
+		return
+	fi
+
+	# Fallback: check if main or master exists
+	if git show-ref --verify --quiet refs/heads/main; then
+		echo "main"
+	elif git show-ref --verify --quiet refs/heads/master; then
+		echo "master"
+	else
+		# Last resort: use current branch
+		git branch --show-current
+	fi
+}
+
+# Check if in a git repo (for git-related operations)
+check_git_repo() {
+	if ! git rev-parse --git-dir >/dev/null 2>&1; then
+		die "Not in a git repository"
+	fi
+}
+
+# Parse arguments
+mode=""
+pattern=""
+diff_ref=""
+use_fzf=false
+include_untracked=false
+files=()
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)
+			show_help
+			exit 0
+			;;
+		-m|--modified)
+			mode="modified"
+			shift
+			;;
+		-u|--untracked)
+			include_untracked=true
+			shift
+			;;
+		-g|--grep)
+			mode="grep"
+			shift
+			if [ $# -eq 0 ]; then
+				die "Option -g/--grep requires a pattern"
+			fi
+			pattern="$1"
+			shift
+			;;
+		-d|--diff)
+			mode="diff"
+			shift
+			# Check if next arg is a ref (not a flag)
+			if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
+				diff_ref="$1"
+				shift
+			fi
+			;;
+		-i|--interactive)
+			use_fzf=true
+			shift
+			;;
+		-*)
+			die "Unknown option: $1"
+			;;
+		*)
+			files="$files $1"
+			shift
+			;;
+	esac
+done
+
+# Get list of files based on mode
+file_list=""
+
+case "$mode" in
+	modified)
+		check_git_repo
+		if [ "$include_untracked" = true ]; then
+			file_list=$(git status --porcelain | awk '{print $2}')
+		else
+			file_list=$(git status --porcelain | grep '^ M\| M\|^M' | awk '{print $2}')
+		fi
+		if [ -z "$file_list" ]; then
+			die "No modified files found"
+		fi
+		;;
+	grep)
+		check_git_repo
+		file_list=$(git grep -l "$pattern" 2>/dev/null || true)
+		if [ -z "$file_list" ]; then
+			die "No files matching pattern '$pattern'"
+		fi
+		;;
+	diff)
+		check_git_repo
+		if [ -z "$diff_ref" ]; then
+			diff_ref=$(get_default_branch)
+		fi
+		file_list=$(git diff --name-only "$diff_ref"..HEAD 2>/dev/null || true)
+		if [ -z "$file_list" ]; then
+			die "No files changed from $diff_ref"
+		fi
+		;;
+	"")
+		# No mode, use provided files
+		if [ -z "$files" ]; then
+			die "No files specified. Use -h for help."
+		fi
+		file_list="$files"
+		;;
+esac
+
+# Use fzf for interactive selection if requested
+if [ "$use_fzf" = true ]; then
+	if ! command -v fzf >/dev/null 2>&1; then
+		die "fzf is not installed"
+	fi
+	file_list=$(echo "$file_list" | fzf --multi)
+	if [ -z "$file_list" ]; then
+		echo "No files selected"
+		exit 0
+	fi
+fi
+
+# Open files in editor
+editor="${EDITOR:-vi}"
+
+# Convert file_list to proper arguments (handle spaces in filenames)
+exec $editor $file_list
