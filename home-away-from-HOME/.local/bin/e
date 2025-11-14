@@ -10,23 +10,28 @@ Usage: e [OPTIONS] [FILES...]
 Enhanced editor wrapper for git-aware file opening.
 
 OPTIONS:
-    -m, --modified          Open modified git files
-    -u, --untracked         Open untracked git files (can be combined with -m)
-    -g, --grep PATTERN      Open files matching pattern (uses git grep in git repos, grep otherwise)
-    -d, --diff [REF]        Open files from git diff (compares to default branch or REF)
-    -i, --interactive       Use fzf to select files interactively
-    -h, --help              Show this help message
+    -m, --modified           Open modified git files
+    -u, --untracked          Open untracked git files (can be combined with -m)
+    -g, --grep PATTERN       Open files matching pattern (uses git grep in git repos, grep otherwise)
+    -d, --diff [REF]         Open files from git diff (compares to default branch or REF)
+    -i, --interactive        Use fzf to select files interactively
+    -h, --help               Show this help message
 
 EXAMPLES:
-    e                       Open editor with no files
-    e file.txt              Open file.txt
-    e -m                    Open all modified files
-    e -u                    Open all untracked files
-    e -mu                   Open all modified and untracked files
-    e -mui                  Select from modified/untracked files with fzf
-    e -g "TODO"             Open files containing "TODO"
-    e -d                    Open files changed from default branch
-    e -d dev                Open files changed from dev branch
+    e                        Open editor with no files
+    e file.txt               Open file.txt
+    e -m                     Open all modified files
+    e -u                     Open all untracked files
+    e -mu                    Open all modified and untracked files
+    e -mui                   Select from modified/untracked files with fzf
+    e -g "TODO"              Open files containing "TODO"
+    e -d                     Open files changed from default branch
+    e -d dev                 Open files changed from dev branch
+
+PIPING:
+    find . -name "*.py" | e  Open all Python files
+    git ls-files | e         Open all tracked files
+    ls | e -i                Pipe files to fzf for selection
 
 EDITOR: Uses \$EDITOR (currently: ${EDITOR:-vi})
 EOF
@@ -142,6 +147,20 @@ while [ $# -gt 0 ]; do
 			;;
 	esac
 done
+
+# Check for stdin input (piped data)
+has_stdin=false
+if [ ! -t 0 ]; then
+	has_stdin=true
+	stdin_files=$(cat)
+
+	# Error if trying to use stdin with mode flags
+	if [ -n "$mode" ]; then
+		die "Cannot use stdin input with mode flags (-m, -u, -g, -d)"
+	fi
+
+	files="$files $stdin_files"
+fi
 
 # Get list of files based on mode
 file_list=""
