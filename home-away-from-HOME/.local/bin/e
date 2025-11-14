@@ -11,20 +11,22 @@ Enhanced editor wrapper for git-aware file opening.
 
 OPTIONS:
     -m, --modified          Open modified git files
-    -u, --untracked         Include untracked files (use with -m)
+    -u, --untracked         Open untracked git files (can be combined with -m)
     -g, --grep PATTERN      Open files matching git grep pattern
     -d, --diff [REF]        Open files from git diff (compares to default branch or REF)
     -i, --interactive       Use fzf to select files interactively
     -h, --help              Show this help message
 
 EXAMPLES:
+    e                       Open editor with no files
     e file.txt              Open file.txt
     e -m                    Open all modified files
-    e -m -u                 Open all modified and untracked files
-    e -m -i                 Select from modified files with fzf
+    e -u                    Open all untracked files
+    e -mu                   Open all modified and untracked files
+    e -mui                  Select from modified/untracked files with fzf
     e -g "TODO"             Open files containing "TODO"
     e -d                    Open files changed from default branch
-    e -d main               Open files changed from main branch
+    e -d dev                Open files changed from dev branch
 
 EDITOR: Uses \$EDITOR (currently: ${EDITOR:-vi})
 EOF
@@ -144,6 +146,11 @@ done
 # Get list of files based on mode
 file_list=""
 
+# Handle the case where -u is used alone (no mode set)
+if [ "$include_untracked" = true ] && [ -z "$mode" ]; then
+	mode="untracked"
+fi
+
 case "$mode" in
 	modified)
 		check_git_repo
@@ -154,6 +161,13 @@ case "$mode" in
 		fi
 		if [ -z "$file_list" ]; then
 			die "No modified files found"
+		fi
+		;;
+	untracked)
+		check_git_repo
+		file_list=$(git status --porcelain | grep '^??' | awk '{print $2}')
+		if [ -z "$file_list" ]; then
+			die "No untracked files found"
 		fi
 		;;
 	grep)
