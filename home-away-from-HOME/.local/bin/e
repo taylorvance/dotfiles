@@ -12,7 +12,7 @@ Enhanced editor wrapper for git-aware file opening.
 OPTIONS:
     -m, --modified          Open modified git files
     -u, --untracked         Open untracked git files (can be combined with -m)
-    -g, --grep PATTERN      Open files matching git grep pattern
+    -g, --grep PATTERN      Open files matching pattern (uses git grep in git repos, grep otherwise)
     -d, --diff [REF]        Open files from git diff (compares to default branch or REF)
     -i, --interactive       Use fzf to select files interactively
     -h, --help              Show this help message
@@ -171,8 +171,13 @@ case "$mode" in
 		fi
 		;;
 	grep)
-		check_git_repo
-		file_list=$(git grep -l "$pattern" 2>/dev/null || true)
+		# Use git grep if in a git repo, otherwise use regular grep
+		if git rev-parse --git-dir >/dev/null 2>&1; then
+			file_list=$(git grep -l "$pattern" 2>/dev/null || true)
+		else
+			# Recursive grep, exclude common directories, only list filenames
+			file_list=$(grep -r -l "$pattern" . 2>/dev/null | grep -v '/\.' | sed 's|^\./||' || true)
+		fi
 		if [ -z "$file_list" ]; then
 			die "No files matching pattern '$pattern'"
 		fi
