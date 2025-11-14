@@ -128,7 +128,7 @@ autocmd BufEnter * if exists("b:prev_pos") | call setpos('.', b:prev_pos) | endi
 
 " quick save/quit
 nnoremap <leader>w <cmd>w<cr>
-nnoremap <leader>q <cmd>q<cr>
+nnoremap <silent> <leader>q <cmd>silent! argdelete * \| q<cr>
 
 " hit j and k (order and case don't matter) to escape insert mode
 inoremap jk <esc>
