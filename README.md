@@ -62,7 +62,7 @@ Use at your own risk. I encourage you to peruse the install script. It's like 30
 |-- dotfiles
     |-- README.md
     |-- backups
-    |   |-- 2020-01-08_04-08-15
+    |   |-- 2020-01-08_04-08-15_12345
     |       |-- .vimrc
     |-- config
     |-- home-away-from-HOME
@@ -75,7 +75,7 @@ Use at your own risk. I encourage you to peruse the install script. It's like 30
 
 #### Backups
 
-When you run the install script, there may be files in your home directory that would be overwritten by symlinking. Any file with the same name as one configured to be symlinked will be copied to `dotfiles/backups/`, in a subdirectory named after the current date/time.
+When you run the install script, there may be files in your home directory that would be overwritten by symlinking. Any file with the same name as one configured to be symlinked will be copied to `dotfiles/backups/`, in a subdirectory named after the current date/time and process ID.
 
 #### Config
 
