@@ -2,11 +2,11 @@
 
 DESTINATIONDIR=$HOME
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-BACKUPDIR=$BASEDIR/backups/"$(date +%Y-%m-%d_%H-%M-%S)"
+BACKUPDIR=$BASEDIR/backups/"$(date +%Y-%m-%d_%H-%M-%S)_$$"
 
 if [ -d "$BACKUPDIR" ]; then
 	echo "Backup directory $BACKUPDIR already exists. Please wait literally one second and try again."
-	exit
+	exit 1
 fi
 
 printf "Installing dotfiles...\n"
@@ -14,7 +14,7 @@ printf "Installing dotfiles...\n"
 # Loop through the files and folders listed in $BASEDIR/config
 while IFS= read -r filepath
 do
-	# Remove trailing slash (not sure if this is necessary)
+	# Remove trailing slash (necessary because ln -s behaves differently for directories with trailing slashes)
 	filepath=${filepath%/}
 
 	printf "\n${filepath}:  "
@@ -22,29 +22,29 @@ do
 	oldfile=$DESTINATIONDIR/$filepath
 	newfile=$BASEDIR/home-away-from-HOME/$filepath
 
-	if [ ! -e $newfile ]; then
+	if [ ! -e "$newfile" ]; then
 		printf "$newfile not found"
 		continue
 	fi
 
 	# If the file is already correctly symlinked, skip.
-	if [ "$(readlink $oldfile)" = "$newfile" ]; then
+	if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
 		printf "already installed"
 		continue
 	fi
 
 	# If a file with this name already exists, copy it to the backup folder to avoid overwriting.
-	if [ -e $oldfile ]; then
-		mkdir -p $BACKUPDIR
+	if [ -e "$oldfile" ]; then
+		mkdir -p "$BACKUPDIR"
 		# Make a deep, recursive copy, removing symlinks.
-		cp -RL $oldfile $BACKUPDIR
-		rm -rf $oldfile
+		cp -RL "$oldfile" "$BACKUPDIR"
+		rm -rf "$oldfile"
 		printf "existing file backed up; "
 	fi
 
-	mkdir -p $(dirname $oldfile)
-	ln -Ffs $newfile $oldfile
+	mkdir -p "$(dirname "$oldfile")"
+	ln -Ffs "$newfile" "$oldfile"
 	printf "installed"
-done < $BASEDIR/config
+done < "$BASEDIR/config"
 
 printf "\n\nInstallation complete!\n"
