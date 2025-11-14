@@ -109,7 +109,30 @@ while [ $# -gt 0 ]; do
 			shift
 			;;
 		-*)
-			die "Unknown option: $1"
+			# Handle combined short flags (e.g., -mu, -mi)
+			if [ "${#1}" -gt 2 ] && [ "${1#--}" = "$1" ]; then
+				# Extract individual flags
+				flags="${1#-}"
+				shift
+				# Process each character as a separate flag
+				while [ -n "$flags" ]; do
+					flag="${flags%"${flags#?}"}"
+					flags="${flags#?}"
+					case "$flag" in
+						m) mode="modified" ;;
+						u) include_untracked=true ;;
+						i) use_fzf=true ;;
+						g|d|h)
+							die "Option -$flag cannot be combined with other flags"
+							;;
+						*)
+							die "Unknown option: -$flag"
+							;;
+					esac
+				done
+			else
+				die "Unknown option: $1"
+			fi
 			;;
 		*)
 			files="$files $1"
@@ -151,10 +174,7 @@ case "$mode" in
 		fi
 		;;
 	"")
-		# No mode, use provided files
-		if [ -z "$files" ]; then
-			die "No files specified. Use -h for help."
-		fi
+		# No mode, use provided files (or open editor with no args)
 		file_list="$files"
 		;;
 esac
