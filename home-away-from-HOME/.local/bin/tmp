@@ -1,0 +1,156 @@
+#!/bin/bash
+# tmp - Quick temporary workspace creator
+
+USAGE="Usage: tmp [-s|-r|-d]
+Create and cd to a timestamped temporary directory
+
+Options:
+  -s    Select from existing temp directories (or create new if none selected)
+  -r    cd to most recent temp directory
+  -d    Delete temp directories (interactive: enter numbers, 'a' for all, or Enter to cancel)
+
+Examples:
+  tmp       Create new temp dir and cd to it
+  tmp -s    List existing dirs and prompt for selection (default: create new)
+  tmp -r    cd to most recent temp directory
+  tmp -d    Delete temp directories interactively"
+
+TMP_BASE="/tmp/tmp-workspaces"
+RECENT=false
+SELECT=false
+DELETE=false
+
+# Parse options
+while getopts "rsdh" opt; do
+  case $opt in
+    r) RECENT=true ;;
+    s) SELECT=true ;;
+    d) DELETE=true ;;
+    h) echo "$USAGE"; exit 0 ;;
+    *) echo "$USAGE" >&2; exit 1 ;;
+  esac
+done
+
+# Delete temp directories interactively
+if [ "$DELETE" = true ]; then
+  if [ ! -d "$TMP_BASE" ] || [ -z "$(ls -A "$TMP_BASE" 2>/dev/null)" ]; then
+    echo "No temporary workspaces to delete" >&2
+    exit 0
+  fi
+
+  echo "Temp workspaces:" >&2
+  # Create array of directories sorted by time (newest first)
+  dirs=()
+  while IFS= read -r dir; do
+    dirs+=("$dir")
+  done < <(ls -t "$TMP_BASE")
+
+  # Display numbered list
+  for i in "${!dirs[@]}"; do
+    echo "$((i+1)). ${dirs[$i]}" >&2
+  done
+  echo >&2
+
+  # Prompt for deletion
+  echo -n "Enter numbers to delete (space-separated), 'a' for all, or Enter to cancel: " >&2
+  read -r choice
+
+  # If empty, cancel
+  if [ -z "$choice" ]; then
+    echo "Cancelled" >&2
+    exit 0
+  fi
+
+  # Handle "all"
+  if [[ "$choice" =~ ^(a|all)$ ]]; then
+    echo "Deleting all workspaces..." >&2
+    rm -rf "$TMP_BASE"/*
+    echo "All workspaces deleted" >&2
+    exit 0
+  fi
+
+  # Handle space-separated numbers
+  deleted_count=0
+  for num in $choice; do
+    if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#dirs[@]}" ]; then
+      dir_to_delete="${dirs[$((num-1))]}"
+      rm -rf "$TMP_BASE/$dir_to_delete"
+      echo "Deleted: $dir_to_delete" >&2
+      ((deleted_count++))
+    else
+      echo "Invalid number: $num (skipping)" >&2
+    fi
+  done
+
+  if [ $deleted_count -gt 0 ]; then
+    echo "Deleted $deleted_count workspace(s)" >&2
+  else
+    echo "No workspaces deleted" >&2
+  fi
+  exit 0
+fi
+
+# cd to most recent temp directory
+if [ "$RECENT" = true ]; then
+  if [ -d "$TMP_BASE" ]; then
+    LATEST_DIR=$(ls -t "$TMP_BASE" | head -n 1)
+    if [ -n "$LATEST_DIR" ]; then
+      echo "cd \"$TMP_BASE/$LATEST_DIR\""
+    else
+      echo "No temporary workspaces found" >&2
+      exit 1
+    fi
+  else
+    echo "No temporary workspaces found" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+# Select from existing temp directories
+if [ "$SELECT" = true ]; then
+  if [ -d "$TMP_BASE" ] && [ -n "$(ls -A "$TMP_BASE" 2>/dev/null)" ]; then
+    echo "Existing temp workspaces:" >&2
+    # Create array of directories sorted by time (newest first)
+    dirs=()
+    while IFS= read -r dir; do
+      dirs+=("$dir")
+    done < <(ls -t "$TMP_BASE")
+
+    # Display numbered list
+    for i in "${!dirs[@]}"; do
+      echo "$((i+1)). ${dirs[$i]}" >&2
+    done
+    echo >&2
+
+    # Prompt for selection
+    echo -n "Select number (or press Enter to create new): " >&2
+    read -r choice
+
+    # If empty, fall through to create new
+    if [ -z "$choice" ]; then
+      # Fall through to create new workspace below
+      true
+    elif [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#dirs[@]}" ]; then
+      # Valid selection
+      selected_dir="${dirs[$((choice-1))]}"
+      echo "cd \"$TMP_BASE/$selected_dir\""
+      exit 0
+    else
+      echo "Invalid selection" >&2
+      exit 1
+    fi
+  fi
+  # If no existing dirs or user pressed Enter, fall through to create new
+fi
+
+# Create temp workspace
+mkdir -p "$TMP_BASE"
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+TMP_DIR="$TMP_BASE/$TIMESTAMP"
+mkdir -p "$TMP_DIR"
+
+echo "Created temporary workspace: $TMP_DIR"
+
+# Output the cd command for the parent shell to eval
+echo "cd \"$TMP_DIR\""

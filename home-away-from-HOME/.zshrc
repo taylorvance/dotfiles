@@ -124,6 +124,26 @@ else
 fi
 # `e` for "edit" has a more sophisticated implementation in ~/.local/bin/e
 
+# `tmp` (see ~/.local/bin/tmp) wrapper function to properly cd into temp directory
+tmp() {
+	local output
+	output=$($HOME/.local/bin/tmp "$@")
+	if [ $? -eq 0 ]; then
+		# Extract the cd command and eval it
+		local cd_cmd=$(echo "$output" | grep '^cd ' | tail -n 1)
+		if [ -n "$cd_cmd" ]; then
+			eval "$cd_cmd"
+			# Show any other output (excluding the cd command)
+			echo "$output" | grep -v '^cd '
+		else
+			# No cd command, just show output (like -l flag)
+			echo "$output"
+		fi
+	else
+		echo "$output"
+	fi
+}
+
 alias python='python3'
 #poetry completions zsh > ~/.zfunc/_poetry
 #fpath+=~/.zfunc

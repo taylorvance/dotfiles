@@ -13,7 +13,10 @@ OPTIONS:
     -m, --modified           Open modified git files
     -u, --untracked          Open untracked git files (can be combined with -m)
     -g, --grep PATTERN       Open files matching pattern (uses git grep in git repos, grep otherwise)
+    -n, --name PATTERN       Open files whose names match pattern (e.g., "*.py")
     -d, --diff [REF]         Open files from git diff (compares to default branch or REF)
+    -a, --all                Open all files in git repo (tracked files)
+    --history [N]            Open N most recently modified files (default: 10)
     -i, --interactive        Use fzf to select files interactively
     -h, --help               Show this help message
 
@@ -25,8 +28,13 @@ EXAMPLES:
     e -mu                    Open all modified and untracked files
     e -mui                   Select from modified/untracked files with fzf
     e -g "TODO"              Open files containing "TODO"
+    e -n "*.py"              Open files whose names match *.py
     e -d                     Open files changed from default branch
     e -d dev                 Open files changed from dev branch
+    e -a                     Open all tracked files in git repo
+    e -ai                    Select from all tracked files with fzf
+    e --history              Open 10 most recently modified files
+    e --history 20           Open 20 most recently modified files
 
 PIPING:
     find . -name "*.py" | e  Open all Python files
@@ -64,10 +72,32 @@ get_default_branch() {
 	fi
 }
 
+# Check if we're in a git repo once at startup
+is_git_repo=false
+git_root=""
+if git rev-parse --git-dir >/dev/null 2>&1; then
+	is_git_repo=true
+	git_root=$(git rev-parse --show-toplevel)
+fi
+
 # Check if in a git repo (for git-related operations)
 check_git_repo() {
-	if ! git rev-parse --git-dir >/dev/null 2>&1; then
+	if [ "$is_git_repo" = false ]; then
 		die "Not in a git repository"
+	fi
+}
+
+# Convert git-relative paths to paths relative to current directory
+make_paths_relative() {
+	local git_files="$1"
+	if [ -z "$git_root" ] || [ "$git_root" = "$PWD" ]; then
+		# Already at git root or not in git repo
+		echo "$git_files"
+	else
+		# Prefix each path with git_root
+		echo "$git_files" | while IFS= read -r file; do
+			[ -n "$file" ] && echo "$git_root/$file"
+		done
 	fi
 }
 
@@ -75,6 +105,7 @@ check_git_repo() {
 mode=""
 pattern=""
 diff_ref=""
+history_count=10
 use_fzf=false
 include_untracked=false
 files=()
@@ -101,6 +132,28 @@ while [ $# -gt 0 ]; do
 			fi
 			pattern="$1"
 			shift
+			;;
+		-n|--name)
+			mode="name"
+			shift
+			if [ $# -eq 0 ]; then
+				die "Option -n/--name requires a pattern"
+			fi
+			pattern="$1"
+			shift
+			;;
+		-a|--all)
+			mode="all"
+			shift
+			;;
+		--history)
+			mode="history"
+			shift
+			# Check if next arg is a number (not a flag)
+			if [ $# -gt 0 ] && [ "${1#-}" = "$1" ] && [ "$1" -eq "$1" ] 2>/dev/null; then
+				history_count="$1"
+				shift
+			fi
 			;;
 		-d|--diff)
 			mode="diff"
@@ -129,7 +182,8 @@ while [ $# -gt 0 ]; do
 						m) mode="modified" ;;
 						u) include_untracked=true ;;
 						i) use_fzf=true ;;
-						g|d|h)
+						a) mode="all" ;;
+						g|d|n|h)
 							die "Option -$flag cannot be combined with other flags"
 							;;
 						*)
@@ -178,6 +232,7 @@ case "$mode" in
 		else
 			file_list=$(git status --porcelain | grep '^ M\| M\|^M' | awk '{print $2}')
 		fi
+		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No modified files found"
 		fi
@@ -185,14 +240,16 @@ case "$mode" in
 	untracked)
 		check_git_repo
 		file_list=$(git status --porcelain | grep '^??' | awk '{print $2}')
+		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No untracked files found"
 		fi
 		;;
 	grep)
 		# Use git grep if in a git repo, otherwise use regular grep
-		if git rev-parse --git-dir >/dev/null 2>&1; then
+		if [ "$is_git_repo" = true ]; then
 			file_list=$(git grep -l "$pattern" 2>/dev/null || true)
+			file_list=$(make_paths_relative "$file_list")
 		else
 			# Recursive grep, exclude common directories, only list filenames
 			file_list=$(grep -r -l "$pattern" . 2>/dev/null | grep -v '/\.' | sed 's|^\./||' || true)
@@ -201,12 +258,56 @@ case "$mode" in
 			die "No files matching pattern '$pattern'"
 		fi
 		;;
+	name)
+		# Find files by name pattern
+		if [ "$is_git_repo" = true ]; then
+			# In git repo, search tracked files
+			file_list=$(git ls-files | grep "$pattern" || true)
+			file_list=$(make_paths_relative "$file_list")
+		else
+			# Outside git repo, use find
+			file_list=$(find . -type f -name "$pattern" 2>/dev/null | sed 's|^\./||' || true)
+		fi
+		if [ -z "$file_list" ]; then
+			die "No files matching name pattern '$pattern'"
+		fi
+		;;
+	all)
+		check_git_repo
+		file_list=$(git ls-files)
+		file_list=$(make_paths_relative "$file_list")
+		if [ -z "$file_list" ]; then
+			die "No tracked files found"
+		fi
+		;;
+	history)
+		# Get N most recently modified files by filesystem modification time
+		if [ "$is_git_repo" = true ]; then
+			# In git repo, only consider tracked files
+			# Use stat to get mtime, sort by it, take top N
+			# Need to run stat from git root since git ls-files returns paths relative to root
+			file_list=$(cd "$git_root" && git ls-files -z | xargs -0 stat -f "%m %N" 2>/dev/null | sort -rn | head -n "$history_count" | cut -d' ' -f2-)
+			file_list=$(make_paths_relative "$file_list")
+		else
+			# Outside git repo, find all files and sort by mtime
+			# -printf '%T@ %p\n' prints: modification_time_in_seconds filepath
+			# %T@ = file's last modification time in seconds since Unix epoch (with decimal fractions)
+			# %p = file's path
+			# \n = newline
+			# We sort numerically in reverse (-rn), take top N, then strip the timestamp
+			file_list=$(find . -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n "$history_count" | cut -d' ' -f2- | sed 's|^\./||')
+		fi
+		if [ -z "$file_list" ]; then
+			die "No files found"
+		fi
+		;;
 	diff)
 		check_git_repo
 		if [ -z "$diff_ref" ]; then
 			diff_ref=$(get_default_branch)
 		fi
 		file_list=$(git diff --name-only "$diff_ref"..HEAD 2>/dev/null || true)
+		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No files changed from $diff_ref"
 		fi

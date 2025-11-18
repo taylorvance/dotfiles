@@ -4,6 +4,7 @@
 .config/nvim/lua/plugins/init.lua
 .gitconfig
 .local/bin/e
+.local/bin/tmp
 .tmux.conf
 .vim/colors/4bit.vim
 .vim/colors/colortv.vim
