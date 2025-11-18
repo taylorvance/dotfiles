@@ -1,5 +1,13 @@
 let mapleader = "\<space>"
 
+" auto-cd to dotfiles repo when editing symlinked dotfiles
+autocmd BufEnter *
+	\ let resolved = resolve(expand('%:p')) |
+	\ if resolved =~# $HOME . '/dotfiles/home-away-from-HOME/' |
+	\   silent! lcd ~/dotfiles |
+	\   let b:git_dir = $HOME . '/dotfiles/.git' |
+	\ endif
+
 " load plugins with lua/config/lazy.lua and lua/config/plugins/*.lua
 lua require("config.lazy")
 
