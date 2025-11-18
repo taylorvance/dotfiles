@@ -20,8 +20,6 @@ autocmd FileType javascriptreact,typescriptreact setlocal tabstop=2 softtabstop=
 " use spaces for C# (dotnet)
 autocmd FileType cs setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 
-" use Telescope UI as the default vim.ui.select (move to plugin init file?)
-lua require("telescope").load_extension("ui-select")
 
 " < FOLDING > {{{
 set foldlevelstart=10       " fold very nested indents by default
@@ -52,22 +50,11 @@ nnoremap <expr> N (v:searchforward ? 'N' : 'n')
 " search by plain text (very nomagic: only / has special meaning)
 "nnoremap / /\V
 
-" find files
-nnoremap <c-t> <cmd>call ProjectFiles()<cr>
-function! ProjectFiles()
-	" if in a git repo, search git files
-	" else search all files
-	let l:git_dir = finddir('.git', '.;')
-	if l:git_dir != ''
-		execute 'Telescope git_files show_untracked=true'
-	else
-		" show hidden files, follow symlinks, exclude some files
-		execute 'Telescope find_files find_command=fd,--type,f,--hidden,--follow,--exclude,.git,--exclude,.DS_Store'
-	endif
-endfunction
+" find files (smart: git files in repo, all files otherwise)
+nnoremap <c-t> <cmd>lua Snacks.picker.smart()<cr>
 
 " find code
-nnoremap <c-f> <cmd>Telescope live_grep<cr>
+nnoremap <c-f> <cmd>lua Snacks.picker.grep()<cr>
 
 " git grep the word under the cursor
 function! GrepCword()
@@ -107,9 +94,13 @@ noremap <c-l> $
 noremap <tab> %
 
 " list open buffers, sorted by most recently used
-nnoremap gb <cmd>Telescope buffers sort_mru=true<cr>
+nnoremap gb <cmd>lua Snacks.picker.buffers()<cr>
+" list recently opened files
+nnoremap gf <cmd>lua Snacks.picker.recent()<cr>
+" list files in git status
+nnoremap gc <cmd>lua Snacks.picker.git_status()<cr>
 " jumplist (recently visited locations)
-nnoremap gj <cmd>Telescope jumplist<cr>
+nnoremap gj <cmd>lua Snacks.picker.jumps()<cr>
 " go to buffer last seen in this window (aka alternate file)
 nnoremap <c-b> <c-^>
 " delete current buffer
@@ -176,17 +167,17 @@ command! -nargs=1 DupFile execute 'saveas' expand('%:h') . '/' . <q-args>
 " << LSP >> {{{
 
 " go to references
-nnoremap gr <cmd>Telescope lsp_references<cr>
+nnoremap gr <cmd>lua Snacks.picker.lsp_references()<cr>
 " go to definition
-nnoremap gd <cmd>Telescope lsp_definitions<cr>
+nnoremap gd <cmd>lua Snacks.picker.lsp_definitions()<cr>
 " go to type definition
-nnoremap gt <cmd>Telescope lsp_type_definitions<cr>
+nnoremap gt <cmd>lua Snacks.picker.lsp_type_definitions()<cr>
 " go to implementations
-nnoremap gi <cmd>Telescope lsp_implementations<cr>
+nnoremap gi <cmd>lua Snacks.picker.lsp_implementations()<cr>
 " go to document symbols
-nnoremap gs <cmd>Telescope lsp_document_symbols<cr>
+nnoremap gs <cmd>lua Snacks.picker.lsp_symbols()<cr>
 " go to workspace symbols
-nnoremap gS <cmd>Telescope lsp_workspace_symbols<cr>
+nnoremap gS <cmd>lua Snacks.picker.lsp_workspace_symbols()<cr>
 
 " code actions
 nnoremap ca <cmd>lua vim.lsp.buf.code_action()<cr>

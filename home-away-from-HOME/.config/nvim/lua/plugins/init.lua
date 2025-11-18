@@ -138,8 +138,8 @@ return {
 					{'diagnostics',
 						on_click = function(_, _, mod)
 							if mod:find('s') then
-								-- open telescope diagnostics
-								require('telescope.builtin').diagnostics()
+								-- open snacks diagnostics
+								Snacks.picker.diagnostics()
 							else
 								-- toggle diagnostics
 								vim.diagnostic.enable(not vim.diagnostic.is_enabled())
@@ -278,44 +278,26 @@ return {
 	'preservim/nerdcommenter',
 	'tpope/vim-repeat',
 	'tpope/vim-surround',
-	{'nvim-telescope/telescope.nvim',
-		branch = 'master',
-		dependencies = {
-			'nvim-lua/plenary.nvim',
-			{'nvim-telescope/telescope-fzf-native.nvim', build='make'},
-			'nvim-tree/nvim-web-devicons',
-		},
-		config = function()
-			local telescope = require('telescope')
-			local actions = require('telescope.actions')
-
-			telescope.setup({
-				defaults = {
-					path_display = {'shorten'}, -- smart or shorten
-					dynamic_preview_title = true,
-					mappings = {
-						i = {
-							['<esc>'] = actions.close, -- instead of requiring double-esc
-							['<c-k>'] = actions.move_selection_previous,
-							['<c-j>'] = actions.move_selection_next,
+	{'folke/snacks.nvim',
+		priority = 1000,
+		lazy = false,
+		opts = {
+			picker = {
+				enabled = true,
+				-- Include hidden files (for dotfiles repos)
+				hidden = true,
+				win = {
+					input = {
+						keys = {
+							['<esc>'] = { 'close', mode = { 'n', 'i' } },
+							['<c-j>'] = { 'list_down', mode = { 'i', 'n' } },
+							['<c-k>'] = { 'list_up', mode = { 'i', 'n' } },
 						},
 					},
 				},
-			})
-
-			telescope.load_extension('fzf')
-		end,
+			},
+		},
 	},
-	{'nvim-telescope/telescope-ui-select.nvim',
-		--[[
-		dependencies = {'nvim-telescope/telescope.nvim'},
-		config = function()
-			require('telescope-ui-select').setup()
-			require('telescope').load_extension('ui_select')
-		end,
-		--]]
-	},
-	--.TODO: look into Trouble for lsp diag mgmt https://youtu.be/6pAG3BHurdM?si=boM5AtmHsM1y7QFz&t=4384
 	{'folke/tokyonight.nvim', lazy=false, priority=1000}, -- colorschemes should be loaded first
 	{'nvim-treesitter/nvim-treesitter', build=':TSUpdate'},--.TODO: see josean's options https://youtu.be/6pAG3BHurdM?si=sKDNN2tci4_Hmv89&t=2723
 	{'folke/trouble.nvim',
