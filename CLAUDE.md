@@ -33,7 +33,7 @@ make restore    # Interactively restore from backups
 ## Architecture
 
 ### Core Structure
-- **`Makefile`**: Standard API with targets: `setup`, `teardown`, `status`, `verify`, `restore`, `help`
+- **`Makefile`**: Standard API with targets: `setup`, `teardown`, `status`, `restore`, `help`
 - **`bin/symlink-manager.sh`**: Helper script that handles symlink operations (install, uninstall, status, restore)
 - **`home-away-from-HOME/`**: Source directory containing all dotfiles, organized exactly as they should appear under `~/`
 - **`config`**: Text file listing paths to symlink (relative to `home-away-from-HOME/` and `~/`)

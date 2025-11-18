@@ -228,3 +228,9 @@ nnoremap <leader>[ :diffget LOCAL<cr>
 nnoremap <leader>] :diffget REMOTE<cr>
 
 " }}}
+
+
+" Load local customizations if they exist
+if filereadable(expand("~/.config/nvim/local.vim"))
+    source ~/.config/nvim/local.vim
+endif

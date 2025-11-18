@@ -173,3 +173,7 @@ export NVM_DIR="$HOME/.nvm"
 # Initialize completion system (must be after all fpath modifications)
 # Force rebuild of completion cache
 autoload -Uz compinit && compinit -i
+
+
+# Load local customizations if they exist
+[ -f ~/.zshrc.local ] && source ~/.zshrc.local
