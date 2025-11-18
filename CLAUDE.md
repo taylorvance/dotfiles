@@ -4,30 +4,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is a personal dotfiles repository using a custom symlink-based management system. Files in `home-away-from-HOME/` are symlinked to `~/` via the `install` script based on paths listed in `config`.
+This is a personal dotfiles repository using a custom symlink-based management system. Files in `home-away-from-HOME/` are symlinked to `~/` via a Makefile that calls the `bin/symlink-manager.sh` helper script, based on paths listed in `config`.
 
 ## Key Commands
 
 ### Installation
 ```bash
-./install
+make setup
 ```
 - Creates symlinks from `home-away-from-HOME/` to `~/` for files listed in `config`
 - Idempotent: safe to run multiple times
-- Backs up conflicting files to `backups/YYYY-MM-DD_HH-MM-SS/`
+- Backs up conflicting files to `backups/YYYY-MM-DD_HH-MM-SS_PID/`
 - Only symlinks files/directories specified in `config`
+
+### Other Make Targets
+```bash
+make help       # Show all available targets with descriptions
+make status     # Check installation status of all dotfiles
+make teardown   # Remove all symlinks
+make restore    # Interactively restore from backups
+```
 
 ### Adding New Dotfiles
 1. Place file in `home-away-from-HOME/` matching desired path relative to `~/`
 2. Add the relative path to `config` (one path per line)
-3. Run `./install` to create the symlink
+3. Run `make setup` to create the symlink
 
 ## Architecture
 
 ### Core Structure
+- **`Makefile`**: Standard API with targets: `setup`, `teardown`, `status`, `verify`, `restore`, `help`
+- **`bin/symlink-manager.sh`**: Helper script that handles symlink operations (install, uninstall, status, restore)
 - **`home-away-from-HOME/`**: Source directory containing all dotfiles, organized exactly as they should appear under `~/`
 - **`config`**: Text file listing paths to symlink (relative to `home-away-from-HOME/` and `~/`)
-- **`install`**: Bash script that creates symlinks and handles backups
 - **`backups/`**: Auto-generated backup directory for conflicting files
 
 ### Custom Scripts (`home-away-from-HOME/.local/bin/`)
