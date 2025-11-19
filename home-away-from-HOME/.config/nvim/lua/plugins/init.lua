@@ -298,7 +298,46 @@ return {
 		},
 	},
 	{'folke/tokyonight.nvim', lazy=false, priority=1000}, -- colorschemes should be loaded first
-	{'nvim-treesitter/nvim-treesitter', build=':TSUpdate'},--.TODO: see josean's options https://youtu.be/6pAG3BHurdM?si=sKDNN2tci4_Hmv89&t=2723
+	{"nvim-tree/nvim-tree.lua",
+		dependencies = {"nvim-tree/nvim-web-devicons"},
+		version = "*",
+		lazy = false,
+		config = function()
+			require("nvim-tree").setup {}
+		end,
+	},
+	{'nvim-treesitter/nvim-treesitter',
+		build = ':TSUpdate',
+		config = function()
+			require('nvim-treesitter.configs').setup({
+				-- Install parsers for these languages
+				ensure_installed = {
+					'vim', 'vimdoc', 'lua',
+					'python', 'javascript', 'typescript', 'tsx',
+					'html', 'css', 'json', 'yaml',
+					'php', 'c_sharp',
+					'bash', 'markdown', 'regex',
+				},
+				auto_install = true, -- auto-install missing parsers when entering buffer
+				highlight = {
+					enable = true,
+					additional_vim_regex_highlighting = false,
+				},
+				indent = {
+					enable = true,
+				},
+				incremental_selection = {
+					enable = true,
+					keymaps = {
+						init_selection = '<cr>',
+						node_incremental = '<cr>',
+						node_decremental = '<bs>',
+						scope_incremental = '<c-s>',
+					},
+				},
+			})
+		end,
+	},
 	{'folke/trouble.nvim',
 		cmd = 'Trouble',
 		opts = {

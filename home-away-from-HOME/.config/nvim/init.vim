@@ -115,6 +115,9 @@ nnoremap <c-b> <c-^>
 " delete current buffer
 nnoremap <leader>bd <cmd>bdelete<cr>
 
+" open file explorer
+nnoremap <leader>fe <cmd>NvimTreeToggle<cr>
+
 " restore cursor position when opening a file
 autocmd BufReadPost * if line("'\"")>0 && line("'\"")<=line("$") | exe "normal! g`\"" | endif
 " restore cursor position when switching buffers
