@@ -275,7 +275,6 @@ return {
 			})
 		end,
 	},
-	'preservim/nerdcommenter',
 	'tpope/vim-repeat',
 	'tpope/vim-surround',
 	{'folke/snacks.nvim',

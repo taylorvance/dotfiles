@@ -20,6 +20,7 @@ set relativenumber          " ...and relative line number of other lines
 set cursorline              " highlight current line
 set linebreak               " don't break words when wrapping
 set splitright              " open vertical split panes to the right
+set undofile                " persistent undo history
 
 " tabs are 4 columns wide, each indentation level is one tab
 set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
@@ -106,7 +107,7 @@ nnoremap gb <cmd>lua Snacks.picker.buffers()<cr>
 " list recently opened files
 nnoremap gf <cmd>lua Snacks.picker.recent()<cr>
 " list files in git status
-nnoremap gc <cmd>lua Snacks.picker.git_status()<cr>
+nnoremap gs <cmd>lua Snacks.picker.git_status()<cr>
 " jumplist (recently visited locations)
 nnoremap gj <cmd>lua Snacks.picker.jumps()<cr>
 " go to buffer last seen in this window (aka alternate file)
@@ -146,9 +147,6 @@ nnoremap > >>
 vnoremap < <gv
 vnoremap > >gv
 
-" persistent undo history
-set undofile
-
 " maintain clipboard after pasting over something in visual mode
 xnoremap p "_dP
 
@@ -182,10 +180,6 @@ nnoremap gd <cmd>lua Snacks.picker.lsp_definitions()<cr>
 nnoremap gt <cmd>lua Snacks.picker.lsp_type_definitions()<cr>
 " go to implementations
 nnoremap gi <cmd>lua Snacks.picker.lsp_implementations()<cr>
-" go to document symbols
-nnoremap gs <cmd>lua Snacks.picker.lsp_symbols()<cr>
-" go to workspace symbols
-nnoremap gS <cmd>lua Snacks.picker.lsp_workspace_symbols()<cr>
 
 " code actions
 nnoremap ca <cmd>lua vim.lsp.buf.code_action()<cr>
@@ -222,10 +216,6 @@ tnoremap <esc> <c-\><c-n>
 nnoremap ! :!
 " quicker terminal access
 nnoremap % <cmd>split \| terminal<cr>
-
-" git mergetool
-nnoremap <leader>[ :diffget LOCAL<cr>
-nnoremap <leader>] :diffget REMOTE<cr>
 
 " }}}
 
