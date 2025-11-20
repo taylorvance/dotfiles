@@ -166,7 +166,7 @@ alias python='python3'
 #fpath+=~/.zfunc
 
 # Show hidden files and ignore common directories
-alias tree2='tree -a -I "node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|*.git|*.DS_Store|*.venv|*.env|obj|bin|lib|include|share|var|tmp|temp|cache|log|logs|backup|backups|build|dist"'
+# alias tree2='tree -a -I "node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|*.git|*.DS_Store|*.venv|*.env|obj|bin|lib|include|share|var|tmp|temp|cache|log|logs|backup|backups|build|dist"'
 
 # Use nvim as default editor
 export EDITOR=nvim
@@ -217,11 +217,15 @@ if command -v eza >/dev/null 2>&1; then
 			level=$1
 			shift
 		fi
+
+		# Ignore common directories and build artifacts
+		local ignore_patterns='node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|.git|.DS_Store|.venv|.env|build|dist|target|.pytest_cache|.mypy_cache|vendor|.next|.nuxt|*.swp|*.swo'
+
 		# level=0 means unlimited (omit the --level flag)
 		if [[ $level -eq 0 ]]; then
-			eza --tree --icons --group-directories-first --git-ignore "$@"
+			eza --tree --all --icons --group-directories-first --git-ignore --ignore-glob="$ignore_patterns" "$@"
 		else
-			eza --tree --icons --group-directories-first --git-ignore --level=$level "$@"
+			eza --tree --all --icons --group-directories-first --git-ignore --level=$level --ignore-glob="$ignore_patterns" "$@"
 		fi
 	}
 else
