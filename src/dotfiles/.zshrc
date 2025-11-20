@@ -205,9 +205,25 @@ if command -v eza >/dev/null 2>&1; then
 	alias ls='eza --icons --group-directories-first'
 	alias ll='eza -l --icons --group-directories-first --git'
 	alias la='eza -la --icons --group-directories-first --git'
-	alias lt='eza --tree --icons --group-directories-first --git-ignore --level=2'
-	alias lt3='eza --tree --icons --group-directories-first --git-ignore --level=3'
-	alias lt4='eza --tree --icons --group-directories-first --git-ignore --level=4'
+	# lt - tree view with configurable depth (defaults to full depth)
+	# Usage: lt [level] [path]
+	#   lt        → unlimited depth (default)
+	#   lt 3      → level 3
+	#   lt 3 dir  → level 3 for specific directory
+	lt() {
+		local level=0
+		# If first arg is a digit, use it as level
+		if [[ "$1" =~ ^[0-9]+$ ]]; then
+			level=$1
+			shift
+		fi
+		# level=0 means unlimited (omit the --level flag)
+		if [[ $level -eq 0 ]]; then
+			eza --tree --icons --group-directories-first --git-ignore "$@"
+		else
+			eza --tree --icons --group-directories-first --git-ignore --level=$level "$@"
+		fi
+	}
 else
 	# Fallback to regular ls with some useful flags
 	alias ll='ls -lh'
