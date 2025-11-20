@@ -3,6 +3,7 @@
 .config/nvim/lua/config/lazy.lua
 .config/nvim/lua/plugins/init.lua
 .gitconfig
+.gitignore
 .local/bin/e
 .local/bin/tmp
 .tmux.conf

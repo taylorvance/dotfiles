@@ -83,11 +83,13 @@ PROMPT+='$(git_prompt_info)'
 ZSH_THEME_VI_PROMPT_INSERT=""
 ZSH_THEME_VI_PROMPT_NORMAL=" %B%F{cyan}-- NORMAL --%f%b"
 PROMPT+='$(vi_prompt_info)'
+# command duration (if 3+ seconds)
+PROMPT+='$ZSH_THEME_PROMPT_DURATION'
 # newline and down-right line thing
 PROMPT+=$'\n'
 PROMPT+='%F{blue}└─%f'
-# green or red % prompt
-PROMPT+=' %(?.%F{green}%#%f.%F{red}%#%f) '
+# green or red % prompt (red shows last exit code)
+PROMPT+=' %(?.%F{green}%#%f.%F{red}%# [%?]%f) '
 
 # Secondary prompt arrow
 PROMPT2='   %F{cyan}>%f '
@@ -107,10 +109,25 @@ function zle-line-init zle-keymap-select {
 zle -N zle-line-init
 zle -N zle-keymap-select
 
-# Before executing a command, store these variables for the prompt
-ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
+# Before executing a command, store start time for duration calculation
 preexec () {
-	ZSH_THEME_PROMPT_CMD_TIME=$(date +"%H:%M:%S")
+	ZSH_THEME_PROMPT_CMD_START=$SECONDS
+}
+
+# After command completes, calculate duration
+precmd() {
+	if [ -n "$ZSH_THEME_PROMPT_CMD_START" ]; then
+		local duration=$((SECONDS - ZSH_THEME_PROMPT_CMD_START))
+		if [ $duration -ge 3 ]; then
+			# Show duration if command took 3+ seconds
+			ZSH_THEME_PROMPT_DURATION=" %F{yellow}[${duration}s]%f"
+		else
+			ZSH_THEME_PROMPT_DURATION=""
+		fi
+		unset ZSH_THEME_PROMPT_CMD_START
+	else
+		ZSH_THEME_PROMPT_DURATION=""
+	fi
 }
 
 
@@ -173,6 +190,102 @@ export NVM_DIR="$HOME/.nvm"
 # Initialize completion system (must be after all fpath modifications)
 # Force rebuild of completion cache
 autoload -Uz compinit && compinit -i
+
+
+# MODERN CLI TOOLS
+
+# zoxide - smarter cd that learns your habits
+# Usage: z <partial-path>  (e.g., "z dot" jumps to ~/dotfiles)
+if command -v zoxide >/dev/null 2>&1; then
+	eval "$(zoxide init zsh)"
+fi
+
+# eza - modern ls replacement (with fallback to regular ls)
+if command -v eza >/dev/null 2>&1; then
+	alias ls='eza --icons --group-directories-first'
+	alias ll='eza -l --icons --group-directories-first --git'
+	alias la='eza -la --icons --group-directories-first --git'
+	alias lt='eza --tree --icons --group-directories-first --git-ignore --level=2'
+	alias lt3='eza --tree --icons --group-directories-first --git-ignore --level=3'
+	alias lt4='eza --tree --icons --group-directories-first --git-ignore --level=4'
+else
+	# Fallback to regular ls with some useful flags
+	alias ll='ls -lh'
+	alias la='ls -lAh'
+fi
+
+# fd - modern find replacement (keep original find available)
+if command -v fd >/dev/null 2>&1; then
+	# Don't alias 'find' to avoid breaking scripts, provide 'f' shortcut instead
+	alias f='fd'
+fi
+
+# ripgrep - add convenient alias if installed
+if command -v rg >/dev/null 2>&1; then
+	alias rg='rg --smart-case --hidden --glob "!.git/*"'
+fi
+
+# atuin - magical shell history
+if command -v atuin >/dev/null 2>&1; then
+	eval "$(atuin init zsh --disable-up-arrow)"
+	# Note: Use Ctrl-r for atuin search, up-arrow still does prefix search
+fi
+
+
+# USEFUL SHELL FUNCTIONS
+
+# mkcd - create directory and cd into it
+mkcd() {
+	mkdir -p "$1" && cd "$1"
+}
+
+# extract - extract any archive type
+extract() {
+	if [ -f "$1" ]; then
+		case "$1" in
+			*.tar.bz2)   tar xjf "$1"     ;;
+			*.tar.gz)    tar xzf "$1"     ;;
+			*.bz2)       bunzip2 "$1"     ;;
+			*.rar)       unrar e "$1"     ;;
+			*.gz)        gunzip "$1"      ;;
+			*.tar)       tar xf "$1"      ;;
+			*.tbz2)      tar xjf "$1"     ;;
+			*.tgz)       tar xzf "$1"     ;;
+			*.zip)       unzip "$1"       ;;
+			*.Z)         uncompress "$1"  ;;
+			*.7z)        7z x "$1"        ;;
+			*)     echo "'$1' cannot be extracted via extract()" ;;
+		esac
+	else
+		echo "'$1' is not a valid file"
+	fi
+}
+
+# backup - quick backup of a file
+backup() {
+	cp "$1" "$1.backup-$(date +%Y%m%d-%H%M%S)"
+}
+
+# fcd - cd to a directory using fzf (requires fd and fzf)
+fcd() {
+	if ! command -v fd >/dev/null 2>&1 || ! command -v fzf >/dev/null 2>&1; then
+		echo "fcd requires 'fd' and 'fzf' to be installed" >&2
+		return 1
+	fi
+
+	local dir
+	local preview_cmd
+	if command -v eza >/dev/null 2>&1; then
+		preview_cmd='eza --tree --level=1 --icons {}'
+	else
+		preview_cmd='ls -la {}'
+	fi
+
+	dir=$(fd --type d --hidden --exclude .git | fzf --preview "$preview_cmd")
+	if [ -n "$dir" ]; then
+		cd "$dir"
+	fi
+}
 
 
 # Load local customizations if they exist

@@ -1,0 +1,37 @@
+# Ubuntu base for broader compatibility testing
+# Larger than Alpine but more similar to common Linux environments
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install base system tools needed for testing
+RUN apt-get update && apt-get install -y \
+    bash \
+    coreutils \
+    curl \
+    git \
+    make \
+    ncurses-bin \
+    findutils \
+    grep \
+    sed \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create test user with sudo access (non-root to match real usage)
+RUN useradd -m -s /bin/bash -G sudo testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Switch to test user
+USER testuser
+WORKDIR /home/testuser
+
+# Copy dotfiles repository into container
+COPY --chown=testuser:testuser . /home/testuser/dotfiles
+
+# Set working directory to dotfiles
+WORKDIR /home/testuser/dotfiles
+
+# Default command: run test suite
+CMD ["tests/test-runner.sh", "all"]

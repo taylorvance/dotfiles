@@ -1,0 +1,34 @@
+# Fast, minimal Alpine Linux base for testing
+# Final image size: ~200MB with all tools
+FROM alpine:3.19
+
+# Install base system tools needed for testing
+RUN apk add --no-cache \
+    bash \
+    coreutils \
+    curl \
+    git \
+    make \
+    ncurses \
+    findutils \
+    grep \
+    sed \
+    tar \
+    gzip \
+    && rm -rf /var/cache/apk/*
+
+# Create test user (non-root to match real usage)
+RUN adduser -D -s /bin/bash testuser
+
+# Create home directory structure
+USER testuser
+WORKDIR /home/testuser
+
+# Copy dotfiles repository into container
+COPY --chown=testuser:testuser . /home/testuser/dotfiles
+
+# Set working directory to dotfiles
+WORKDIR /home/testuser/dotfiles
+
+# Default command: run test suite
+CMD ["tests/test-runner.sh", "all"]

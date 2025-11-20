@@ -8,7 +8,7 @@ set -e
 MODE="${1:-install}"
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 DESTINATIONDIR=$HOME
-SOURCEDIR=$BASEDIR/home-away-from-HOME
+SOURCEDIR=$BASEDIR/src/dotfiles
 CONFIGFILE=$BASEDIR/config
 BACKUPSDIR=$BASEDIR/backups
 
@@ -27,7 +27,7 @@ install_dotfiles() {
         exit 1
     fi
 
-    printf "Installing dotfiles...\n"
+    printf "Linking dotfiles...\n\n"
 
     while IFS= read -r filepath; do
         # Skip empty lines
@@ -36,41 +36,49 @@ install_dotfiles() {
         # Remove trailing slash (necessary because ln -s behaves differently for directories with trailing slashes)
         filepath=${filepath%/}
 
-        printf "\n${filepath}:  "
-
         oldfile=$DESTINATIONDIR/$filepath
         newfile=$SOURCEDIR/$filepath
 
         if [ ! -e "$newfile" ]; then
-            printf "${RED}source not found${NC}"
+            printf "  ${RED}✗${NC} ${filepath}\n"
             continue
         fi
 
         # If the file is already correctly symlinked, skip.
         if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
-            printf "${GREEN}already installed${NC}"
+            printf "  ${GREEN}✓${NC} ${filepath}\n"
             continue
         fi
 
         # If a file with this name already exists, copy it to the backup folder to avoid overwriting.
         if [ -e "$oldfile" ]; then
             mkdir -p "$BACKUPDIR"
-            # Make a deep, recursive copy, removing symlinks.
-            cp -RL "$oldfile" "$BACKUPDIR"
+            # Make a deep, recursive copy, removing symlinks, preserving full path structure
+            mkdir -p "$BACKUPDIR/$(dirname "$filepath")"
+            cp -RL "$oldfile" "$BACKUPDIR/$filepath"
             rm -rf "$oldfile"
-            printf "${YELLOW}backed up${NC}; "
         fi
 
-        mkdir -p "$(dirname "$oldfile")"
+        # Create parent directories, removing any conflicting files in the path
+        local parent_dir="$(dirname "$oldfile")"
+        if [ -f "$parent_dir" ]; then
+            # Parent path is a file, need to back it up and remove it
+            mkdir -p "$BACKUPDIR"
+            local parent_path="${parent_dir#$DESTINATIONDIR/}"
+            mkdir -p "$BACKUPDIR/$(dirname "$parent_path")"
+            cp -RL "$parent_dir" "$BACKUPDIR/$parent_path"
+            rm -rf "$parent_dir"
+        fi
+        mkdir -p "$parent_dir"
         ln -Ffs "$newfile" "$oldfile"
-        printf "${GREEN}installed${NC}"
+        printf "  ${GREEN}✓${NC} ${filepath}\n"
     done < "$CONFIGFILE"
 
-    printf "\n\n${GREEN}Installation complete!${NC}\n"
+    printf "\n${GREEN}All dotfiles linked${NC}\n"
 }
 
 uninstall_dotfiles() {
-    printf "Uninstalling dotfiles...\n"
+    printf "Unlinking dotfiles...\n\n"
 
     while IFS= read -r filepath; do
         # Skip empty lines
@@ -78,25 +86,23 @@ uninstall_dotfiles() {
 
         filepath=${filepath%/}
 
-        printf "\n${filepath}:  "
-
         oldfile=$DESTINATIONDIR/$filepath
         newfile=$SOURCEDIR/$filepath
 
         # Check if it's currently symlinked to our dotfiles
         if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
             rm -f "$oldfile"
-            printf "${GREEN}removed${NC}"
+            printf "  ${GREEN}✓${NC} ${filepath}\n"
         elif [ -L "$oldfile" ]; then
-            printf "${YELLOW}symlink exists but points elsewhere${NC}"
+            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
         elif [ -e "$oldfile" ]; then
-            printf "${YELLOW}exists but not a symlink${NC}"
+            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
         else
-            printf "not installed"
+            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
         fi
     done < "$CONFIGFILE"
 
-    printf "\n\n${GREEN}Uninstallation complete!${NC}\n"
+    printf "\n${GREEN}All dotfiles unlinked${NC}\n"
 }
 
 show_status() {
@@ -113,31 +119,29 @@ show_status() {
         oldfile=$DESTINATIONDIR/$filepath
         newfile=$SOURCEDIR/$filepath
 
-        printf "  %-50s " "$filepath"
-
         if [ ! -e "$newfile" ]; then
-            printf "${RED}✗ source missing${NC}\n"
+            printf "  ${RED}✗${NC} ${filepath}\n"
             all_ok=false
         elif [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
-            printf "${GREEN}✓ installed${NC}\n"
+            printf "  ${GREEN}✓${NC} ${filepath}\n"
         elif [ -L "$oldfile" ]; then
-            printf "${YELLOW}⚠ wrong symlink${NC}\n"
+            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
             all_ok=false
         elif [ -e "$oldfile" ]; then
-            printf "${YELLOW}⚠ file exists${NC}\n"
+            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
             all_ok=false
         else
-            printf "${RED}✗ not installed${NC}\n"
+            printf "  ${RED}✗${NC} ${filepath}\n"
             all_ok=false
         fi
     done < "$CONFIGFILE"
 
     printf "\n"
     if $all_ok; then
-        printf "${GREEN}All dotfiles are correctly installed!${NC}\n"
+        printf "${GREEN}All dotfiles linked${NC}\n"
         exit 0
     else
-        printf "${YELLOW}Some dotfiles need attention.${NC}\n"
+        printf "${YELLOW}Run 'make link' to install missing dotfiles${NC}\n"
         exit 1
     fi
 }

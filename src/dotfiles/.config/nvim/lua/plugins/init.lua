@@ -181,8 +181,8 @@ return {
 			local lspconfig = require('lspconfig')
 			local util = require('lspconfig.util')
 			require('mason-lspconfig').setup({
-				--                   Python    JS      PHP            C#          Vim     Lua      HTML
-				ensure_installed = {'pyright','ts_ls','intelephense','omnisharp','vimls','lua_ls','html'},
+				--                  Python    pylint JS      PHP            C#          Vim     Lua      HTML
+				ensure_installed = {'pyright','ruff','ts_ls','intelephense','omnisharp','vimls','lua_ls','html'},
 				automatic_installation = true,
 				-- Set up LSP servers after installation.
 				handlers = {
@@ -259,12 +259,12 @@ return {
 	{'mfussenegger/nvim-lint',
 		event = {'BufReadPost','BufNewFile'},
 		dependencies = {
-			{"rshkarin/mason-nvim-lint", opts={ensure_installed={"eslint_d","ruff"}}},
+			{"rshkarin/mason-nvim-lint", opts={ensure_installed={"eslint_d"}}},
 		},
 		config = function()
 			local lint = require('lint')
 			lint.linters_by_ft = {
-				python = {'ruff'},
+				-- python uses ruff LSP instead (configured via mason-lspconfig)
 				javascript = {'eslint_d'},
 				javascriptreact = {'eslint_d'},
 				typescript = {'eslint_d'},
@@ -274,6 +274,31 @@ return {
 				callback = function() lint.try_lint() end,
 			})
 		end,
+	},
+	{'stevearc/conform.nvim',
+		event = {'BufWritePre'},
+		cmd = {'ConformInfo'},
+		dependencies = {
+			{'zapling/mason-conform.nvim', opts={ensure_installed={'prettier','black'}}},
+		},
+		opts = {
+			formatters_by_ft = {
+				javascript = {'prettier'},
+				javascriptreact = {'prettier'},
+				typescript = {'prettier'},
+				typescriptreact = {'prettier'},
+				css = {'prettier'},
+				html = {'prettier'},
+				json = {'prettier'},
+				yaml = {'prettier'},
+				markdown = {'prettier'},
+				python = {'black'},
+			},
+			format_on_save = {
+				timeout_ms = 500,
+				lsp_format = 'fallback',
+			},
+		},
 	},
 	'tpope/vim-repeat',
 	'tpope/vim-surround',

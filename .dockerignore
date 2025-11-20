@@ -1,0 +1,7 @@
+# Don't copy these into Docker build context
+.git
+.DS_Store
+backups
+*.swp
+*.swo
+*~
