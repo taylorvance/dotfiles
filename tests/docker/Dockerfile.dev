@@ -1,0 +1,78 @@
+# Ubuntu-based development environment with pre-installed dotfiles
+# Use this for interactive manual testing of your dotfiles setup
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install base system tools and add necessary repos
+RUN apt-get update && apt-get install -y \
+    bash \
+    coreutils \
+    curl \
+    git \
+    make \
+    ncurses-bin \
+    findutils \
+    grep \
+    sed \
+    sudo \
+    wget \
+    build-essential \
+    unzip \
+    ca-certificates \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create test user with sudo access (non-root to match real usage)
+RUN useradd -m -s /bin/bash -G sudo testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Install neovim - use unstable PPA for newer version (0.9+)
+# GitHub releases don't have ARM64 builds, so PPA is more reliable
+RUN add-apt-repository -y ppa:neovim-ppa/unstable && \
+    apt-get update && \
+    apt-get install -y neovim && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install modern CLI tools that aren't in default Ubuntu repos
+# These make the dev environment nicer but aren't critical for dotfiles to work
+RUN apt-get update && apt-get install -y \
+    fd-find \
+    ripgrep \
+    && ln -s $(which fdfind) /usr/local/bin/fd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install bat from GitHub (Ubuntu's version is old/renamed)
+# Detect architecture and download appropriate package
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -LO https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_${ARCH}.deb && \
+    dpkg -i bat_0.24.0_${ARCH}.deb && \
+    rm bat_0.24.0_${ARCH}.deb
+
+# Update apt cache for remaining tools
+RUN apt-get update
+
+# Switch to test user
+USER testuser
+WORKDIR /home/testuser
+
+# Copy dotfiles repository into container
+COPY --chown=testuser:testuser . /home/testuser/dotfiles
+
+# Set working directory to dotfiles
+WORKDIR /home/testuser/dotfiles
+
+# Install dotfiles (runs install-tools.sh + symlink-manager.sh)
+# This tests the actual installation process
+# Use -y flag to auto-accept optional tool prompts
+RUN src/install-tools.sh -y && src/symlink-manager.sh install
+
+# Switch to home directory and configure shell
+WORKDIR /home/testuser
+
+# Source zshrc in bash profile for when entering container
+RUN echo '[ -f ~/.zshrc ] && exec zsh' >> /home/testuser/.bashrc
+
+# Default command: start zsh with login shell
+CMD ["/bin/bash", "-l"]

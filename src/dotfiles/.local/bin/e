@@ -1,40 +1,47 @@
-#!/bin/sh
+#!/bin/bash
 # Enhanced editor wrapper for git-aware file opening
 
 set -e
 
 show_help() {
 	cat <<EOF
-Usage: e [OPTIONS] [FILES...]
+Usage: e [OPTIONS] [FILTERS...]
 
-Enhanced editor wrapper for git-aware file opening.
+Enhanced editor wrapper for git-aware file opening with composable filters.
 
-OPTIONS:
-    -m, --modified           Open modified git files
-    -u, --untracked          Open untracked git files (can be combined with -m)
-    -g, --grep PATTERN       Open files matching pattern (uses git grep in git repos, grep otherwise)
-    -n, --name PATTERN       Open files whose names match pattern (e.g., "*.py")
-    -d, --diff [REF]         Open files from git diff (compares to default branch or REF)
-    -a, --all                Open all files in git repo (tracked files)
-    --history [N]            Open N most recently modified files (default: 10)
+FILE SET OPTIONS (pick one, or combine -m with -u):
+    -m, --modified           Modified tracked files
+    -u, --untracked          Untracked files
+    -a, --all                All tracked files in git repo
+    -d, --diff [REF]         Files from git diff (default branch or REF)
+    --history [N]            N most recently modified files (default: 10)
+
+FILTER OPTIONS (can combine multiple):
+    -g, --grep PATTERN       Filter by content matching PATTERN
+    -n, --name PATTERN       Filter by filename matching PATTERN (regex)
+    FILTERS...               Filter by filename substring (when using other options)
+
+MODIFIERS:
     -i, --interactive        Use fzf to select files interactively
     -h, --help               Show this help message
 
-EXAMPLES:
+COMPOSITION: All filters AND together. For example:
+    e -m -g TODO             Modified files containing "TODO"
+    e -u -n test             Untracked files with "test" in name
+    e -g TODO test           Files containing "TODO" with "test" in filename
+    e -m -g TODO -n .py      Modified Python files containing "TODO"
+    e -a component           All tracked files with "component" in filename
+    e -mui                   Modified+untracked files, interactive selection
+
+BASIC USAGE:
     e                        Open editor with no files
-    e file.txt               Open file.txt
+    e file.txt               Open file.txt (create if doesn't exist)
     e -m                     Open all modified files
-    e -u                     Open all untracked files
-    e -mu                    Open all modified and untracked files
-    e -mui                   Select from modified/untracked files with fzf
-    e -g "TODO"              Open files containing "TODO"
-    e -n "*.py"              Open files whose names match *.py
+    e -mu                    Open modified and untracked files
     e -d                     Open files changed from default branch
     e -d dev                 Open files changed from dev branch
-    e -a                     Open all tracked files in git repo
-    e -ai                    Select from all tracked files with fzf
+    e -ai                    Browse all tracked files with fzf
     e --history              Open 10 most recently modified files
-    e --history 20           Open 20 most recently modified files
 
 PIPING:
     find . -name "*.py" | e  Open all Python files
@@ -102,13 +109,14 @@ make_paths_relative() {
 }
 
 # Parse arguments
-mode=""
-pattern=""
+file_set=""
+grep_pattern=""
+name_pattern=""
 diff_ref=""
 history_count=10
 use_fzf=false
 include_untracked=false
-files=()
+positional_filters=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -117,7 +125,10 @@ while [ $# -gt 0 ]; do
 			exit 0
 			;;
 		-m|--modified)
-			mode="modified"
+			if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
+				die "Cannot combine multiple file set options (only -m -u is allowed)"
+			fi
+			file_set="modified"
 			shift
 			;;
 		-u|--untracked)
@@ -125,29 +136,33 @@ while [ $# -gt 0 ]; do
 			shift
 			;;
 		-g|--grep)
-			mode="grep"
 			shift
 			if [ $# -eq 0 ]; then
 				die "Option -g/--grep requires a pattern"
 			fi
-			pattern="$1"
+			grep_pattern="$1"
 			shift
 			;;
 		-n|--name)
-			mode="name"
 			shift
 			if [ $# -eq 0 ]; then
 				die "Option -n/--name requires a pattern"
 			fi
-			pattern="$1"
+			name_pattern="$1"
 			shift
 			;;
 		-a|--all)
-			mode="all"
+			if [ -n "$file_set" ]; then
+				die "Cannot combine multiple file set options"
+			fi
+			file_set="all"
 			shift
 			;;
 		--history)
-			mode="history"
+			if [ -n "$file_set" ]; then
+				die "Cannot combine multiple file set options"
+			fi
+			file_set="history"
 			shift
 			# Check if next arg is a number (not a flag)
 			if [ $# -gt 0 ] && [ "${1#-}" = "$1" ] && [ "$1" -eq "$1" ] 2>/dev/null; then
@@ -156,7 +171,10 @@ while [ $# -gt 0 ]; do
 			fi
 			;;
 		-d|--diff)
-			mode="diff"
+			if [ -n "$file_set" ]; then
+				die "Cannot combine multiple file set options"
+			fi
+			file_set="diff"
 			shift
 			# Check if next arg is a ref (not a flag)
 			if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
@@ -179,12 +197,22 @@ while [ $# -gt 0 ]; do
 					flag="${flags%"${flags#?}"}"
 					flags="${flags#?}"
 					case "$flag" in
-						m) mode="modified" ;;
+						m)
+							if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
+								die "Cannot combine multiple file set options (only -m -u is allowed)"
+							fi
+							file_set="modified"
+							;;
 						u) include_untracked=true ;;
 						i) use_fzf=true ;;
-						a) mode="all" ;;
+						a)
+							if [ -n "$file_set" ]; then
+								die "Cannot combine multiple file set options"
+							fi
+							file_set="all"
+							;;
 						g|d|n|h)
-							die "Option -$flag cannot be combined with other flags"
+							die "Option -$flag cannot be combined with other flags (requires argument)"
 							;;
 						*)
 							die "Unknown option: -$flag"
@@ -196,41 +224,63 @@ while [ $# -gt 0 ]; do
 			fi
 			;;
 		*)
-			files="$files $1"
+			# Collect positional argument (only one allowed with filters, multiple for direct file opening)
+			if [ -n "$positional_filters" ]; then
+				positional_filters="$positional_filters $1"
+			else
+				positional_filters="$1"
+			fi
 			shift
 			;;
 	esac
 done
 
+# Validate: if using filters, only one positional arg allowed
+if [ -n "$file_set" -o -n "$grep_pattern" -o -n "$name_pattern" ]; then
+	# Count words in positional_filters
+	word_count=$(echo "$positional_filters" | wc -w | tr -d ' ')
+	if [ "$word_count" -gt 1 ]; then
+		die "Only one positional filter allowed. Use regex for complex patterns (e.g., 'test.*component')"
+	fi
+fi
+
 # Check for stdin input (piped data)
+# Use timeout to check if stdin has data without blocking
 has_stdin=false
 if [ ! -t 0 ]; then
-	has_stdin=true
-	stdin_files=$(cat)
+	# Try to read stdin with 0.01s timeout - if data available, read it all
+	stdin_files=$(timeout 0.01 cat 2>/dev/null || true)
 
-	# Error if trying to use stdin with mode flags
-	if [ -n "$mode" ]; then
-		die "Cannot use stdin input with mode flags (-m, -u, -g, -d)"
+	if [ -n "$stdin_files" ]; then
+		has_stdin=true
+
+		# Error if trying to use stdin with file set or filter flags
+		if [ -n "$file_set" ] || [ -n "$grep_pattern" ] || [ -n "$name_pattern" ]; then
+			die "Cannot use stdin input with file set or filter flags"
+		fi
+
+		positional_filters="$positional_filters $stdin_files"
 	fi
-
-	files="$files $stdin_files"
 fi
 
-# Get list of files based on mode
+# Build file list using composable filters
 file_list=""
 
-# Handle the case where -u is used alone (no mode set)
-if [ "$include_untracked" = true ] && [ -z "$mode" ]; then
-	mode="untracked"
+# Step 1: Determine base file set
+# Handle the case where -u is used alone (no file_set)
+if [ "$include_untracked" = true ] && [ -z "$file_set" ]; then
+	file_set="untracked"
 fi
 
-case "$mode" in
+case "$file_set" in
 	modified)
 		check_git_repo
 		if [ "$include_untracked" = true ]; then
-			file_list=$(git status --porcelain | awk '{print $2}')
+			# Get modified and untracked, but exclude deleted files
+			file_list=$(git status --porcelain | grep -v '^D\| D' | awk '{print $2}')
 		else
-			file_list=$(git status --porcelain | grep '^ M\| M\|^M' | awk '{print $2}')
+			# Get only modified files (not deleted)
+			file_list=$(git status --porcelain | grep '^ M\| M\|^M' | grep -v '^D\| D' | awk '{print $2}')
 		fi
 		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
@@ -243,33 +293,6 @@ case "$mode" in
 		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No untracked files found"
-		fi
-		;;
-	grep)
-		# Use git grep if in a git repo, otherwise use regular grep
-		if [ "$is_git_repo" = true ]; then
-			file_list=$(git grep -l "$pattern" 2>/dev/null || true)
-			file_list=$(make_paths_relative "$file_list")
-		else
-			# Recursive grep, exclude common directories, only list filenames
-			file_list=$(grep -r -l "$pattern" . 2>/dev/null | grep -v '/\.' | sed 's|^\./||' || true)
-		fi
-		if [ -z "$file_list" ]; then
-			die "No files matching pattern '$pattern'"
-		fi
-		;;
-	name)
-		# Find files by name pattern
-		if [ "$is_git_repo" = true ]; then
-			# In git repo, search tracked files
-			file_list=$(git ls-files | grep "$pattern" || true)
-			file_list=$(make_paths_relative "$file_list")
-		else
-			# Outside git repo, use find
-			file_list=$(find . -type f -name "$pattern" 2>/dev/null | sed 's|^\./||' || true)
-		fi
-		if [ -z "$file_list" ]; then
-			die "No files matching name pattern '$pattern'"
 		fi
 		;;
 	all)
@@ -313,10 +336,69 @@ case "$mode" in
 		fi
 		;;
 	"")
-		# No mode, use provided files (or open editor with no args)
-		file_list="$files"
+		# No file set specified
+		# If we have filters, default to all tracked files (or all files if not in git repo)
+		if [ -n "$grep_pattern" ] || [ -n "$name_pattern" ]; then
+			if [ "$is_git_repo" = true ]; then
+				file_list=$(git ls-files)
+				file_list=$(make_paths_relative "$file_list")
+			else
+				# Outside git repo, find all files
+				file_list=$(find . -type f 2>/dev/null | sed 's|^\./||' || true)
+			fi
+		else
+			# No file set and no filters - use positional args as files to open
+			file_list="$positional_filters"
+		fi
 		;;
 esac
+
+# Step 2: Apply all filename filters (cheap - do this before expensive grep)
+# Both -n and positional arg are just filename pattern matching
+if [ -n "$file_list" ]; then
+	# Apply -n pattern if provided
+	if [ -n "$name_pattern" ]; then
+		file_list=$(echo "$file_list" | grep "$name_pattern" || true)
+		if [ -z "$file_list" ]; then
+			die "No files matching name pattern '$name_pattern'"
+		fi
+	fi
+
+	# Apply positional filter if provided (only when using filters, not for direct file opening)
+	if [ -n "$positional_filters" ] && [ -n "$file_set" -o -n "$grep_pattern" -o -n "$name_pattern" ]; then
+		file_list=$(echo "$file_list" | grep "$positional_filters" || true)
+		if [ -z "$file_list" ]; then
+			die "No files matching filter '$positional_filters'"
+		fi
+	fi
+fi
+
+# Step 3: Apply content filter (expensive - do this last on the reduced file set)
+if [ -n "$grep_pattern" ] && [ -n "$file_list" ]; then
+	if [ "$is_git_repo" = true ]; then
+		# Use git grep on the file list
+		filtered=""
+		for file in $file_list; do
+			if git grep -q "$grep_pattern" -- "$file" 2>/dev/null; then
+				filtered="$filtered$file"$'\n'
+			fi
+		done
+		file_list="$filtered"
+	else
+		# Use regular grep
+		filtered=""
+		for file in $file_list; do
+			if [ -f "$file" ] && grep -q "$grep_pattern" "$file" 2>/dev/null; then
+				filtered="$filtered$file"$'\n'
+			fi
+		done
+		file_list="$filtered"
+	fi
+
+	if [ -z "$file_list" ]; then
+		die "No files matching content pattern '$grep_pattern'"
+	fi
+fi
 
 # Use fzf for interactive selection if requested
 if [ "$use_fzf" = true ]; then
