@@ -4,6 +4,23 @@
 
 set -e
 
+# Parse command line flags
+AUTO_YES=false
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-y|--yes)
+			AUTO_YES=true
+			shift
+			;;
+		*)
+			echo "Unknown option: $1"
+			echo "Usage: $0 [-y|--yes]"
+			echo "  -y, --yes    Automatically answer yes to all prompts"
+			exit 1
+			;;
+	esac
+done
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -21,6 +38,7 @@ SKIPPED="⊙"
 declare -a installed_tools
 declare -a present_tools
 declare -a failed_tools
+declare -a failed_optional_tools
 declare -a skipped_tools
 
 # Print colored message
@@ -112,6 +130,55 @@ install_tool() {
 	return 1
 }
 
+# Install optional tool (non-critical, won't fail build)
+install_optional_tool() {
+	local tool=$1
+	local pkg_name=${2:-$tool}  # Use tool name if package name not specified
+
+	if command_exists "$tool"; then
+		print_status "$YELLOW" "$PRESENT" "$tool (already installed)"
+		present_tools+=("$tool")
+		return 0
+	fi
+
+	print_status "$BLUE" "..." "Installing $tool..."
+
+	case $PKG_MGR in
+		brew)
+			if brew install "$pkg_name" >/dev/null 2>&1; then
+				print_status "$GREEN" "$INSTALLED" "$tool"
+				installed_tools+=("$tool")
+				return 0
+			fi
+			;;
+		apt)
+			if sudo apt install -y "$pkg_name" >/dev/null 2>&1; then
+				print_status "$GREEN" "$INSTALLED" "$tool"
+				installed_tools+=("$tool")
+				return 0
+			fi
+			;;
+		dnf)
+			if sudo dnf install -y "$pkg_name" >/dev/null 2>&1; then
+				print_status "$GREEN" "$INSTALLED" "$tool"
+				installed_tools+=("$tool")
+				return 0
+			fi
+			;;
+		pacman)
+			if sudo pacman -S --noconfirm "$pkg_name" >/dev/null 2>&1; then
+				print_status "$GREEN" "$INSTALLED" "$tool"
+				installed_tools+=("$tool")
+				return 0
+			fi
+			;;
+	esac
+
+	print_status "$YELLOW" "$SKIPPED" "$tool (not available in repos)"
+	failed_optional_tools+=("$tool")
+	return 0
+}
+
 # Install optional tool (prompt before installing)
 install_optional() {
 	local tool=$1
@@ -123,13 +190,19 @@ install_optional() {
 		return 0
 	fi
 
-	# Prompt user
-	echo -ne "${YELLOW}Install ${tool}? (y/N): ${NC}"
-	read -r response
-	if [[ ! "$response" =~ ^[Yy]$ ]]; then
-		print_status "$YELLOW" "$SKIPPED" "$tool (skipped)"
-		skipped_tools+=("$tool")
-		return 0
+	# Auto-yes if flag is set
+	if [ "$AUTO_YES" = true ]; then
+		# Just continue to installation
+		:
+	else
+		# Prompt user
+		echo -ne "${YELLOW}Install ${tool}? (y/N): ${NC}"
+		read -r response
+		if [[ ! "$response" =~ ^[Yy]$ ]]; then
+			print_status "$YELLOW" "$SKIPPED" "$tool (skipped)"
+			skipped_tools+=("$tool")
+			return 0
+		fi
 	fi
 
 	print_status "$BLUE" "..." "Installing $tool..."
@@ -242,16 +315,18 @@ main() {
 
 	echo ""
 	echo -e "${BLUE}Installing modern CLI tools...${NC}"
+	echo "(These enhance the shell experience but aren't critical)"
+	echo ""
 
-	# Modern CLI replacements
-	install_tool fzf
-	install_tool bat
-	install_tool zoxide
-	install_tool eza
-	install_tool fd
-	install_tool rg ripgrep
-	install_tool delta git-delta
-	install_tool atuin
+	# Modern CLI replacements (all have fallbacks in .zshrc)
+	install_optional_tool fzf
+	install_optional_tool bat
+	install_optional_tool zoxide
+	install_optional_tool eza
+	install_optional_tool fd
+	install_optional_tool rg ripgrep
+	install_optional_tool delta git-delta
+	install_optional_tool atuin
 
 	echo ""
 	echo -e "${BLUE}Installing development tools...${NC}"
@@ -284,15 +359,22 @@ main() {
 		present_tools+=("python3")
 	fi
 
-	echo ""
-	echo -e "${BLUE}Installing optional language tools...${NC}"
-	echo "(These are only needed if you work with specific languages)"
-	echo ""
+	# Only prompt for language-specific tools in interactive mode
+	if [ "$AUTO_YES" = false ]; then
+		echo ""
+		echo -e "${BLUE}Installing optional language tools...${NC}"
+		echo "(These are only needed if you work with specific languages)"
+		echo ""
 
-	# Optional language-specific tools
-	install_optional ollama
-	install_optional dotnet
-	install_optional php
+		# Optional language-specific tools
+		install_optional ollama
+		install_optional dotnet
+		install_optional php
+	else
+		echo ""
+		echo -e "${YELLOW}Skipping optional language tools (ollama, dotnet, php) in non-interactive mode${NC}"
+		echo -e "${YELLOW}Install these manually if needed after setup${NC}"
+	fi
 
 	# Print summary
 	echo ""
@@ -317,11 +399,19 @@ main() {
 		echo ""
 	fi
 
+	if [ ${#failed_optional_tools[@]} -gt 0 ]; then
+		echo -e "${YELLOW}Optional tools not available (${#failed_optional_tools[@]}):${NC}"
+		printf "  %s\n" "${failed_optional_tools[@]}"
+		echo -e "${YELLOW}(These aren't critical - your dotfiles will work fine with fallbacks)${NC}"
+		echo ""
+	fi
+
 	if [ ${#failed_tools[@]} -gt 0 ]; then
-		echo -e "${RED}Failed (${#failed_tools[@]}):${NC}"
+		echo -e "${RED}Critical tools failed (${#failed_tools[@]}):${NC}"
 		printf "  %s\n" "${failed_tools[@]}"
 		echo ""
-		echo -e "${YELLOW}Note: Your dotfiles will still work, but some features may be limited.${NC}"
+		echo -e "${RED}ERROR: Core tools are required for dotfiles to function properly.${NC}"
+		echo "Please install these manually and try again."
 		exit 1
 	fi
 

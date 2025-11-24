@@ -51,7 +51,7 @@ Run `make help` to see all available commands:
 **Setup & Management:**
 
 - `make setup` - Complete bootstrap: install tools + create symlinks
-- `make install-tools` - Install required CLI tools (prompts to also install optional tools)
+- `make install` - Install required CLI tools (prompts to also install optional tools)
 - `make link` - Create symlinks only (no tool installation)
 - `make unlink` - Remove all dotfile symlinks
 - `make status` - Show installation status of tools and dotfiles
