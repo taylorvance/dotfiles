@@ -1,0 +1,335 @@
+#!/bin/sh
+# System information utility - quick hardware specs at a glance
+
+set -e
+
+show_help() {
+	cat <<EOF
+Usage: sysinfo [OPTIONS]
+
+Cross-platform system information utility that displays hardware specs.
+
+OPTIONS:
+    -m, --more               Show extended information (network, display, etc.)
+    -h, --help               Show this help message
+
+SUPPORTED PLATFORMS:
+    macOS (Intel and Apple Silicon), Linux, WSL
+EOF
+}
+
+# Detect platform
+detect_platform() {
+	if [ "$(uname)" = "Darwin" ]; then
+		echo "macos"
+	elif [ -f /proc/version ] && grep -qi microsoft /proc/version; then
+		echo "wsl"
+	elif [ "$(uname)" = "Linux" ]; then
+		echo "linux"
+	else
+		echo "unknown"
+	fi
+}
+
+# Get CPU info
+get_cpu() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			local brand=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Unknown")
+			local cores=$(sysctl -n hw.ncpu 2>/dev/null || echo "?")
+			echo "$brand ($cores cores)"
+			;;
+		linux|wsl)
+			local model=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[[:space:]]*//' || echo "Unknown")
+			local cores=$(grep -c "^processor" /proc/cpuinfo 2>/dev/null || echo "?")
+			echo "$model ($cores cores)"
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
+}
+
+# Get RAM in GB
+get_ram() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			local bytes=$(sysctl -n hw.memsize 2>/dev/null || echo "0")
+			echo "$(echo "scale=0; $bytes / 1024 / 1024 / 1024" | bc) GB"
+			;;
+		linux|wsl)
+			local kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
+			echo "$(echo "scale=0; $kb / 1024 / 1024" | bc) GB"
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
+}
+
+# Get GPU info
+get_gpu() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			local chip=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "Chipset Model:" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//')
+			local vram=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "VRAM" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//')
+			local metal=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -o "Metal.*" | head -1)
+			if [ -n "$chip" ]; then
+				local result="$chip"
+				[ -n "$vram" ] && result="$result ($vram)"
+				[ -n "$metal" ] && [ -z "$vram" ] && result="$result ($metal)"
+				echo "$result"
+			else
+				echo "Unknown"
+			fi
+			;;
+		linux|wsl)
+			if command -v lspci >/dev/null 2>&1; then
+				lspci 2>/dev/null | grep -i "vga\|3d\|display" | head -1 | sed 's/.*: //' || echo "Unknown"
+			else
+				echo "Unknown (lspci not available)"
+			fi
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
+}
+
+# Get storage info
+get_storage() {
+	local avail=$(df -h / 2>/dev/null | tail -1 | awk '{print $4}')
+	local total=$(df -h / 2>/dev/null | tail -1 | awk '{print $2}')
+	if [ -n "$avail" ] && [ -n "$total" ]; then
+		echo "${avail}B / ${total}B"
+	else
+		echo "Unknown"
+	fi
+}
+
+# Get OS info
+get_os() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			local ver=$(sw_vers -productVersion 2>/dev/null || echo "Unknown")
+			local build=$(sw_vers -buildVersion 2>/dev/null)
+			[ -n "$build" ] && echo "macOS $ver ($build)" || echo "macOS $ver"
+			;;
+		linux)
+			if [ -f /etc/os-release ]; then
+				. /etc/os-release
+				echo "${PRETTY_NAME:-Linux}"
+			else
+				echo "Linux $(uname -r)"
+			fi
+			;;
+		wsl)
+			if [ -f /etc/os-release ]; then
+				. /etc/os-release
+				echo "${PRETTY_NAME:-Linux} (WSL)"
+			else
+				echo "Linux (WSL)"
+			fi
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
+}
+
+# Get architecture
+get_arch() {
+	uname -m
+}
+
+# Get kernel
+get_kernel() {
+	uname -r
+}
+
+# Get hostname
+get_hostname() {
+	hostname 2>/dev/null || cat /etc/hostname 2>/dev/null || echo "Unknown"
+}
+
+# Get uptime
+get_uptime() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			local boot=$(sysctl -n kern.boottime 2>/dev/null | awk -F'[ ,]' '{print $4}')
+			if [ -n "$boot" ]; then
+				local now=$(date +%s)
+				local secs=$((now - boot))
+				local days=$((secs / 86400))
+				local hours=$(((secs % 86400) / 3600))
+				local mins=$(((secs % 3600) / 60))
+				if [ $days -gt 0 ]; then
+					echo "${days}d ${hours}h ${mins}m"
+				elif [ $hours -gt 0 ]; then
+					echo "${hours}h ${mins}m"
+				else
+					echo "${mins}m"
+				fi
+			else
+				echo "Unknown"
+			fi
+			;;
+		linux|wsl)
+			if [ -f /proc/uptime ]; then
+				local secs=$(cut -d. -f1 /proc/uptime)
+				local days=$((secs / 86400))
+				local hours=$(((secs % 86400) / 3600))
+				local mins=$(((secs % 3600) / 60))
+				if [ $days -gt 0 ]; then
+					echo "${days}d ${hours}h ${mins}m"
+				elif [ $hours -gt 0 ]; then
+					echo "${hours}h ${mins}m"
+				else
+					echo "${mins}m"
+				fi
+			else
+				echo "Unknown"
+			fi
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
+}
+
+# Get local IP
+get_local_ip() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			local ip=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+			echo "${ip:-No active connection}"
+			;;
+		linux|wsl)
+			local ip=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
+			if [ -z "$ip" ]; then
+				ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+			fi
+			echo "${ip:-No active connection}"
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
+}
+
+# Get public IP
+get_public_ip() {
+	curl -s --max-time 2 ifconfig.me 2>/dev/null || \
+	curl -s --max-time 2 icanhazip.com 2>/dev/null || \
+	echo "Unavailable"
+}
+
+# Get display resolution
+get_display() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			system_profiler SPDisplaysDataType 2>/dev/null | grep "Resolution:" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//' || echo "Unknown"
+			;;
+		linux)
+			if command -v xrandr >/dev/null 2>&1 && [ -n "$DISPLAY" ]; then
+				xrandr 2>/dev/null | grep '\*' | head -1 | awk '{print $1}' || echo "Unknown"
+			else
+				echo "Unknown (no display or xrandr)"
+			fi
+			;;
+		wsl)
+			echo "N/A (WSL)"
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
+}
+
+# Get disk breakdown
+get_disks() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			df -h 2>/dev/null | grep "^/dev/" | awk '{printf "  %-20s %s / %s (%s used)\n", $9, $4, $2, $5}'
+			;;
+		linux|wsl)
+			df -h 2>/dev/null | grep "^/dev/" | awk '{printf "  %-20s %s / %s (%s used)\n", $6, $4, $2, $5}'
+			;;
+	esac
+}
+
+# Get shell
+get_shell() {
+	basename "$SHELL"
+}
+
+# Get terminal
+get_terminal() {
+	if [ -n "$TERM_PROGRAM" ]; then
+		echo "$TERM_PROGRAM"
+	elif [ -n "$TERM" ]; then
+		echo "$TERM"
+	else
+		echo "Unknown"
+	fi
+}
+
+# Main
+main() {
+	local show_more=false
+
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-h|--help)
+				show_help
+				exit 0
+				;;
+			-m|--more)
+				show_more=true
+				shift
+				;;
+			*)
+				echo "Unknown option: $1" >&2
+				exit 1
+				;;
+		esac
+	done
+
+	local platform=$(detect_platform)
+
+	echo ""
+	printf "%-12s %s\n" "CPU:" "$(get_cpu "$platform")"
+	printf "%-12s %s\n" "RAM:" "$(get_ram "$platform")"
+	printf "%-12s %s\n" "GPU:" "$(get_gpu "$platform")"
+	printf "%-12s %s\n" "Storage:" "$(get_storage)"
+	printf "%-12s %s\n" "OS:" "$(get_os "$platform")"
+	printf "%-12s %s\n" "Arch:" "$(get_arch)"
+
+	if [ "$show_more" = true ]; then
+		echo ""
+		printf "%-12s %s\n" "Kernel:" "$(get_kernel)"
+		printf "%-12s %s\n" "Hostname:" "$(get_hostname)"
+		printf "%-12s %s\n" "Uptime:" "$(get_uptime "$platform")"
+		printf "%-12s %s\n" "Shell:" "$(get_shell)"
+		printf "%-12s %s\n" "Terminal:" "$(get_terminal)"
+		echo ""
+		printf "%-12s %s\n" "Local IP:" "$(get_local_ip "$platform")"
+		printf "%-12s %s\n" "Public IP:" "$(get_public_ip)"
+		printf "%-12s %s\n" "Display:" "$(get_display "$platform")"
+		echo ""
+		echo "Volumes:"
+		get_disks "$platform"
+	fi
+
+	echo ""
+}
+
+main "$@"
