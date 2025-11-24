@@ -111,6 +111,23 @@ zle -N zle-keymap-select
 
 # Before executing a command, store start time for duration calculation
 preexec () {
+	# Skip timer for commands that typically wait for user interaction
+	local interactive_cmds=(
+		'\bless\b' '\bmore\b' '\bmost\b'           # Pagers
+		'\bvim?\b' '\bnvim\b' '\bnano\b' '\bemacs\b'  # Editors
+		'\bman\b' '\binfo\b'                       # Documentation
+		'\btop\b' '\bhtop\b' '\bbtop\b'            # Monitors
+		'git (diff|log|show)'                      # Git pagers
+		'sudo (apt|dnf|yum|pacman) install'        # Package managers with prompts
+	)
+
+	for pattern in $interactive_cmds; do
+		if [[ "$1" =~ $pattern ]]; then
+			unset ZSH_THEME_PROMPT_CMD_START
+			return
+		fi
+	done
+
 	ZSH_THEME_PROMPT_CMD_START=$SECONDS
 }
 
