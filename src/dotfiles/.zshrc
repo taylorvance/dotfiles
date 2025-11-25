@@ -113,12 +113,12 @@ zle -N zle-keymap-select
 preexec () {
 	# Skip timer for commands that typically wait for user interaction
 	local interactive_cmds=(
-		'\bless\b' '\bmore\b' '\bmost\b'           # Pagers
-		'\bvim?\b' '\bnvim\b' '\bnano\b' '\bemacs\b'  # Editors
-		'\bman\b' '\binfo\b'                       # Documentation
-		'\btop\b' '\bhtop\b' '\bbtop\b'            # Monitors
-		'git (diff|log|show)'                      # Git pagers
-		'sudo (apt|dnf|yum|pacman) install'        # Package managers with prompts
+		'\bvim?\b' '\bnvim\b' '\be\b'        # Editors
+		'\bman\b' 		                     # Documentation
+		'\bless\b' '\bbat\b' '\br\b'         # Pagers
+		'git (diff|di|log|lg|show)'          # Git pagers
+		'\btop\b' '\bhtop\b' '\bbtop\b'      # Monitors
+		'sudo (apt|dnf|yum|pacman) install'  # Package managers with prompts
 	)
 
 	for pattern in $interactive_cmds; do
