@@ -1,3 +1,4 @@
+.config/bat/config
 .config/nvim/README.md
 .config/nvim/init.vim
 .config/nvim/lua/config/lazy.lua

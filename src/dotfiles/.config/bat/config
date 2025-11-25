@@ -1,0 +1,15 @@
+# bat configuration
+# See: bat --help
+
+# Set theme (auto-downloaded by .zshrc on first use)
+--theme="tokyonight_moon"
+
+# Show line numbers and git modifications
+--style="numbers,changes"
+
+# Use italic text (if terminal supports it)
+--italic-text=always
+
+# Map file extensions
+--map-syntax "*.conf:INI"
+--map-syntax ".ignore:Git Ignore"

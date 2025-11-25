@@ -151,7 +151,17 @@ precmd() {
 # MISC
 
 # `r` for "read" (alias to bat/less)
+# bat config sets theme and options via ~/.config/bat/config
 if command -v bat >/dev/null; then
+	# Auto-download bat themes if missing (self-healing setup)
+	if [ ! -f "$HOME/.config/bat/themes/tokyonight_moon.tmTheme" ]; then
+		mkdir -p "$HOME/.config/bat/themes"
+		if command -v curl >/dev/null; then
+			curl -fsSL -o "$HOME/.config/bat/themes/tokyonight_moon.tmTheme" \
+				"https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_moon.tmTheme" >/dev/null 2>&1 && \
+				bat cache --build >/dev/null 2>&1
+		fi
+	fi
 	alias r='bat'
 else
 	alias r='less'
