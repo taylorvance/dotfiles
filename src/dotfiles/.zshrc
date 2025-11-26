@@ -83,7 +83,7 @@ PROMPT+='$(git_prompt_info)'
 ZSH_THEME_VI_PROMPT_INSERT=""
 ZSH_THEME_VI_PROMPT_NORMAL=" %B%F{cyan}-- NORMAL --%f%b"
 PROMPT+='$(vi_prompt_info)'
-# command duration (if 3+ seconds)
+# command duration
 PROMPT+='$ZSH_THEME_PROMPT_DURATION'
 # newline and down-right line thing
 PROMPT+=$'\n'
@@ -110,23 +110,25 @@ zle -N zle-line-init
 zle -N zle-keymap-select
 
 # Before executing a command, store start time for duration calculation
-preexec () {
-	# Skip timer for commands that typically wait for user interaction
-	local interactive_cmds=(
-		'\bvim?\b' '\bnvim\b' '\be\b'        # Editors
-		'\bman\b' 		                     # Documentation
-		'\bless\b' '\bbat\b' '\br\b'         # Pagers
-		'git (diff|di|log|lg|show)'          # Git pagers
-		'\btop\b' '\bhtop\b' '\bbtop\b'      # Monitors
-		'sudo (apt|dnf|yum|pacman) install'  # Package managers with prompts
-	)
+preexec() {
+	local cmd="$1"
+	local interactive=(vim nvim e man less bat r top htop btop claude)
 
-	for pattern in $interactive_cmds; do
-		if [[ "$1" =~ $pattern ]]; then
-			unset ZSH_THEME_PROMPT_CMD_START
-			return
-		fi
+	# Get first command (or command after sudo)
+	local first="${cmd%% *}"
+	[[ "$first" == "sudo" ]] && first="${${cmd#sudo }%% *}"
+
+	# Skip if first cmd or anything after a pipe is interactive
+	for prog in $interactive; do
+		[[ "$first" == "$prog" ]] && return
+		# Glob pattern: append space to cmd so "| prog" at end becomes "| prog "
+		[[ "$cmd " == *"| $prog "* || "$cmd " == *"|$prog "* ]] && return
 	done
+
+	# Git pagers
+	[[ "$cmd" =~ ^git\ (diff|di|log|lg|show) ]] && return
+	# Package managers with prompts
+	[[ "$cmd" =~ ^sudo\ (apt|dnf|yum|pacman)\ install ]] && return
 
 	ZSH_THEME_PROMPT_CMD_START=$SECONDS
 }
@@ -135,8 +137,7 @@ preexec () {
 precmd() {
 	if [ -n "$ZSH_THEME_PROMPT_CMD_START" ]; then
 		local duration=$((SECONDS - ZSH_THEME_PROMPT_CMD_START))
-		if [ $duration -ge 3 ]; then
-			# Show duration if command took 3+ seconds
+		if [ $duration -ge 1 ]; then
 			ZSH_THEME_PROMPT_DURATION=" %F{yellow}[${duration}s]%f"
 		else
 			ZSH_THEME_PROMPT_DURATION=""
@@ -163,6 +164,7 @@ if command -v bat >/dev/null; then
 		fi
 	fi
 	alias r='bat'
+	export PAGER=bat
 else
 	alias r='less'
 fi

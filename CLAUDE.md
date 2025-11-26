@@ -134,7 +134,7 @@ Uses a **composable filter model** where all filters AND together:
 
 - Uses Antigen plugin manager with oh-my-zsh
 - Vi mode enabled with `jk`/`kj` escape to normal mode
-- Custom theme showing user@host, path, git branch, vi mode, command duration (3+s), exit code
+- Custom theme showing user@host, path, git branch, vi mode, command duration (1+s), exit code
 - Key bindings: ↑/↓ for history search, `^r` for atuin/history search
 - Modern CLI tools: `zoxide` (z), `eza` (ls/ll/la/lt), `fd` (f), `ripgrep` (rg), `atuin` (history)
 - Aliases: `r` (bat/less), `tree2` (filtered tree), `python` (python3)
