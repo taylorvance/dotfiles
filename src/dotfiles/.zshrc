@@ -151,7 +151,7 @@ precmd() {
 
 # MISC
 
-# `r` for "read" (alias to bat/less)
+# `r` for "read" - smart pager that handles both files and piped colored output
 # bat config sets theme and options via ~/.config/bat/config
 if command -v bat >/dev/null; then
 	# Auto-download bat themes if missing (self-healing setup)
@@ -231,9 +231,9 @@ fi
 
 # eza - modern ls replacement (with fallback to regular ls)
 if command -v eza >/dev/null 2>&1; then
-	alias ls='eza --icons --group-directories-first'
-	alias ll='eza -l --icons --group-directories-first --git'
-	alias la='eza -la --icons --group-directories-first --git'
+	alias ls='eza --icons=always --group-directories-first --color=always'
+	alias ll='eza -l --icons=always --group-directories-first --git --color=always'
+	alias la='eza -la --icons=always --group-directories-first --git --color=always'
 	# lt - tree view with configurable depth (defaults to full depth)
 	# Usage: lt [level] [path]
 	#   lt        → unlimited depth (default)
@@ -252,9 +252,9 @@ if command -v eza >/dev/null 2>&1; then
 
 		# level=0 means unlimited (omit the --level flag)
 		if [[ $level -eq 0 ]]; then
-			eza --tree --all --icons --group-directories-first --git-ignore --ignore-glob="$ignore_patterns" "$@"
+			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --ignore-glob="$ignore_patterns" "$@"
 		else
-			eza --tree --all --icons --group-directories-first --git-ignore --level=$level --ignore-glob="$ignore_patterns" "$@"
+			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --level=$level --ignore-glob="$ignore_patterns" "$@"
 		fi
 	}
 else
