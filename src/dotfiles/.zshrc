@@ -83,7 +83,8 @@ PROMPT+='$(git_prompt_info)'
 ZSH_THEME_VI_PROMPT_INSERT=""
 ZSH_THEME_VI_PROMPT_NORMAL=" %B%F{cyan}-- NORMAL --%f%b"
 PROMPT+='$(vi_prompt_info)'
-# command duration
+# command duration (shown if >= CMD_DURATION_THRESHOLD seconds)
+CMD_DURATION_THRESHOLD=2
 PROMPT+='$ZSH_THEME_PROMPT_DURATION'
 # newline and down-right line thing
 PROMPT+=$'\n'
@@ -137,7 +138,7 @@ preexec() {
 precmd() {
 	if [ -n "$ZSH_THEME_PROMPT_CMD_START" ]; then
 		local duration=$((SECONDS - ZSH_THEME_PROMPT_CMD_START))
-		if [ $duration -ge 1 ]; then
+		if [ $duration -ge $CMD_DURATION_THRESHOLD ]; then
 			ZSH_THEME_PROMPT_DURATION=" %F{yellow}[${duration}s]%f"
 		else
 			ZSH_THEME_PROMPT_DURATION=""
