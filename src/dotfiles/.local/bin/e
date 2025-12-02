@@ -289,7 +289,7 @@ case "$file_set" in
 		;;
 	untracked)
 		check_git_repo
-		file_list=$(git status --porcelain | grep '^??' | awk '{print $2}')
+		file_list=$(git ls-files --others --exclude-standard)
 		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No untracked files found"

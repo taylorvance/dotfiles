@@ -169,6 +169,24 @@ run_e() {
     [[ "$output" != *"other.txt"* ]]
 }
 
+@test "e -u -n PATTERN: finds files inside untracked directories" {
+    # Setup: create tracked file and untracked directory with files
+    echo "tracked" > tracked.txt
+    git add tracked.txt
+    git commit -q -m "initial"
+    mkdir -p newdir
+    echo "untracked" > newdir/temp.txt
+    echo "untracked" > newdir/other.txt
+
+    # Run: should find temp.txt inside untracked directory
+    run_e -u -n temp
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"newdir/temp.txt"* ]]
+    [[ "$output" != *"other.txt"* ]]
+}
+
 # ============================================================================
 # POSITIONAL FILTER TESTS
 # ============================================================================
