@@ -37,6 +37,7 @@
 [core]
 	editor = nvim
 	excludesFile = ~/.gitignore
+	pager = delta
 
 [grep]
 	extendRegexp = true
