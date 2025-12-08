@@ -259,6 +259,58 @@ run_e() {
     # This would test -a -i combined, but requires fzf
 }
 
+@test "e -i: implies -a (all tracked files)" {
+    # Setup: mock fzf to just pass through
+    cat > "$TEST_DIR/fzf" <<'EOF'
+#!/bin/bash
+cat
+EOF
+    chmod +x "$TEST_DIR/fzf"
+    export PATH="$TEST_DIR:$PATH"
+
+    # Create tracked files
+    echo "file1" > file1.txt
+    echo "file2" > file2.txt
+    echo "untracked" > untracked.txt
+    git add file1.txt file2.txt
+    git commit -q -m "initial"
+
+    # Run
+    run_e -i
+
+    # Assert: should get all tracked files (not untracked)
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file2.txt"* ]]
+    [[ "$output" != *"untracked.txt"* ]]
+}
+
+@test "e -i FILTER: filters all tracked files with positional arg" {
+    # Setup: mock fzf to just pass through
+    cat > "$TEST_DIR/fzf" <<'EOF'
+#!/bin/bash
+cat
+EOF
+    chmod +x "$TEST_DIR/fzf"
+    export PATH="$TEST_DIR:$PATH"
+
+    # Create tracked files
+    echo "content" > component.js
+    echo "content" > helper.js
+    echo "content" > test.js
+    git add .
+    git commit -q -m "initial"
+
+    # Run: -i with positional filter
+    run_e -i component
+
+    # Assert: should only get files matching "component"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"component.js"* ]]
+    [[ "$output" != *"helper.js"* ]]
+    [[ "$output" != *"test.js"* ]]
+}
+
 # ============================================================================
 # ERROR CASES
 # ============================================================================
@@ -277,22 +329,65 @@ run_e() {
     [[ "$output" == *"Only one positional filter allowed"* ]]
 }
 
-@test "e -m -a: cannot combine multiple file sets" {
-    # Run
-    run_e -m -a
+@test "e -ma: -a is superset of -m, opens all tracked files" {
+    # Setup
+    echo "file1" > file1.txt
+    echo "file2" > file2.txt
+    git add .
+    git commit -q -m "initial"
+    echo "modified" > file1.txt
 
-    # Assert
-    [ "$status" -ne 0 ]
-    [[ "$output" == *"Cannot combine multiple file set options"* ]]
+    # Run: -ma should behave like -a
+    run_e -ma
+
+    # Assert: should get all tracked files
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file2.txt"* ]]
 }
 
-@test "e -a -d: cannot combine multiple file sets" {
+@test "e -a -d: cannot combine -a with -d" {
     # Run
     run_e -a -d
 
     # Assert
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Cannot combine multiple file set options"* ]]
+    [[ "$output" == *"Cannot combine"* ]]
+}
+
+@test "e -au: all tracked plus untracked (everything)" {
+    # Setup
+    echo "tracked1" > tracked1.txt
+    echo "tracked2" > tracked2.txt
+    git add .
+    git commit -q -m "initial"
+    echo "untracked" > untracked.txt
+
+    # Run
+    run_e -au
+
+    # Assert: should get all tracked AND untracked
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tracked1.txt"* ]]
+    [[ "$output" == *"tracked2.txt"* ]]
+    [[ "$output" == *"untracked.txt"* ]]
+}
+
+@test "e -amu: same as -au (everything)" {
+    # Setup
+    echo "tracked" > tracked.txt
+    git add .
+    git commit -q -m "initial"
+    echo "modified" > tracked.txt
+    echo "untracked" > untracked.txt
+
+    # Run
+    run_e -amu
+
+    # Assert: should get everything
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tracked.txt"* ]]
+    [[ "$output" == *"untracked.txt"* ]]
 }
 
 @test "e -g: requires pattern argument" {
@@ -367,4 +462,117 @@ run_e() {
     # Assert
     [ "$status" -eq 0 ]
     [[ "$output" == *"COMPOSITION"* ]]
+}
+
+# ============================================================================
+# SUBDIRECTORY TESTS - Running from within repo subdirectories
+# ============================================================================
+
+# Helper to run e script from a subdirectory
+run_e_from_subdir() {
+    local subdir="$1"
+    shift
+    cd "$TEST_REPO/$subdir"
+    run "$TEST_DIR/e" "$@"
+}
+
+@test "e -u from subdirectory: paths are correct" {
+    # Setup: create subdirectory structure
+    mkdir -p "$TEST_REPO/apps/overlay/src"
+    echo "tracked" > "$TEST_REPO/apps/overlay/tracked.txt"
+    git -C "$TEST_REPO" add apps/overlay/tracked.txt
+    git -C "$TEST_REPO" commit -q -m "initial"
+    echo "untracked" > "$TEST_REPO/apps/overlay/src/newfile.txt"
+
+    # Run from subdirectory
+    run_e_from_subdir "apps/overlay" -u
+
+    # Assert: path should be absolute and correct
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"apps/overlay/src/newfile.txt"* ]]
+    # Should NOT have wrong path like just "src/newfile.txt" prepended to git root
+    [[ "$output" != *"$TEST_REPO/src/newfile.txt" ]]
+}
+
+@test "e -u FILTER from subdirectory: finds files with correct paths" {
+    # Setup: this is the exact scenario from the bug report
+    mkdir -p "$TEST_REPO/apps/overlay/src/test"
+    echo "tracked" > "$TEST_REPO/apps/overlay/tracked.txt"
+    git -C "$TEST_REPO" add apps/overlay/tracked.txt
+    git -C "$TEST_REPO" commit -q -m "initial"
+    echo "mock data" > "$TEST_REPO/apps/overlay/src/test/mockData.ts"
+
+    # Run from subdirectory with filter
+    run_e_from_subdir "apps/overlay" -u mock
+
+    # Assert: should find the file with correct full path
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"apps/overlay/src/test/mockData.ts"* ]]
+}
+
+@test "e -m from subdirectory: paths are correct" {
+    # Setup
+    mkdir -p "$TEST_REPO/src/components"
+    echo "content" > "$TEST_REPO/src/components/Button.tsx"
+    git -C "$TEST_REPO" add .
+    git -C "$TEST_REPO" commit -q -m "initial"
+    echo "modified" > "$TEST_REPO/src/components/Button.tsx"
+
+    # Run from subdirectory
+    run_e_from_subdir "src" -m
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"src/components/Button.tsx"* ]]
+}
+
+@test "e -a from subdirectory: paths are correct" {
+    # Setup
+    mkdir -p "$TEST_REPO/lib/utils"
+    echo "util1" > "$TEST_REPO/lib/utils/helper.js"
+    echo "util2" > "$TEST_REPO/lib/utils/format.js"
+    git -C "$TEST_REPO" add .
+    git -C "$TEST_REPO" commit -q -m "initial"
+
+    # Run from subdirectory
+    run_e_from_subdir "lib/utils" -a
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"lib/utils/helper.js"* ]]
+    [[ "$output" == *"lib/utils/format.js"* ]]
+}
+
+@test "e -a FILTER from subdirectory: filters work with correct paths" {
+    # Setup
+    mkdir -p "$TEST_REPO/packages/core/src"
+    echo "test1" > "$TEST_REPO/packages/core/src/test.spec.ts"
+    echo "main" > "$TEST_REPO/packages/core/src/index.ts"
+    git -C "$TEST_REPO" add .
+    git -C "$TEST_REPO" commit -q -m "initial"
+
+    # Run from deep subdirectory with filter
+    run_e_from_subdir "packages/core/src" -a spec
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"packages/core/src/test.spec.ts"* ]]
+    [[ "$output" != *"index.ts"* ]]
+}
+
+@test "e -g PATTERN from subdirectory: content search with correct paths" {
+    # Setup
+    mkdir -p "$TEST_REPO/modules/auth"
+    echo "// TODO: implement" > "$TEST_REPO/modules/auth/login.ts"
+    echo "done" > "$TEST_REPO/modules/auth/logout.ts"
+    git -C "$TEST_REPO" add .
+    git -C "$TEST_REPO" commit -q -m "initial"
+
+    # Run from subdirectory
+    run_e_from_subdir "modules" -g TODO
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"modules/auth/login.ts"* ]]
+    [[ "$output" != *"logout.ts"* ]]
 }

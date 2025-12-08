@@ -113,7 +113,7 @@ zle -N zle-keymap-select
 # Before executing a command, store start time for duration calculation
 preexec() {
 	local cmd="$1"
-	local interactive=(vim nvim e man less bat r top htop btop claude)
+	local interactive=(vim nvim e man less bat r lt top htop btop claude)
 
 	# Get first command (or command after sudo)
 	local first="${cmd%% *}"
@@ -253,9 +253,9 @@ if command -v eza >/dev/null 2>&1; then
 
 		# level=0 means unlimited (omit the --level flag)
 		if [[ $level -eq 0 ]]; then
-			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --ignore-glob="$ignore_patterns" "$@"
+			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --ignore-glob="$ignore_patterns" "$@" | r
 		else
-			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --level=$level --ignore-glob="$ignore_patterns" "$@"
+			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --level=$level --ignore-glob="$ignore_patterns" "$@" | r
 		fi
 	}
 else

@@ -95,8 +95,14 @@ nnoremap = +
 
 " ctrl-movement jumps
 noremap <c-h> ^
-noremap <c-j> <c-d>zz
-noremap <c-k> <c-u>zz
+if $TMUX != ''
+	" tmux adds an extra status line, so we need to account for that in order to show the current line at the top when jumping
+	noremap <c-j> <c-d>zz<c-y>
+	noremap <c-k> <c-u>zz<c-e>
+else
+	noremap <c-j> <c-d>zz
+	noremap <c-k> <c-u>zz
+endif
 noremap <c-l> $
 
 " use tab to move to matching bracket in modes: Normal, Visual, Select, Operator-pending
@@ -161,6 +167,7 @@ nnoremap <leader>o m`o<esc>``
 nnoremap <leader>O m`O<esc>``
 
 " insert current datetime
+inoremap <c-d> <c-r>=strftime('%Y-%m-%d')<c-m>
 inoremap <c-t> <c-r>=strftime('%Y-%m-%d %H:%M:%S')<c-m>
 
 " yank into system clipboard
