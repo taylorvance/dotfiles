@@ -9,10 +9,10 @@ Usage: e [OPTIONS] [FILTERS...]
 
 Enhanced editor wrapper for git-aware file opening with composable filters.
 
-FILE SET OPTIONS (pick one, or combine -m with -u):
+FILE SET OPTIONS (combinable: -m, -u, -a):
     -m, --modified           Modified tracked files
     -u, --untracked          Untracked files
-    -a, --all                All tracked files in git repo
+    -a, --all                All tracked files (-a includes -m; -au = everything)
     -d, --diff [REF]         Files from git diff (default branch or REF)
     --history [N]            N most recently modified files (default: 10)
 
@@ -22,7 +22,7 @@ FILTER OPTIONS (can combine multiple):
     FILTERS...               Filter by filename substring (when using other options)
 
 MODIFIERS:
-    -i, --interactive        Use fzf to select files interactively
+    -i, --interactive        Use fzf to select files (implies -a if no file set)
     -h, --help               Show this help message
 
 COMPOSITION: All filters AND together. For example:
@@ -40,7 +40,8 @@ BASIC USAGE:
     e -mu                    Open modified and untracked files
     e -d                     Open files changed from default branch
     e -d dev                 Open files changed from dev branch
-    e -ai                    Browse all tracked files with fzf
+    e -i                     Browse all tracked files with fzf
+    e -i foo                 Browse files matching "foo" with fzf
     e --history              Open 10 most recently modified files
 
 PIPING:
@@ -125,10 +126,10 @@ while [ $# -gt 0 ]; do
 			exit 0
 			;;
 		-m|--modified)
-			if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
-				die "Cannot combine multiple file set options (only -m -u is allowed)"
+			# -a is superset of -m, so if -a is set, ignore -m
+			if [ "$file_set" != "all" ]; then
+				file_set="modified"
 			fi
-			file_set="modified"
 			shift
 			;;
 		-u|--untracked)
@@ -152,8 +153,9 @@ while [ $# -gt 0 ]; do
 			shift
 			;;
 		-a|--all)
-			if [ -n "$file_set" ]; then
-				die "Cannot combine multiple file set options"
+			# -a is superset of -m, so -a always wins
+			if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
+				die "Cannot combine -a with -d or --history"
 			fi
 			file_set="all"
 			shift
@@ -198,16 +200,17 @@ while [ $# -gt 0 ]; do
 					flags="${flags#?}"
 					case "$flag" in
 						m)
-							if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
-								die "Cannot combine multiple file set options (only -m -u is allowed)"
+							# -a is superset of -m, so if -a is set, ignore -m
+							if [ "$file_set" != "all" ]; then
+								file_set="modified"
 							fi
-							file_set="modified"
 							;;
 						u) include_untracked=true ;;
 						i) use_fzf=true ;;
 						a)
-							if [ -n "$file_set" ]; then
-								die "Cannot combine multiple file set options"
+							# -a is superset of -m, so -a always wins
+							if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
+								die "Cannot combine -a with -d or --history"
 							fi
 							file_set="all"
 							;;
@@ -289,7 +292,7 @@ case "$file_set" in
 		;;
 	untracked)
 		check_git_repo
-		file_list=$(git ls-files --others --exclude-standard)
+		file_list=$(git ls-files --others --exclude-standard --full-name)
 		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No untracked files found"
@@ -297,10 +300,14 @@ case "$file_set" in
 		;;
 	all)
 		check_git_repo
-		file_list=$(git ls-files)
+		file_list=$(git ls-files --full-name)
+		if [ "$include_untracked" = true ]; then
+			untracked=$(git ls-files --others --exclude-standard --full-name)
+			file_list="$file_list"$'\n'"$untracked"
+		fi
 		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
-			die "No tracked files found"
+			die "No files found"
 		fi
 		;;
 	history)
@@ -337,10 +344,10 @@ case "$file_set" in
 		;;
 	"")
 		# No file set specified
-		# If we have filters, default to all tracked files (or all files if not in git repo)
-		if [ -n "$grep_pattern" ] || [ -n "$name_pattern" ]; then
+		# If we have filters or interactive mode, default to all tracked files (or all files if not in git repo)
+		if [ -n "$grep_pattern" ] || [ -n "$name_pattern" ] || [ "$use_fzf" = true ]; then
 			if [ "$is_git_repo" = true ]; then
-				file_list=$(git ls-files)
+				file_list=$(git ls-files --full-name)
 				file_list=$(make_paths_relative "$file_list")
 			else
 				# Outside git repo, find all files
@@ -365,7 +372,7 @@ if [ -n "$file_list" ]; then
 	fi
 
 	# Apply positional filter if provided (only when using filters, not for direct file opening)
-	if [ -n "$positional_filters" ] && [ -n "$file_set" -o -n "$grep_pattern" -o -n "$name_pattern" ]; then
+	if [ -n "$positional_filters" ] && [ -n "$file_set" -o -n "$grep_pattern" -o -n "$name_pattern" -o "$use_fzf" = true ]; then
 		file_list=$(echo "$file_list" | grep "$positional_filters" || true)
 		if [ -z "$file_list" ]; then
 			die "No files matching filter '$positional_filters'"
