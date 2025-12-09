@@ -14,7 +14,7 @@ FILE SET OPTIONS (combinable: -m, -u, -a):
     -u, --untracked          Untracked files
     -a, --all                All tracked files (-a includes -m; -au = everything)
     -d, --diff [REF]         Files from git diff (default branch or REF)
-    --history [N]            N most recently modified files (default: 10)
+    -r, --recent [N]         N most recently modified files (default: 10)
 
 FILTER OPTIONS (can combine multiple):
     -g, --grep PATTERN       Filter by content matching PATTERN
@@ -42,7 +42,7 @@ BASIC USAGE:
     e -d dev                 Open files changed from dev branch
     e -i                     Browse all tracked files with fzf
     e -i foo                 Browse files matching "foo" with fzf
-    e --history              Open 10 most recently modified files
+    e -r                     Open 10 most recently modified files
 
 PIPING:
     find . -name "*.py" | e  Open all Python files
@@ -114,7 +114,7 @@ file_set=""
 grep_pattern=""
 name_pattern=""
 diff_ref=""
-history_count=10
+recent_count=10
 use_fzf=false
 include_untracked=false
 positional_filters=""
@@ -155,20 +155,20 @@ while [ $# -gt 0 ]; do
 		-a|--all)
 			# -a is superset of -m, so -a always wins
 			if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
-				die "Cannot combine -a with -d or --history"
+				die "Cannot combine -a with -d or -r"
 			fi
 			file_set="all"
 			shift
 			;;
-		--history)
+		-r|--recent)
 			if [ -n "$file_set" ]; then
 				die "Cannot combine multiple file set options"
 			fi
-			file_set="history"
+			file_set="recent"
 			shift
 			# Check if next arg is a number (not a flag)
 			if [ $# -gt 0 ] && [ "${1#-}" = "$1" ] && [ "$1" -eq "$1" ] 2>/dev/null; then
-				history_count="$1"
+				recent_count="$1"
 				shift
 			fi
 			;;
@@ -210,11 +210,11 @@ while [ $# -gt 0 ]; do
 						a)
 							# -a is superset of -m, so -a always wins
 							if [ -n "$file_set" ] && [ "$file_set" != "modified" ]; then
-								die "Cannot combine -a with -d or --history"
+								die "Cannot combine -a with -d or -r"
 							fi
 							file_set="all"
 							;;
-						g|d|n|h)
+						g|d|n|h|r)
 							die "Option -$flag cannot be combined with other flags (requires argument)"
 							;;
 						*)
@@ -310,13 +310,13 @@ case "$file_set" in
 			die "No files found"
 		fi
 		;;
-	history)
+	recent)
 		# Get N most recently modified files by filesystem modification time
 		if [ "$is_git_repo" = true ]; then
 			# In git repo, only consider tracked files
 			# Use stat to get mtime, sort by it, take top N
 			# Need to run stat from git root since git ls-files returns paths relative to root
-			file_list=$(cd "$git_root" && git ls-files -z | xargs -0 stat -f "%m %N" 2>/dev/null | sort -rn | head -n "$history_count" | cut -d' ' -f2-)
+			file_list=$(cd "$git_root" && git ls-files -z | xargs -0 stat -f "%m %N" 2>/dev/null | sort -rn | head -n "$recent_count" | cut -d' ' -f2-)
 			file_list=$(make_paths_relative "$file_list")
 		else
 			# Outside git repo, find all files and sort by mtime
@@ -325,7 +325,7 @@ case "$file_set" in
 			# %p = file's path
 			# \n = newline
 			# We sort numerically in reverse (-rn), take top N, then strip the timestamp
-			file_list=$(find . -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n "$history_count" | cut -d' ' -f2- | sed 's|^\./||')
+			file_list=$(find . -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n "$recent_count" | cut -d' ' -f2- | sed 's|^\./||')
 		fi
 		if [ -z "$file_list" ]; then
 			die "No files found"
