@@ -1,35 +1,49 @@
 #!/bin/bash
 # tmp - Quick temporary workspace creator
 
-USAGE="Usage: tmp [-s|-r|-d]
+USAGE="Usage: tmp [-l|-r|-e [FILENAME]|-d]
 Create and cd to a timestamped temporary directory
 
 Options:
-  -s    Select from existing temp directories (or create new if none selected)
-  -r    cd to most recent temp directory
-  -d    Delete temp directories (interactive: enter numbers, 'a' for all, or Enter to cancel)
+  -l           List and select from existing temp directories (or create new if none selected)
+  -r           cd to most recent temp directory
+  -e [FILE]    Create temp dir, cd to it, and open editor (default: scratch.txt)
+  -d           Delete temp directories (interactive: enter numbers, 'a' for all, or Enter to cancel)
 
 Examples:
-  tmp       Create new temp dir and cd to it
-  tmp -s    List existing dirs and prompt for selection (default: create new)
-  tmp -r    cd to most recent temp directory
-  tmp -d    Delete temp directories interactively"
+  tmp          Create new temp dir and cd to it
+  tmp -l       List existing dirs and prompt for selection (default: create new)
+  tmp -r       cd to most recent temp directory
+  tmp -e       Create temp dir, cd, and open editor with scratch.txt
+  tmp -e test.py    Open test.py for Python syntax highlighting
+  tmp -d       Delete temp directories interactively"
 
 TMP_BASE="/tmp/tmp-workspaces"
 RECENT=false
 SELECT=false
 DELETE=false
+EDIT=false
+FILENAME="scratch.txt"
 
 # Parse options
-while getopts "rsdh" opt; do
+while getopts "rldeh" opt; do
   case $opt in
     r) RECENT=true ;;
-    s) SELECT=true ;;
+    l) SELECT=true ;;
     d) DELETE=true ;;
+    e) EDIT=true ;;
     h) echo "$USAGE"; exit 0 ;;
     *) echo "$USAGE" >&2; exit 1 ;;
   esac
 done
+
+# Shift past options to get positional arguments
+shift $((OPTIND - 1))
+
+# If -e flag was used and there's an argument, use it as filename
+if [ "$EDIT" = true ] && [ -n "$1" ]; then
+  FILENAME="$1"
+fi
 
 # Delete temp directories interactively
 if [ "$DELETE" = true ]; then
@@ -154,3 +168,8 @@ echo "Created temporary workspace: $TMP_DIR"
 
 # Output the cd command for the parent shell to eval
 echo "cd \"$TMP_DIR\""
+
+# If edit mode, output editor command with filename
+if [ "$EDIT" = true ]; then
+  echo "EDITOR_CMD:$FILENAME"
+fi

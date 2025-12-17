@@ -1,0 +1,272 @@
+#!/bin/bash
+# proj - Project-aware workflow manager with tmux integration
+#
+# Combines zoxide (smart cd) with tmux sessions for seamless project switching.
+# Each project gets its own tmux session, making context switching effortless.
+
+set -e
+
+show_help() {
+	cat <<EOF
+Usage: proj [OPTIONS] [PROJECT]
+
+Project-aware workflow manager with tmux session integration.
+
+BASIC USAGE:
+    proj myproject           cd to project + attach/create tmux session
+    proj work/backend        Works with paths (uses zoxide for smart matching)
+    proj                     List recent projects (interactive fzf picker)
+
+OPTIONS:
+    -l, --list               List all tmux sessions with project info
+    -k, --kill PROJECT       Kill tmux session for project
+    -n, --new PROJECT        Force create new session (don't attach)
+    -d, --detach             cd to project without attaching tmux session
+    -h, --help               Show this help message
+
+FEATURES:
+    • Smart project matching via zoxide (learns your habits)
+    • Automatic tmux session creation/attachment
+    • One session per project (sessions named after project)
+    • Works inside or outside tmux
+
+EXAMPLES:
+    proj dotfiles            Jump to ~/dotfiles, create/attach session "dotfiles"
+    proj -l                  List all active project sessions
+    proj -k myapp            Kill the "myapp" session
+    proj -d backend          cd to backend project without tmux session
+    proj                     Show fzf picker of recent projects
+
+INTEGRATION:
+    • Uses zoxide for smart directory matching
+    • Creates tmux sessions named after project directories
+    • Falls back to regular cd if tmux not available
+
+EOF
+}
+
+die() {
+	echo "Error: $1" >&2
+	exit 1
+}
+
+# Check if we're inside tmux
+in_tmux() {
+	[ -n "$TMUX" ]
+}
+
+# Get project name from path (basename)
+get_project_name() {
+	local path="$1"
+	basename "$path" | tr '.' '_' | tr ' ' '_'
+}
+
+# Check if tmux session exists
+session_exists() {
+	local session="$1"
+	tmux has-session -t="$session" 2>/dev/null
+}
+
+# List all tmux sessions with project info
+list_sessions() {
+	if ! command -v tmux >/dev/null 2>&1; then
+		die "tmux is not installed"
+	fi
+
+	if ! tmux list-sessions 2>/dev/null; then
+		echo "No active tmux sessions"
+		return 0
+	fi
+}
+
+# Kill a project session
+kill_session() {
+	local project="$1"
+
+	if [ -z "$project" ]; then
+		die "Please specify a project name"
+	fi
+
+	if ! command -v tmux >/dev/null 2>&1; then
+		die "tmux is not installed"
+	fi
+
+	local session_name=$(get_project_name "$project")
+
+	if ! session_exists "$session_name"; then
+		die "Session '$session_name' does not exist"
+	fi
+
+	tmux kill-session -t "$session_name"
+	echo "Killed session: $session_name"
+}
+
+# Get project path using zoxide
+get_project_path() {
+	local query="$1"
+
+	if command -v zoxide >/dev/null 2>&1; then
+		# Use zoxide to find the path
+		local path=$(zoxide query "$query" 2>/dev/null)
+		if [ -n "$path" ]; then
+			echo "$path"
+			return 0
+		fi
+	fi
+
+	# Fallback: check if it's a direct path
+	if [ -d "$query" ]; then
+		echo "$(cd "$query" && pwd)"
+		return 0
+	fi
+
+	return 1
+}
+
+# Interactive project picker using fzf
+pick_project() {
+	if ! command -v fzf >/dev/null 2>&1; then
+		die "fzf is required for interactive mode"
+	fi
+
+	local projects=""
+
+	# Get projects from zoxide if available
+	if command -v zoxide >/dev/null 2>&1; then
+		projects=$(zoxide query -l 2>/dev/null | head -20)
+	fi
+
+	if [ -z "$projects" ]; then
+		die "No recent projects found"
+	fi
+
+	# Let user pick
+	local selected=$(echo "$projects" | fzf --height=40% --reverse --prompt="Select project: ")
+
+	if [ -z "$selected" ]; then
+		echo "No project selected"
+		exit 0
+	fi
+
+	echo "$selected"
+}
+
+# Main project switching logic
+switch_project() {
+	local query="$1"
+	local force_new="$2"
+	local detach="$3"
+
+	# Get project path
+	local project_path=$(get_project_path "$query")
+
+	if [ -z "$project_path" ]; then
+		die "Could not find project: $query"
+	fi
+
+	# Get session name from path
+	local session_name=$(get_project_name "$project_path")
+
+	# If detach mode, just cd
+	if [ "$detach" = true ]; then
+		echo "cd \"$project_path\""
+		return 0
+	fi
+
+	# Check if tmux is available
+	if ! command -v tmux >/dev/null 2>&1; then
+		# No tmux, just cd
+		echo "cd \"$project_path\""
+		return 0
+	fi
+
+	# Decide whether to create or attach
+	if session_exists "$session_name" && [ "$force_new" != true ]; then
+		# Session exists, attach to it
+		if in_tmux; then
+			# Already in tmux, switch client
+			tmux switch-client -t "$session_name"
+		else
+			# Not in tmux, attach
+			tmux attach-session -t "$session_name"
+		fi
+	else
+		# Create new session
+		if in_tmux; then
+			# Create new session and switch to it
+			tmux new-session -d -s "$session_name" -c "$project_path"
+			tmux switch-client -t "$session_name"
+		else
+			# Create and attach
+			tmux new-session -s "$session_name" -c "$project_path"
+		fi
+	fi
+}
+
+# Main entry point
+main() {
+	local project=""
+	local list_mode=false
+	local kill_mode=false
+	local force_new=false
+	local detach=false
+
+	# Parse arguments
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-h|--help)
+				show_help
+				exit 0
+				;;
+			-l|--list)
+				list_mode=true
+				shift
+				;;
+			-k|--kill)
+				kill_mode=true
+				shift
+				if [ $# -eq 0 ]; then
+					die "Option -k/--kill requires a project name"
+				fi
+				project="$1"
+				shift
+				;;
+			-n|--new)
+				force_new=true
+				shift
+				;;
+			-d|--detach)
+				detach=true
+				shift
+				;;
+			-*)
+				die "Unknown option: $1"
+				;;
+			*)
+				project="$1"
+				shift
+				;;
+		esac
+	done
+
+	# Handle modes
+	if [ "$list_mode" = true ]; then
+		list_sessions
+		exit 0
+	fi
+
+	if [ "$kill_mode" = true ]; then
+		kill_session "$project"
+		exit 0
+	fi
+
+	# Interactive mode if no project specified
+	if [ -z "$project" ]; then
+		project=$(pick_project)
+	fi
+
+	# Switch to project
+	switch_project "$project" "$force_new" "$detach"
+}
+
+main "$@"

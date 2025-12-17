@@ -112,6 +112,52 @@ run_e() {
     [[ "$output" != *"untracked.txt"* ]]
 }
 
+@test "e -d: opens files changed from default branch" {
+    # Setup: create initial commit on main
+    echo "initial" > file1.txt
+    echo "initial" > file2.txt
+    git add .
+    git commit -q -m "initial"
+
+    # Create feature branch and make changes
+    git checkout -b feature -q
+    echo "changed" > file1.txt
+    echo "new file" > file3.txt
+    git add .
+    git commit -q -m "feature changes"
+
+    # Run
+    run_e -d
+
+    # Assert: should show files changed from main/master
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file3.txt"* ]]
+    [[ "$output" != *"file2.txt"* ]]
+}
+
+@test "e -d REF: opens files changed from specific ref" {
+    # Setup
+    echo "v1" > file.txt
+    git add file.txt
+    git commit -q -m "v1"
+
+    echo "v2" > file.txt
+    git add file.txt
+    git commit -q -m "v2"
+
+    echo "v3" > file.txt
+    git add file.txt
+    git commit -q -m "v3"
+
+    # Run: diff from HEAD~2
+    run_e -d HEAD~2
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file.txt"* ]]
+}
+
 # ============================================================================
 # COMPOSITION TESTS - COMBINING FILTERS
 # ============================================================================

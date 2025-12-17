@@ -3,6 +3,10 @@
 
 # Use Homebrew before system default.
 export PATH=/opt/homebrew/bin:$PATH
+
+# Fix for less v633+ treating Nerd Font icons (private-use Unicode) as non-printable
+# See: https://github.com/sharkdp/bat/issues/2578
+export LESSUTFCHARDEF=E000-F8FF:p,F0000-FFFFD:p,100000-10FFFD:p
 #export PATH=/usr/local/bin:$PATH
 export PATH=/opt/homebrew/opt/python@3.12/libexec/bin:$PATH
 # Custom scripts
@@ -171,32 +175,12 @@ else
 fi
 # `e` for "edit" has a more sophisticated implementation in ~/.local/bin/e
 
-# `tmp` (see ~/.local/bin/tmp) wrapper function to properly cd into temp directory
-tmp() {
-	local output
-	output=$($HOME/.local/bin/tmp "$@")
-	if [ $? -eq 0 ]; then
-		# Extract the cd command and eval it
-		local cd_cmd=$(echo "$output" | grep '^cd ' | tail -n 1)
-		if [ -n "$cd_cmd" ]; then
-			eval "$cd_cmd"
-			# Show any other output (excluding the cd command)
-			echo "$output" | grep -v '^cd '
-		else
-			# No cd command, just show output (like -l flag)
-			echo "$output"
-		fi
-	else
-		echo "$output"
-	fi
-}
+# Load custom wrapper functions (tmp, proj, raw)
+source $HOME/.zsh/functions.zsh
 
 alias python='python3'
 #poetry completions zsh > ~/.zfunc/_poetry
 #fpath+=~/.zfunc
-
-# Show hidden files and ignore common directories
-# alias tree2='tree -a -I "node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|*.git|*.DS_Store|*.venv|*.env|obj|bin|lib|include|share|var|tmp|temp|cache|log|logs|backup|backups|build|dist"'
 
 # Use nvim as default editor
 export EDITOR=nvim
@@ -231,33 +215,11 @@ if command -v zoxide >/dev/null 2>&1; then
 fi
 
 # eza - modern ls replacement (with fallback to regular ls)
+# See also: lt() in ~/.zsh/functions.zsh
 if command -v eza >/dev/null 2>&1; then
 	alias ls='eza --icons=always --group-directories-first --color=always'
 	alias ll='eza -l --icons=always --group-directories-first --git --color=always'
 	alias la='eza -la --icons=always --group-directories-first --git --color=always'
-	# lt - tree view with configurable depth (defaults to full depth)
-	# Usage: lt [level] [path]
-	#   lt        → unlimited depth (default)
-	#   lt 3      → level 3
-	#   lt 3 dir  → level 3 for specific directory
-	lt() {
-		local level=0
-		# If first arg is a digit, use it as level
-		if [[ "$1" =~ ^[0-9]+$ ]]; then
-			level=$1
-			shift
-		fi
-
-		# Ignore common directories and build artifacts
-		local ignore_patterns='node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|.git|.DS_Store|.venv|.env|build|dist|target|.pytest_cache|.mypy_cache|vendor|.next|.nuxt|*.swp|*.swo'
-
-		# level=0 means unlimited (omit the --level flag)
-		if [[ $level -eq 0 ]]; then
-			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --ignore-glob="$ignore_patterns" "$@" | r
-		else
-			eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --level=$level --ignore-glob="$ignore_patterns" "$@" | r
-		fi
-	}
 else
 	# Fallback to regular ls with some useful flags
 	alias ll='ls -lh'
@@ -282,61 +244,10 @@ if command -v atuin >/dev/null 2>&1; then
 fi
 
 
-# USEFUL SHELL FUNCTIONS
-
-# mkcd - create directory and cd into it
-mkcd() {
-	mkdir -p "$1" && cd "$1"
-}
-
-# extract - extract any archive type
-extract() {
-	if [ -f "$1" ]; then
-		case "$1" in
-			*.tar.bz2)   tar xjf "$1"     ;;
-			*.tar.gz)    tar xzf "$1"     ;;
-			*.bz2)       bunzip2 "$1"     ;;
-			*.rar)       unrar e "$1"     ;;
-			*.gz)        gunzip "$1"      ;;
-			*.tar)       tar xf "$1"      ;;
-			*.tbz2)      tar xjf "$1"     ;;
-			*.tgz)       tar xzf "$1"     ;;
-			*.zip)       unzip "$1"       ;;
-			*.Z)         uncompress "$1"  ;;
-			*.7z)        7z x "$1"        ;;
-			*)     echo "'$1' cannot be extracted via extract()" ;;
-		esac
-	else
-		echo "'$1' is not a valid file"
-	fi
-}
-
-# backup - quick backup of a file
-backup() {
-	cp "$1" "$1.backup-$(date +%Y%m%d-%H%M%S)"
-}
-
-# fcd - cd to a directory using fzf (requires fd and fzf)
-fcd() {
-	if ! command -v fd >/dev/null 2>&1 || ! command -v fzf >/dev/null 2>&1; then
-		echo "fcd requires 'fd' and 'fzf' to be installed" >&2
-		return 1
-	fi
-
-	local dir
-	local preview_cmd
-	if command -v eza >/dev/null 2>&1; then
-		preview_cmd='eza --tree --level=1 --icons {}'
-	else
-		preview_cmd='ls -la {}'
-	fi
-
-	dir=$(fd --type d --hidden --exclude .git | fzf --preview "$preview_cmd")
-	if [ -n "$dir" ]; then
-		cd "$dir"
-	fi
-}
-
+# Command not found handler (suggest packages)
+if [[ -f /opt/homebrew/Library/Taps/homebrew/homebrew-command-not-found/handler.sh ]]; then
+	source /opt/homebrew/Library/Taps/homebrew/homebrew-command-not-found/handler.sh
+fi
 
 # Load local customizations if they exist
 [ -f ~/.zshrc.local ] && source ~/.zshrc.local

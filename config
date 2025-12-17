@@ -6,8 +6,10 @@
 .gitconfig
 .gitignore
 .local/bin/e
+.local/bin/proj
 .local/bin/sysinfo
 .local/bin/tmp
 .tmux.conf
 .zlogin
+.zsh/functions.zsh
 .zshrc

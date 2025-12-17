@@ -25,14 +25,15 @@ set undofile                " persistent undo history
 " tabs are 4 columns wide, each indentation level is one tab
 set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
 " better indenting for react
-autocmd FileType javascriptreact,typescriptreact setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+"autocmd FileType javascriptreact,typescriptreact setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 " use spaces for C# (dotnet)
 autocmd FileType cs setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 
 
 " < FOLDING > {{{
 set foldlevelstart=10       " fold very nested indents by default
-set foldmethod=indent       " fold based on indent level
+set foldmethod=expr         " use expression-based folding (treesitter)
+set foldexpr=nvim_treesitter#foldexpr()
 " fold by marker for vim files
 augroup filetype_vim
 	autocmd!
@@ -83,26 +84,20 @@ nnoremap <silent> <leader>gg <cmd>call GrepCword()<cr>n
 
 " << NAVIGATION >> {{{
 
-set scrolloff=3         " keep a 3-line pad above and below the cursor
+set scrolloff=3         " keep a 3-line pad above and below the cursor (update `ctrl-movement` maps if this changes)
 set startofline         " move to first non-blank character when moving to another line
 
 " move cursor by display lines (helps when a line is visually wrapped)
-nnoremap k gk
-nnoremap j gj
+noremap k gk
+noremap j gj
 
 " don't require shift for moving to the beginning of the next line (-/+ navigation without shift)
 nnoremap = +
 
 " ctrl-movement jumps
 noremap <c-h> ^
-if $TMUX != ''
-	" tmux adds an extra status line, so we need to account for that in order to show the current line at the top when jumping
-	noremap <c-j> <c-d>zz<c-y>
-	noremap <c-k> <c-u>zz<c-e>
-else
-	noremap <c-j> <c-d>zz
-	noremap <c-k> <c-u>zz
-endif
+noremap <c-j> <c-d>zz
+noremap <c-k> <c-u>zz
 noremap <c-l> $
 
 " use tab to move to matching bracket in modes: Normal, Visual, Select, Operator-pending

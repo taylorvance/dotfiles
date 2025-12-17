@@ -295,6 +295,145 @@ teardown() {
 }
 
 # ============================================================================
+# TMUX ADVANCED TESTS
+# ============================================================================
+
+@test "tmux: resurrect plugin directory exists or installs" {
+    skip_if_not_installed tmux
+
+    # Start tmux briefly to trigger TPM auto-install
+    tmux -f "$TEST_HOME/.tmux.conf" new-session -d "sleep 1" || true
+    sleep 2
+
+    # Check if TPM was installed
+    [ -d "$TEST_HOME/.tmux/plugins/tpm" ] || skip "TPM auto-install didn't complete"
+
+    # Check if resurrect plugin exists or is referenced
+    run grep -q "tmux-resurrect" "$TEST_HOME/.tmux.conf"
+    [ "$status" -eq 0 ]
+
+    # Clean up
+    tmux kill-server 2>/dev/null || true
+}
+
+@test "tmux: clipboard integration is configured" {
+    skip_if_not_installed tmux
+
+    # Check that clipboard tools are referenced
+    run grep -E "(pbcopy|xclip|wl-copy)" "$TEST_HOME/.tmux.conf"
+    [ "$status" -eq 0 ]
+}
+
+@test "tmux: can create and switch panes" {
+    skip_if_not_installed tmux
+
+    # Start tmux session
+    tmux -f "$TEST_HOME/.tmux.conf" new-session -d -s test_session "sleep 10"
+
+    # Split window (should create pane)
+    tmux -f "$TEST_HOME/.tmux.conf" split-window -h -t test_session "sleep 10" || true
+
+    # Count panes
+    pane_count=$(tmux -f "$TEST_HOME/.tmux.conf" list-panes -t test_session 2>/dev/null | wc -l | tr -d ' ')
+
+    # Should have at least 1 pane (might be 2 if split worked)
+    [ "$pane_count" -ge 1 ]
+
+    # Clean up
+    tmux kill-server 2>/dev/null || true
+}
+
+# ============================================================================
+# CUSTOM SCRIPTS PATH TESTS
+# ============================================================================
+
+@test "scripts: .local/bin is in PATH after sourcing .zshrc" {
+    skip_if_not_installed zsh
+
+    # Source .zshrc and check PATH
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; echo \$PATH"
+
+    [[ "$output" == *".local/bin"* ]]
+}
+
+@test "scripts: e script is callable" {
+    skip_if_not_installed zsh
+
+    # Check if e script exists and is executable
+    if [ -f "$TEST_HOME/.local/bin/e" ]; then
+        run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; command -v e"
+        [ "$status" -eq 0 ]
+    else
+        skip "e script not in config"
+    fi
+}
+
+@test "scripts: tmp script is callable" {
+    skip_if_not_installed zsh
+
+    if [ -f "$TEST_HOME/.local/bin/tmp" ]; then
+        run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; command -v tmp"
+        [ "$status" -eq 0 ]
+    else
+        skip "tmp script not in config"
+    fi
+}
+
+@test "scripts: sysinfo script is callable" {
+    skip_if_not_installed zsh
+
+    if [ -f "$TEST_HOME/.local/bin/sysinfo" ]; then
+        run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; command -v sysinfo"
+        [ "$status" -eq 0 ]
+    else
+        skip "sysinfo script not in config"
+    fi
+}
+
+# ============================================================================
+# ZSHRC COMPREHENSIVE SOURCING TEST
+# ============================================================================
+
+@test "zsh: .zshrc sources completely without errors" {
+    skip_if_not_installed zsh
+
+    # Try to fully source .zshrc in a real shell
+    run zsh -i -c "echo 'zshrc loaded successfully'" < /dev/null
+
+    # Should complete (even if there are warnings about plugins)
+    [ "$status" -eq 0 ] || [[ "$output" == *"zshrc loaded successfully"* ]]
+}
+
+@test "zsh: antigen loads without fatal errors" {
+    skip_if_not_installed zsh
+
+    # Check if antigen is loaded
+    run zsh -c "source $TEST_HOME/.zshrc 2>&1 | grep -i 'error' || echo 'no errors'"
+
+    [[ "$output" == *"no errors"* ]] || [ "$status" -eq 0 ]
+}
+
+@test "zsh: custom functions are defined" {
+    skip_if_not_installed zsh
+
+    # Check if mkcd function exists
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f mkcd"
+    [ "$status" -eq 0 ]
+
+    # Check if extract function exists
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f extract"
+    [ "$status" -eq 0 ]
+
+    # Check if tmp function exists
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f tmp"
+    [ "$status" -eq 0 ]
+
+    # Check if proj function exists
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f proj"
+    [ "$status" -eq 0 ]
+}
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 

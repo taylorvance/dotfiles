@@ -101,6 +101,36 @@ make test-clean        # Remove test Docker images and containers
 
 ### Custom Scripts (`src/dotfiles/.local/bin/`)
 
+**`tmp`** - Quick temporary workspace creator
+
+Create timestamped temporary directories for scratch work:
+
+- **Basic usage**: `tmp` - create new temp dir and cd to it
+- **Edit mode**: `tmp -e` - create temp dir, cd, and open `scratch.txt` in editor
+- **Custom file**: `tmp -e test.py` - specify filename for syntax highlighting
+- **List/select**: `tmp -l` - interactive picker of existing temp dirs
+- **Recent**: `tmp -r` - cd to most recent temp directory
+- **Delete**: `tmp -d` - interactively delete temp workspaces
+- **Features**:
+  - Timestamped directories: `/tmp/tmp-workspaces/YYYYMMDD-HHMMSS/`
+  - Shell wrapper function handles cd and editor invocation
+  - Perfect for quick experiments, scratch files, or temporary work
+
+**`proj`** - Project-aware workflow manager with tmux integration
+
+Combines **zoxide** (smart directory jumping) with **tmux sessions** for seamless project switching:
+
+- **Basic usage**: `proj myproject` - cd to project + attach/create tmux session
+- **Detach mode**: `proj -d backend` - cd without tmux (outputs cd command for shell wrapper)
+- **List sessions**: `proj -l` - show all active project sessions
+- **Kill session**: `proj -k myapp` - terminate a project session
+- **Interactive picker**: `proj` - fzf picker of recent projects (via zoxide)
+- **Features**:
+  - One tmux session per project (named after directory)
+  - Smart project matching via zoxide (learns your frequently used projects)
+  - Works inside or outside tmux (switches or attaches intelligently)
+  - Graceful fallbacks when tmux/zoxide not installed
+
 **`e`** - Git-aware editor wrapper with composable filters
 
 Uses a **composable filter model** where all filters AND together:

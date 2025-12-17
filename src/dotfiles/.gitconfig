@@ -9,6 +9,7 @@
 	s = switch
 	g = grep --break --heading --line-number
 	lg = log --graph --pretty=format:'%Cred%h%Creset - %s %Cgreen(%cr) %C(bold blue)<%an>%Creset %C(yellow)%d%Creset' --abbrev-commit
+	amend = commit --amend --no-edit
 
 [diff]
 	tool = nvimdiff
