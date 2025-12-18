@@ -280,10 +280,11 @@ case "$file_set" in
 		check_git_repo
 		if [ "$include_untracked" = true ]; then
 			# Get modified and untracked, but exclude deleted files
-			file_list=$(git status --porcelain | grep -v '^D\| D' | awk '{print $2}')
+			# Use cut -c4- to handle filenames with spaces (skip status codes)
+			file_list=$(git status --porcelain | grep -v '^D\| D' | cut -c4-)
 		else
 			# Get only modified files (not deleted)
-			file_list=$(git status --porcelain | grep '^ M\| M\|^M' | grep -v '^D\| D' | awk '{print $2}')
+			file_list=$(git status --porcelain | grep '^ M\| M\|^M' | grep -v '^D\| D' | cut -c4-)
 		fi
 		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
@@ -312,20 +313,34 @@ case "$file_set" in
 		;;
 	recent)
 		# Get N most recently modified files by filesystem modification time
+		# Detect OS for stat format (macOS vs Linux)
+		if [[ "$OSTYPE" == "darwin"* ]]; then
+			stat_cmd="stat -f %m"
+		else
+			stat_cmd="stat -c %Y"
+		fi
+
 		if [ "$is_git_repo" = true ]; then
 			# In git repo, only consider tracked files
 			# Use stat to get mtime, sort by it, take top N
 			# Need to run stat from git root since git ls-files returns paths relative to root
-			file_list=$(cd "$git_root" && git ls-files -z | xargs -0 stat -f "%m %N" 2>/dev/null | sort -rn | head -n "$recent_count" | cut -d' ' -f2-)
+			file_list=$(cd "$git_root" && git ls-files | while IFS= read -r f; do
+				if [ -f "$f" ]; then
+					mtime=$($stat_cmd "$f" 2>/dev/null) && echo "$mtime $f"
+				fi
+			done | sort -rn | head -n "$recent_count" | cut -d' ' -f2-)
 			file_list=$(make_paths_relative "$file_list")
 		else
 			# Outside git repo, find all files and sort by mtime
-			# -printf '%T@ %p\n' prints: modification_time_in_seconds filepath
-			# %T@ = file's last modification time in seconds since Unix epoch (with decimal fractions)
-			# %p = file's path
-			# \n = newline
-			# We sort numerically in reverse (-rn), take top N, then strip the timestamp
-			file_list=$(find . -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n "$recent_count" | cut -d' ' -f2- | sed 's|^\./||')
+			if [[ "$OSTYPE" == "darwin"* ]]; then
+				# macOS: use stat
+				file_list=$(find . -type f | while IFS= read -r f; do
+					mtime=$($stat_cmd "$f" 2>/dev/null) && echo "$mtime $f"
+				done | sort -rn | head -n "$recent_count" | cut -d' ' -f2- | sed 's|^\./||')
+			else
+				# Linux: find -printf is faster
+				file_list=$(find . -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n "$recent_count" | cut -d' ' -f2- | sed 's|^\./||')
+			fi
 		fi
 		if [ -z "$file_list" ]; then
 			die "No files found"
@@ -385,20 +400,22 @@ if [ -n "$grep_pattern" ] && [ -n "$file_list" ]; then
 	if [ "$is_git_repo" = true ]; then
 		# Use git grep on the file list
 		filtered=""
-		for file in $file_list; do
+		while IFS= read -r file; do
+			[ -z "$file" ] && continue
 			if git grep -q "$grep_pattern" -- "$file" 2>/dev/null; then
 				filtered="$filtered$file"$'\n'
 			fi
-		done
+		done <<< "$file_list"
 		file_list="$filtered"
 	else
 		# Use regular grep
 		filtered=""
-		for file in $file_list; do
+		while IFS= read -r file; do
+			[ -z "$file" ] && continue
 			if [ -f "$file" ] && grep -q "$grep_pattern" "$file" 2>/dev/null; then
 				filtered="$filtered$file"$'\n'
 			fi
-		done
+		done <<< "$file_list"
 		file_list="$filtered"
 	fi
 
@@ -423,4 +440,9 @@ fi
 editor="${EDITOR:-vi}"
 
 # Convert file_list to proper arguments (handle spaces in filenames)
-exec $editor $file_list
+# Use tr + xargs -0 for cross-platform handling of newline-separated files
+if [ -n "$file_list" ]; then
+	echo "$file_list" | tr '\n' '\0' | xargs -0 $editor
+else
+	exec $editor
+fi

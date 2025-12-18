@@ -135,7 +135,7 @@ Combines **zoxide** (smart directory jumping) with **tmux sessions** for seamles
 
 Uses a **composable filter model** where all filters AND together:
 
-- **File sets**: `-m` (modified), `-u` (untracked), `-a` (all tracked), `-d [REF]` (diff), `--history [N]` (recent)
+- **File sets**: `-m` (modified), `-u` (untracked), `-a` (all tracked), `-d [REF]` (diff), `-r [N]` (recent)
 - **Content filter**: `-g PATTERN` (files containing pattern)
 - **Name filter**: `-n PATTERN` (filename matches regex)
 - **Positional filters**: Additional filename substring filters
@@ -153,6 +153,7 @@ Uses a **composable filter model** where all filters AND together:
 - `e file.txt`: Open or create file
 - `e -m`, `e -u`, `e -mu`: Modified/untracked files
 - `e -d`, `e -d dev`: Diff from branch
+- `e -r`, `e -r 20`: Recent files (default 10)
 - `e -ai`: Browse all tracked files
 - Piped input: `find . -name "*.py" | e`
 - Detects default branch automatically (main/master)
@@ -167,8 +168,8 @@ Uses a **composable filter model** where all filters AND together:
 - Custom theme showing user@host, path, git branch, vi mode, command duration (configurable via `CMD_DURATION_THRESHOLD`), exit code
 - Key bindings: ↑/↓ for history search, `^r` for atuin/history search
 - Modern CLI tools: `zoxide` (z), `eza` (ls/ll/la/lt), `fd` (f), `ripgrep` (rg), `atuin` (history)
-- Aliases: `r` (bat/less), `tree2` (filtered tree), `python` (python3)
-- Functions: `mkcd`, `extract`, `backup`, `fcd` (fzf directory jump)
+- Aliases: `r` (bat/less), `python` (python3), `f` (fd)
+- Functions: `mkcd`, `extract`, `backup`, `fcd` (fzf directory jump), `lt` (tree view)
 - Integrations: fzf (multi-select by default), nvm
 - Default editor: `nvim`
 - Graceful fallbacks if modern tools not installed
@@ -211,7 +212,7 @@ Uses a **composable filter model** where all filters AND together:
 ### Working with Config
 
 - The `config` file can specify individual files or entire directories
-- Directory symlinks are recursive (all contents linked)
+- Directory entries create a single symlink to the directory (not recursive individual symlinks)
 - Individual file symlinks allow keeping untracked files in the same directory
 
 ### Testing Workflow

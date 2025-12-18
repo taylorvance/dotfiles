@@ -2,10 +2,26 @@
 
 # Symlink manager for dotfiles
 # Supports: install, uninstall, status, restore modes
+# Use --dry-run or -n to preview changes without making them
 
 set -e
 
-MODE="${1:-install}"
+# Parse flags
+DRY_RUN=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n|--dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        *)
+            MODE="$1"
+            shift
+            ;;
+    esac
+done
+MODE="${MODE:-install}"
+
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 DESTINATIONDIR=$HOME
 SOURCEDIR=$BASEDIR/src/dotfiles
@@ -22,12 +38,15 @@ NC='\033[0m' # No Color
 install_dotfiles() {
     BACKUPDIR=$BACKUPSDIR/"$(date +%Y-%m-%d_%H-%M-%S)_$$"
 
-    if [ -d "$BACKUPDIR" ]; then
-        echo "Backup directory $BACKUPDIR already exists. Please wait literally one second and try again."
-        exit 1
+    if [ "$DRY_RUN" = true ]; then
+        printf "${BLUE}[DRY RUN]${NC} Preview of changes:\n\n"
+    else
+        if [ -d "$BACKUPDIR" ]; then
+            echo "Backup directory $BACKUPDIR already exists. Please wait literally one second and try again."
+            exit 1
+        fi
+        printf "Linking dotfiles...\n\n"
     fi
-
-    printf "Linking dotfiles...\n\n"
 
     while IFS= read -r filepath; do
         # Skip empty lines
@@ -40,41 +59,55 @@ install_dotfiles() {
         newfile=$SOURCEDIR/$filepath
 
         if [ ! -e "$newfile" ]; then
-            printf "  ${RED}✗${NC} ${filepath}\n"
+            printf "  ${RED}✗${NC} ${filepath} (source missing)\n"
             continue
         fi
 
         # If the file is already correctly symlinked, skip.
         if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
-            printf "  ${GREEN}✓${NC} ${filepath}\n"
+            printf "  ${GREEN}✓${NC} ${filepath} (already linked)\n"
             continue
         fi
 
-        # If a file with this name already exists, copy it to the backup folder to avoid overwriting.
+        # If a file with this name already exists, it will be backed up
         if [ -e "$oldfile" ]; then
-            mkdir -p "$BACKUPDIR"
-            # Make a deep, recursive copy, removing symlinks, preserving full path structure
-            mkdir -p "$BACKUPDIR/$(dirname "$filepath")"
-            cp -RL "$oldfile" "$BACKUPDIR/$filepath"
-            rm -rf "$oldfile"
+            if [ "$DRY_RUN" = true ]; then
+                printf "  ${YELLOW}→${NC} ${filepath} (would backup existing & link)\n"
+            else
+                mkdir -p "$BACKUPDIR"
+                # Make a deep, recursive copy, removing symlinks, preserving full path structure
+                mkdir -p "$BACKUPDIR/$(dirname "$filepath")"
+                cp -RL "$oldfile" "$BACKUPDIR/$filepath"
+                rm -rf "$oldfile"
+            fi
+        else
+            if [ "$DRY_RUN" = true ]; then
+                printf "  ${BLUE}+${NC} ${filepath} (would create link)\n"
+            fi
         fi
 
-        # Create parent directories, removing any conflicting files in the path
-        local parent_dir="$(dirname "$oldfile")"
-        if [ -f "$parent_dir" ]; then
-            # Parent path is a file, need to back it up and remove it
-            mkdir -p "$BACKUPDIR"
-            local parent_path="${parent_dir#$DESTINATIONDIR/}"
-            mkdir -p "$BACKUPDIR/$(dirname "$parent_path")"
-            cp -RL "$parent_dir" "$BACKUPDIR/$parent_path"
-            rm -rf "$parent_dir"
+        if [ "$DRY_RUN" = false ]; then
+            # Create parent directories, removing any conflicting files in the path
+            local parent_dir="$(dirname "$oldfile")"
+            if [ -f "$parent_dir" ]; then
+                # Parent path is a file, need to back it up and remove it
+                mkdir -p "$BACKUPDIR"
+                local parent_path="${parent_dir#$DESTINATIONDIR/}"
+                mkdir -p "$BACKUPDIR/$(dirname "$parent_path")"
+                cp -RL "$parent_dir" "$BACKUPDIR/$parent_path"
+                rm -rf "$parent_dir"
+            fi
+            mkdir -p "$parent_dir"
+            ln -Ffs "$newfile" "$oldfile"
+            printf "  ${GREEN}✓${NC} ${filepath}\n"
         fi
-        mkdir -p "$parent_dir"
-        ln -Ffs "$newfile" "$oldfile"
-        printf "  ${GREEN}✓${NC} ${filepath}\n"
     done < "$CONFIGFILE"
 
-    printf "\n${GREEN}All dotfiles linked${NC}\n"
+    if [ "$DRY_RUN" = true ]; then
+        printf "\n${BLUE}[DRY RUN]${NC} No changes made. Run without -n to apply.\n"
+    else
+        printf "\n${GREEN}All dotfiles linked${NC}\n"
+    fi
 }
 
 uninstall_dotfiles() {
@@ -202,7 +235,7 @@ case "$MODE" in
         restore_from_backup
         ;;
     *)
-        echo "Usage: $0 {install|uninstall|status|restore}"
+        echo "Usage: $0 [-n|--dry-run] {install|uninstall|status|restore}"
         exit 1
         ;;
 esac

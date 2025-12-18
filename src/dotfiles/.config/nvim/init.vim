@@ -3,7 +3,7 @@ let mapleader = "\<space>"
 " auto-cd to dotfiles repo when editing symlinked dotfiles
 autocmd BufEnter *
 	\ let resolved = resolve(expand('%:p')) |
-	\ if resolved =~# $HOME . '/dotfiles/home-away-from-HOME/' |
+	\ if resolved =~# $HOME . '/dotfiles/src/dotfiles/' |
 	\   silent! lcd ~/dotfiles |
 	\   let b:git_dir = $HOME . '/dotfiles/.git' |
 	\ endif

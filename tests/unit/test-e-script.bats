@@ -622,3 +622,139 @@ run_e_from_subdir() {
     [[ "$output" == *"modules/auth/login.ts"* ]]
     [[ "$output" != *"logout.ts"* ]]
 }
+
+# ============================================================================
+# RECENT FILES TESTS (-r flag)
+# ============================================================================
+
+@test "e -r: opens recently modified files" {
+    # Setup: create files with different modification times
+    echo "old" > old.txt
+    git add old.txt
+    git commit -q -m "initial"
+    sleep 1
+    echo "new" > new.txt
+    git add new.txt
+    git commit -q -m "add new"
+    # Touch new.txt to ensure it's most recent
+    touch new.txt
+
+    # Run
+    run_e -r 1
+
+    # Assert: should get most recently modified file
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"new.txt"* ]]
+}
+
+@test "e -r: respects count argument" {
+    # Setup: create multiple files
+    echo "file1" > file1.txt
+    echo "file2" > file2.txt
+    echo "file3" > file3.txt
+    git add .
+    git commit -q -m "initial"
+
+    # Touch files in order to set modification times
+    # Use 1 second sleeps to ensure filesystem registers different mtimes
+    sleep 1
+    touch file3.txt
+    sleep 1
+    touch file2.txt
+    sleep 1
+    touch file1.txt
+
+    # Run with count of 2
+    run_e -r 2
+
+    # Assert: should get 2 most recent files
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file2.txt"* ]]
+}
+
+@test "e -r: default count is 10" {
+    # Setup: create 15 files
+    for i in $(seq 1 15); do
+        echo "content$i" > "file$i.txt"
+        sleep 0.05
+    done
+    git add .
+    git commit -q -m "initial"
+
+    # Run without count (default 10)
+    run_e -r
+
+    # Assert: should get exactly 10 files
+    [ "$status" -eq 0 ]
+    # Count lines in output (each file on its own line from mock editor)
+    line_count=$(echo "$output" | grep -c "\.txt" || true)
+    [ "$line_count" -eq 10 ]
+}
+
+@test "e --recent: long form works" {
+    # Setup
+    echo "content" > recent.txt
+    git add recent.txt
+    git commit -q -m "initial"
+
+    # Run
+    run_e --recent 1
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"recent.txt"* ]]
+}
+
+# ============================================================================
+# FILENAMES WITH SPACES
+# ============================================================================
+
+@test "e: handles filenames with spaces" {
+    # Setup
+    echo "content" > "file with spaces.txt"
+    git add "file with spaces.txt"
+    git commit -q -m "initial"
+    echo "modified" > "file with spaces.txt"
+
+    # Run
+    run_e -m
+
+    # Assert: file should be opened correctly
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file with spaces.txt"* ]]
+}
+
+@test "e -a: handles multiple files with spaces" {
+    # Setup
+    echo "content1" > "my file.txt"
+    echo "content2" > "another file.txt"
+    echo "content3" > "normal.txt"
+    git add .
+    git commit -q -m "initial"
+
+    # Run
+    run_e -a
+
+    # Assert: all files should be listed
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"my file.txt"* ]]
+    [[ "$output" == *"another file.txt"* ]]
+    [[ "$output" == *"normal.txt"* ]]
+}
+
+@test "e -g PATTERN: finds pattern in file with spaces" {
+    # Setup
+    echo "TODO: fix this" > "my component.js"
+    echo "done" > "other component.js"
+    git add .
+    git commit -q -m "initial"
+
+    # Run
+    run_e -g TODO
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"my component.js"* ]]
+    [[ "$output" != *"other component.js"* ]]
+}

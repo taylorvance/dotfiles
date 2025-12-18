@@ -435,3 +435,84 @@ run_symlink_manager() {
     [ -f "$backup_dir/.file1" ]
     [ -f "$backup_dir/.file2" ]
 }
+
+# ============================================================================
+# DRY-RUN MODE TESTS
+# ============================================================================
+
+@test "dry-run: shows preview without making changes" {
+    # Setup
+    echo "content" > "$TEST_SOURCE/.testfile"
+    create_config ".testfile"
+
+    # Run with dry-run flag
+    run_symlink_manager -n install
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "DRY RUN" ]]
+    [[ "$output" =~ "would create link" ]]
+    # Should NOT create the symlink
+    [ ! -e "$TEST_HOME/.testfile" ]
+}
+
+@test "dry-run: --dry-run long form works" {
+    # Setup
+    echo "content" > "$TEST_SOURCE/.testfile"
+    create_config ".testfile"
+
+    # Run with long form flag
+    run_symlink_manager --dry-run install
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "DRY RUN" ]]
+    [ ! -e "$TEST_HOME/.testfile" ]
+}
+
+@test "dry-run: shows backup warning for conflicting files" {
+    # Setup
+    echo "old content" > "$TEST_HOME/.testfile"
+    echo "new content" > "$TEST_SOURCE/.testfile"
+    create_config ".testfile"
+
+    # Run with dry-run flag
+    run_symlink_manager -n install
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "would backup existing" ]]
+    # Should NOT create backup or symlink
+    [ ! -d "$TEST_BACKUPS" ]
+    [ -f "$TEST_HOME/.testfile" ]
+    [ "$(cat "$TEST_HOME/.testfile")" = "old content" ]
+}
+
+@test "dry-run: shows already linked status" {
+    # Setup
+    echo "content" > "$TEST_SOURCE/.testfile"
+    create_config ".testfile"
+    # Actually create the symlink first
+    run_symlink_manager install
+
+    # Run dry-run
+    run_symlink_manager -n install
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "already linked" ]]
+}
+
+@test "dry-run: flag position can come after mode" {
+    # Setup
+    echo "content" > "$TEST_SOURCE/.testfile"
+    create_config ".testfile"
+
+    # Run with flag after mode
+    run_symlink_manager install -n
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "DRY RUN" ]]
+    [ ! -e "$TEST_HOME/.testfile" ]
+}

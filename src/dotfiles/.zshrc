@@ -7,8 +7,6 @@ export PATH=/opt/homebrew/bin:$PATH
 # Fix for less v633+ treating Nerd Font icons (private-use Unicode) as non-printable
 # See: https://github.com/sharkdp/bat/issues/2578
 export LESSUTFCHARDEF=E000-F8FF:p,F0000-FFFFD:p,100000-10FFFD:p
-#export PATH=/usr/local/bin:$PATH
-export PATH=/opt/homebrew/opt/python@3.12/libexec/bin:$PATH
 # Custom scripts
 export PATH=$HOME/.local/bin:$PATH
 
@@ -196,10 +194,14 @@ export VISUAL=nvim
 export FZF_DEFAULT_OPTS='--multi'
 
 
-# NVM install
+# NVM install (supports both standard install and Homebrew)
 export NVM_DIR="$HOME/.nvm"
-[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+# Standard nvm install location
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+# Homebrew nvm location (macOS)
+[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"
+[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"
 
 # Initialize completion system (must be after all fpath modifications)
 # Force rebuild of completion cache

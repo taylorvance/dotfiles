@@ -18,7 +18,7 @@ Examples:
   tmp -e test.py    Open test.py for Python syntax highlighting
   tmp -d       Delete temp directories interactively"
 
-TMP_BASE="/tmp/tmp-workspaces"
+TMP_BASE="${TMPDIR:-/tmp}/tmp-workspaces"
 RECENT=false
 SELECT=false
 DELETE=false

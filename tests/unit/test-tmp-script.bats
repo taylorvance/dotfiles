@@ -10,13 +10,14 @@ setup() {
     cp "$BATS_TEST_DIRNAME/../../src/dotfiles/.local/bin/tmp" "$TEST_DIR/tmp"
     chmod +x "$TEST_DIR/tmp"
 
-    # Modify script to use TEST_DIR instead of /tmp (portable sed)
+    # Modify script to use TEST_DIR instead of default location (portable sed)
+    # Pattern matches: TMP_BASE="${TMPDIR:-/tmp}/tmp-workspaces" or TMP_BASE="/tmp/tmp-workspaces"
     if sed --version 2>&1 | grep -q GNU; then
         # GNU sed (Linux)
-        sed -i "s|TMP_BASE=\"/tmp/tmp-workspaces\"|TMP_BASE=\"$TMP_BASE\"|" "$TEST_DIR/tmp"
+        sed -i "s|TMP_BASE=.*tmp-workspaces.*|TMP_BASE=\"$TMP_BASE\"|" "$TEST_DIR/tmp"
     else
         # BSD sed (macOS)
-        sed -i '' "s|TMP_BASE=\"/tmp/tmp-workspaces\"|TMP_BASE=\"$TMP_BASE\"|" "$TEST_DIR/tmp"
+        sed -i '' "s|TMP_BASE=.*tmp-workspaces.*|TMP_BASE=\"$TMP_BASE\"|" "$TEST_DIR/tmp"
     fi
 }
 
@@ -334,4 +335,44 @@ run_tmp() {
     [ "$dir1" != "$dir2" ]
     [ -d "$dir1" ]
     [ -d "$dir2" ]
+}
+
+# ============================================================================
+# TMPDIR ENVIRONMENT VARIABLE TESTS
+# ============================================================================
+
+@test "tmp: respects TMPDIR environment variable" {
+    # Setup: Create a fresh tmp script without the test override
+    cp "$BATS_TEST_DIRNAME/../../src/dotfiles/.local/bin/tmp" "$TEST_DIR/tmp-original"
+    chmod +x "$TEST_DIR/tmp-original"
+
+    # Create custom temp directory (use a simple path without special chars)
+    custom_tmp="$TEST_DIR/customtmp"
+    mkdir -p "$custom_tmp"
+
+    # Run with custom TMPDIR (remove any trailing slash for consistent comparison)
+    output=$(TMPDIR="$custom_tmp" "$TEST_DIR/tmp-original" 2>&1)
+
+    # Assert: workspace should be created in custom TMPDIR
+    # Check that the directory was created
+    [ -d "$custom_tmp/tmp-workspaces" ]
+    # Check output mentions the custom path
+    [[ "$output" == *"tmp-workspaces"* ]]
+}
+
+@test "tmp: falls back to /tmp when TMPDIR not set" {
+    # This test verifies the fallback behavior
+    # The script uses ${TMPDIR:-/tmp} so unsetting TMPDIR should use /tmp
+    cp "$BATS_TEST_DIRNAME/../../src/dotfiles/.local/bin/tmp" "$TEST_DIR/tmp-original"
+    chmod +x "$TEST_DIR/tmp-original"
+
+    # Run without TMPDIR (unset it explicitly)
+    unset TMPDIR
+    output=$("$TEST_DIR/tmp-original")
+
+    # Assert: should use /tmp
+    [[ "$output" == *"/tmp/tmp-workspaces/"* ]]
+
+    # Cleanup
+    rm -rf /tmp/tmp-workspaces
 }
