@@ -13,7 +13,7 @@ FILE SET OPTIONS (combinable: -m, -u, -a):
     -m, --modified           Modified tracked files
     -u, --untracked          Untracked files
     -a, --all                All tracked files (-a includes -m; -au = everything)
-    -d, --diff [REF]         Files from git diff (default branch or REF)
+    -d, --diff [ARG]         Files from git diff (passes ARG to git diff --name-only)
     -r, --recent [N]         N most recently modified files (default: 10)
 
 FILTER OPTIONS (can combine multiple):
@@ -38,8 +38,10 @@ BASIC USAGE:
     e file.txt               Open file.txt (create if doesn't exist)
     e -m                     Open all modified files
     e -mu                    Open modified and untracked files
-    e -d                     Open files changed from default branch
-    e -d dev                 Open files changed from dev branch
+    e -d                     Open files differing from default branch
+    e -d dev                 Open files differing from dev branch
+    e -d main..HEAD          Open files changed between main and HEAD
+    e -d branch1..branch2    Open files changed between two branches
     e -i                     Browse all tracked files with fzf
     e -i foo                 Browse files matching "foo" with fzf
     e -r                     Open 10 most recently modified files
@@ -351,10 +353,11 @@ case "$file_set" in
 		if [ -z "$diff_ref" ]; then
 			diff_ref=$(get_default_branch)
 		fi
-		file_list=$(git diff --name-only "$diff_ref"..HEAD 2>/dev/null || true)
+		# Pass through to git diff directly
+		file_list=$(git diff --name-only $diff_ref 2>/dev/null || true)
 		file_list=$(make_paths_relative "$file_list")
 		if [ -z "$file_list" ]; then
-			die "No files changed from $diff_ref"
+			die "No files changed for: git diff --name-only $diff_ref"
 		fi
 		;;
 	"")

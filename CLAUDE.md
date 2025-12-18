@@ -206,7 +206,7 @@ Combines **zoxide** (smart directory jumping) with **tmux sessions** for seamles
 
 Uses a **composable filter model** where all filters AND together:
 
-- **File sets**: `-m` (modified), `-u` (untracked), `-a` (all tracked), `-d [REF]` (diff), `-r [N]` (recent)
+- **File sets**: `-m` (modified), `-u` (untracked), `-a` (all tracked), `-d [ARG]` (diff), `-r [N]` (recent)
 - **Content filter**: `-g PATTERN` (files containing pattern)
 - **Name filter**: `-n PATTERN` (filename matches regex)
 - **Positional filters**: Additional filename substring filters
@@ -223,7 +223,7 @@ Uses a **composable filter model** where all filters AND together:
 **Basic usage:**
 - `e file.txt`: Open or create file
 - `e -m`, `e -u`, `e -mu`: Modified/untracked files
-- `e -d`, `e -d dev`: Diff from branch
+- `e -d`, `e -d dev`, `e -d branch1..branch2`: Diff (mirrors git diff)
 - `e -r`, `e -r 20`: Recent files (default 10)
 - `e -ai`: Browse all tracked files
 - Piped input: `find . -name "*.py" | e`
