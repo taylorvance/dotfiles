@@ -99,6 +99,77 @@ make test-clean        # Remove test Docker images and containers
 - Runs selected test suites
 - Provides interactive shell for debugging
 
+### ⚠️ CRITICAL: Unit Test Safety Rules
+
+**Unit tests can run locally via `make test-local`. They MUST be fully isolated and NEVER touch the real filesystem outside temp directories.**
+
+#### How Test Isolation Works
+
+Each BATS test file follows this pattern:
+
+```bash
+setup() {
+    export TEST_DIR=$(mktemp -d)      # Create isolated temp directory
+    export HOME="$TEST_DIR/home"       # Override HOME if needed
+    mkdir -p "$HOME"
+    # Copy scripts to TEST_DIR, never run from real locations
+}
+
+teardown() {
+    rm -rf "$TEST_DIR"                 # Clean up everything
+}
+```
+
+All file operations happen inside `$TEST_DIR`. Scripts are copied there and modified (e.g., via `sed`) to use test paths instead of real paths.
+
+#### REQUIRED for ALL Unit Tests
+
+1. **Create isolated test directory**: `export TEST_DIR=$(mktemp -d)`
+2. **Override HOME if test touches home directory**: `export HOME="$TEST_DIR/home"`
+3. **Copy scripts to TEST_DIR**: Never execute scripts from `src/` directly
+4. **Clean up in teardown**: `rm -rf "$TEST_DIR"`
+5. **Use variables for ALL paths**: `$TEST_DIR`, `$TEST_HOME`, `$TEST_REPO`, etc.
+
+#### FORBIDDEN in Unit Tests
+
+- ❌ `rm -rf /path` - Never use absolute paths with rm
+- ❌ `> /tmp/file` - Never write to real /tmp (use `$TEST_DIR`)
+- ❌ `mkdir /path` - Never create directories at absolute paths
+- ❌ Running scripts that write to `$HOME` without overriding it
+- ❌ Any operation on `/Users/`, `/home/`, or `~` without override
+- ❌ `tmux kill-server` - Kills ALL user tmux sessions, not just test ones!
+- ❌ `killall`, `pkill` - May kill user processes outside test scope
+
+#### Adding New Tests Checklist
+
+Before adding any unit test:
+- [ ] Does `setup()` create `TEST_DIR=$(mktemp -d)`?
+- [ ] Is `HOME` overridden if the script uses `$HOME`?
+- [ ] Are all file paths relative to `$TEST_DIR`?
+- [ ] Does `teardown()` run `rm -rf "$TEST_DIR"`?
+- [ ] Run `grep -n "rm -rf\|> /\|mkdir /" tests/unit/new-test.bats` and verify all matches use variables
+
+#### Script Safety Requirements
+
+Scripts in `src/` and `src/dotfiles/.local/bin/` that are tested MUST:
+- Use `$HOME` not `~/` for home directory (tilde may not respect overrides)
+- Use `${TMPDIR:-/tmp}` not hardcoded `/tmp`
+- Never hardcode paths like `/Users/...` or `/home/...`
+- Accept paths via environment variables that tests can override
+
+The safety check (`tests/check-test-safety.sh`) audits BOTH test files AND source scripts.
+
+#### How Test Isolation Works Per Script
+
+| Script | Isolation Method |
+|--------|------------------|
+| `symlink-manager.sh` | `$HOME` overridden → `DESTINATIONDIR=$HOME` uses test path |
+| `tmp` | `sed` replaces `TMP_BASE` with test directory |
+| `e` | Runs in `$TEST_REPO` (inside `$TEST_DIR`), mock `$EDITOR` |
+| `proj` | `$HOME` overridden, mock `zoxide` in `$PATH` |
+| `sysinfo` | Read-only, no file writes |
+| `install-tools.sh` | Only syntax-checked (`bash -n`), never executed |
+
 ### Custom Scripts (`src/dotfiles/.local/bin/`)
 
 **`tmp`** - Quick temporary workspace creator

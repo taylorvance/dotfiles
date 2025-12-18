@@ -38,7 +38,7 @@ unlink: ## Remove all dotfile symlinks
 restore: ## Restore files from a backup directory
 	@src/symlink-manager.sh restore
 
-.PHONY: test test-unit test-integration test-configs test-shell test-clean
+.PHONY: test test-unit test-integration test-configs test-shell test-clean test-local test-local-yolo
 test: ## Run all tests in Docker (unit + integration + config)
 	@tests/test-runner.sh all
 test-unit: ## Run only unit tests (fast)
@@ -49,6 +49,28 @@ test-configs: ## Run config verification tests (nvim, tmux, zsh)
 	@tests/test-runner.sh configs
 test-shell: ## Drop into test container for debugging
 	@tests/test-runner.sh shell
+test-local-dryrun: ## Verify tests are safe by running in container first
+	@tests/test-local-dryrun.sh
+test-local: ## Run unit tests locally on macOS (no Docker, faster)
+	@tests/check-test-safety.sh
+	@echo ""
+	@echo "\033[1;33m════════════════════════════════════════════════════════════════\033[0m"
+	@echo "\033[1;33m  ⚠  WARNING: About to run tests directly on your system\033[0m"
+	@echo "\033[1;33m════════════════════════════════════════════════════════════════\033[0m"
+	@echo ""
+	@echo "  Tests passed static safety checks, but if tests have changed"
+	@echo "  since last verified, run '\033[36mmake test-local-dryrun\033[0m' first."
+	@echo ""
+	@printf "  Type 'yes' to continue: " && read ans && [ "$$ans" = "yes" ]
+	@echo ""
+	@echo "Running unit tests locally..."
+	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
+	@bats tests/unit/*.bats
+test-local-yolo: ## Run local tests without confirmation (use after dryrun)
+	@tests/check-test-safety.sh
+	@echo ""
+	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
+	@bats tests/unit/*.bats
 test-clean: ## Remove test Docker images and containers
 	@docker ps -a | grep dotfiles-test | awk '{print $$1}' | xargs -r docker rm 2>/dev/null || true
 	@docker images | grep dotfiles-test | awk '{print $$3}' | xargs -r docker rmi 2>/dev/null || true

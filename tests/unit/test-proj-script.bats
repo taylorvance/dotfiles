@@ -54,8 +54,11 @@ EOF
 }
 
 teardown() {
-    # Kill any tmux sessions created during tests
-    tmux kill-server 2>/dev/null || true
+    # Only kill tmux sessions with "test_" prefix (created by tests)
+    # NEVER use "tmux kill-server" - it kills ALL sessions including user's real ones!
+    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^test_' | while read s; do
+        tmux kill-session -t "$s" 2>/dev/null || true
+    done
     rm -rf "$TEST_DIR"
 }
 
@@ -133,8 +136,10 @@ run_proj() {
 @test "proj -l: shows message when no sessions exist" {
     skip_if_not_installed tmux
 
-    # Kill any existing sessions
-    tmux kill-server 2>/dev/null || true
+    # Skip if there are existing sessions (don't kill them!)
+    if tmux list-sessions 2>/dev/null | grep -qv '^test_'; then
+        skip "User has active tmux sessions - cannot test empty state safely"
+    fi
 
     run run_proj -l
 
