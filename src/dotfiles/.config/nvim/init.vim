@@ -30,19 +30,6 @@ set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
 autocmd FileType cs setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 
 
-" < FOLDING > {{{
-set foldlevelstart=10       " fold very nested indents by default
-set foldmethod=expr         " use expression-based folding (treesitter)
-set foldexpr=nvim_treesitter#foldexpr()
-" fold by marker for vim files
-augroup filetype_vim
-	autocmd!
-	autocmd FileType vim setlocal foldmethod=marker
-augroup END
-" toggle fold
-nnoremap <leader>f za
-" }}}
-
 " }}}
 
 
