@@ -116,10 +116,11 @@ fcd() {
 }
 
 # lt - tree view with configurable depth (requires eza)
-# Usage: lt [level] [path]
-#   lt        → unlimited depth
-#   lt 3      → level 3
-#   lt 3 dir  → level 3 for specific directory
+# Usage: lt [-a] [level] [path]
+#   lt           → unlimited depth, respects .gitignore
+#   lt -a        → show gitignored files (e.g., build output)
+#   lt 3         → level 3
+#   lt -a 2 dir  → level 2, show gitignored, specific directory
 lt() {
 	if ! command -v eza >/dev/null 2>&1; then
 		echo "lt requires 'eza' to be installed" >&2
@@ -127,19 +128,32 @@ lt() {
 	fi
 
 	local level=0
+	local use_gitignore=true
+
+	# Parse flags
+	while [[ "$1" == -* ]]; do
+		case "$1" in
+			-a) use_gitignore=false; shift ;;
+			*) break ;;
+		esac
+	done
+
 	# If first arg is a digit, use it as level
 	if [[ "$1" =~ ^[0-9]+$ ]]; then
 		level=$1
 		shift
 	fi
 
-	# Ignore common directories and build artifacts
-	local ignore_patterns='node_modules|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|*.egg|.git|.DS_Store|.venv|.env|build|dist|target|.pytest_cache|.mypy_cache|vendor|.next|.nuxt|*.swp|*.swo'
+	# Ignore dependency/install artifacts and caches (always hidden - use eza directly to see these)
+	local ignore_patterns='node_modules|vendor|.venv|__pycache__|*.pyc|*.pyo|*.pyd|*.egg-info|.git|.DS_Store|Thumbs.db|.cache|.pytest_cache|.mypy_cache|.next|.nuxt|*.swp|*.swo|*~'
+
+	local git_flag=""
+	[[ "$use_gitignore" == true ]] && git_flag="--git-ignore"
 
 	# level=0 means unlimited (omit the --level flag)
 	if [[ $level -eq 0 ]]; then
-		eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --ignore-glob="$ignore_patterns" "$@" | r
+		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --ignore-glob="$ignore_patterns" "$@" | r
 	else
-		eza --tree --all --icons=always --group-directories-first --git-ignore --color=always --level=$level --ignore-glob="$ignore_patterns" "$@" | r
+		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --level=$level --ignore-glob="$ignore_patterns" "$@" | r
 	fi
 }

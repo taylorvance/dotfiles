@@ -93,6 +93,25 @@ Run `make help` to see all available commands:
 
 3. Test your changes: `make test`
 
+## What's Included
+
+### Tools Installed
+
+Core (nvim, git, tmux, zsh, fzf), modern CLI (zoxide, eza, fd, ripgrep, delta, atuin, bat), and development tools (node, python3). Cross-platform: Homebrew on macOS, apt/dnf/pacman on Linux.
+
+### Custom Scripts (`~/.local/bin/`)
+
+- **`e`** - Git-aware editor wrapper with composable filters
+- **`proj`** - Project switching with zoxide + tmux session management
+- **`tmp`** - Quick temporary workspace creator
+
+### Configurations
+
+- **zsh** - Vi mode, custom prompt, modern CLI integrations, graceful fallbacks
+- **nvim** - lazy.nvim plugin manager
+- **git** - Common aliases, delta diff integration
+- **tmux** - `C-a` prefix, vim-like navigation
+
 ## Project Structure
 
 ```
