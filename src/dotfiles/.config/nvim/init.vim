@@ -75,8 +75,10 @@ set scrolloff=3         " keep a 3-line pad above and below the cursor (update `
 set startofline         " move to first non-blank character when moving to another line
 
 " move cursor by display lines (helps when a line is visually wrapped)
-noremap k gk
-noremap j gj
+nnoremap k gk
+nnoremap j gj
+vnoremap k gk
+vnoremap j gj
 
 " don't require shift for moving to the beginning of the next line (-/+ navigation without shift)
 nnoremap = +
