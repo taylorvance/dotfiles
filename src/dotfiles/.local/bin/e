@@ -36,6 +36,8 @@ COMPOSITION: All filters AND together. For example:
 BASIC USAGE:
     e                        Open editor with no files
     e file.txt               Open file.txt (create if doesn't exist)
+    e file.txt:42            Open file.txt at line 42
+    e docs/*.md              Open multiple files (shell glob)
     e -m                     Open all modified files
     e -mu                    Open modified and untracked files
     e -d                     Open files differing from default branch
@@ -46,10 +48,21 @@ BASIC USAGE:
     e -i foo                 Browse files matching "foo" with fzf
     e -r                     Open 10 most recently modified files
 
+LINE NUMBERS (file:line syntax):
+    e file.txt:42            Open at line 42
+    e file.txt:42:15         Open at line 42 (column ignored, editor-dependent)
+    e src/a.js:10 src/b.js:20  Multiple files at different lines
+    grep -n TODO src/*.js | e  Open grep matches at their line numbers
+    git grep -n pattern | e    Open git grep results at line numbers
+
+    Supported editors: vim, nvim, emacs, nano, gedit, micro (uses +LINE syntax)
+    Note: VS Code/Sublime use different syntax; file:line won't work with them
+
 PIPING:
     find . -name "*.py" | e  Open all Python files
     git ls-files | e         Open all tracked files
-    ls | e -i                Pipe files to fzf for selection
+    grep -rn "TODO" | fzf | e  Select grep match, open at line
+    make 2>&1 | grep error | e  Open compiler errors at line
 
 EDITOR: Uses \$EDITOR (currently: ${EDITOR:-vi})
 EOF
@@ -446,10 +459,50 @@ fi
 # Open files in editor
 editor="${EDITOR:-vi}"
 
-# Convert file_list to proper arguments (handle spaces in filenames)
-# Use tr + xargs -0 for cross-platform handling of newline-separated files
+# Parse file:line:col patterns and build editor arguments
+# Supports: file.txt:42, file.txt:42:15, grep output (file.txt:42:matched text)
+# Converts to: +42 file.txt (universal syntax for vim/nvim/emacs/nano/gedit/micro)
+build_editor_args() {
+	local args=()
+	while IFS= read -r entry; do
+		[ -z "$entry" ] && continue
+
+		# Try to parse file:line[:col][:content] pattern
+		# Strategy: split on colons from the right, validate each part
+		local file="" line=""
+
+		# Check for file:line:col:content (grep -n output) or file:line:col
+		# Pattern: stuff:digits:digits or stuff:digits:digits:stuff
+		if [[ "$entry" =~ ^(.*):([0-9]+):([0-9]+)(:.+)?$ ]]; then
+			file="${BASH_REMATCH[1]}"
+			line="${BASH_REMATCH[2]}"
+			# col is BASH_REMATCH[3], ignored for now
+		# Check for file:line or file:line:content (grep output without column)
+		elif [[ "$entry" =~ ^(.*):([0-9]+)(:[^0-9].*)?$ ]]; then
+			file="${BASH_REMATCH[1]}"
+			line="${BASH_REMATCH[2]}"
+		fi
+
+		# If we found a file:line pattern, use +line syntax
+		if [ -n "$file" ] && [ -n "$line" ]; then
+			# Skip if file looks like a URL scheme (http://, ssh://, etc.)
+			if [[ ! "$file" =~ ^[a-zA-Z]+:// ]]; then
+				args+=( "+$line" "$file" )
+				continue
+			fi
+		fi
+
+		# No line number pattern, use as-is
+		args+=( "$entry" )
+	done
+
+	# Output args null-separated for safe handling
+	printf '%s\0' "${args[@]}"
+}
+
 if [ -n "$file_list" ]; then
-	echo "$file_list" | tr '\n' '\0' | xargs -0 $editor
+	# Build args with +line handling, then pass to editor
+	echo "$file_list" | build_editor_args | xargs -0 $editor
 else
 	exec $editor
 fi

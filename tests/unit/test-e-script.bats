@@ -973,3 +973,161 @@ EOF
     [[ "$output" == *"file1.txt"* ]]
     [[ "$output" == *"file2.txt"* ]]
 }
+
+# ============================================================================
+# LINE NUMBER TESTS - file:line syntax
+# ============================================================================
+
+@test "e file:line: opens file at specific line" {
+    # Setup
+    echo -e "line1\nline2\nline3" > test.txt
+    git add test.txt
+    git commit -q -m "initial"
+
+    # Run
+    run_e test.txt:2
+
+    # Assert: should convert to +line file format
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"+2"* ]]
+    [[ "$output" == *"test.txt"* ]]
+}
+
+@test "e file:line:col: opens file at line (col ignored)" {
+    # Setup
+    echo -e "line1\nline2\nline3" > test.txt
+    git add test.txt
+    git commit -q -m "initial"
+
+    # Run with line:col format
+    run_e test.txt:2:15
+
+    # Assert: should use line number, ignore column
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"+2"* ]]
+    [[ "$output" == *"test.txt"* ]]
+    # Should NOT have column in output
+    [[ "$output" != *":15"* ]]
+}
+
+@test "e multiple files with line numbers" {
+    # Setup
+    echo "file1 content" > file1.txt
+    echo "file2 content" > file2.txt
+    git add .
+    git commit -q -m "initial"
+
+    # Run with multiple file:line args
+    run_e file1.txt:10 file2.txt:20
+
+    # Assert: both should have +line syntax
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"+10"* ]]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"+20"* ]]
+    [[ "$output" == *"file2.txt"* ]]
+}
+
+@test "e mixed files with and without line numbers" {
+    # Setup
+    echo "file1" > file1.txt
+    echo "file2" > file2.txt
+    echo "file3" > file3.txt
+    git add .
+    git commit -q -m "initial"
+
+    # Run with mixed args
+    run_e file1.txt:5 file2.txt file3.txt:15
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"+5"* ]]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file2.txt"* ]]
+    [[ "$output" == *"+15"* ]]
+    [[ "$output" == *"file3.txt"* ]]
+}
+
+@test "piped grep output: file:line:content format" {
+    # Setup
+    echo -e "line1\nTODO: fix this\nline3" > src.js
+    git add src.js
+    git commit -q -m "initial"
+
+    # Run with grep -nH output format (file:line:content)
+    cd "$TEST_REPO"
+    run bash -c 'echo "src.js:2:TODO: fix this" | '"$TEST_DIR/e"
+
+    # Assert: should parse file:line from grep output
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"+2"* ]]
+    [[ "$output" == *"src.js"* ]]
+    # Should NOT include the matched content
+    [[ "$output" != *"TODO"* ]]
+}
+
+@test "piped grep output: multiple matches" {
+    # Setup
+    echo "content" > file1.js
+    echo "content" > file2.js
+    git add .
+    git commit -q -m "initial"
+
+    # Run with multiple grep-style lines
+    cd "$TEST_REPO"
+    run bash -c 'echo -e "file1.js:10:match1\nfile2.js:20:match2" | '"$TEST_DIR/e"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"+10"* ]]
+    [[ "$output" == *"file1.js"* ]]
+    [[ "$output" == *"+20"* ]]
+    [[ "$output" == *"file2.js"* ]]
+}
+
+@test "e file:line with path containing directories" {
+    # Setup
+    mkdir -p src/components
+    echo "component" > src/components/Button.tsx
+    git add .
+    git commit -q -m "initial"
+
+    # Run
+    run_e src/components/Button.tsx:42
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"+42"* ]]
+    [[ "$output" == *"src/components/Button.tsx"* ]]
+}
+
+@test "e preserves files without line numbers" {
+    # Setup
+    echo "content" > normal.txt
+    git add normal.txt
+    git commit -q -m "initial"
+
+    # Run with file that has no :line suffix
+    run_e normal.txt
+
+    # Assert: should NOT add +line
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"normal.txt"* ]]
+    [[ "$output" != *"+"* ]]
+}
+
+@test "e ignores URL-like patterns" {
+    # This tests that http://example.com:8080 isn't parsed as file:line
+    # Setup
+    echo "content" > test.txt
+    git add test.txt
+    git commit -q -m "initial"
+
+    # Run with URL-like input (shouldn't crash, might not open correctly)
+    cd "$TEST_REPO"
+    run bash -c 'echo "http://example.com:8080/path" | '"$TEST_DIR/e"
+
+    # Assert: should pass through as-is (or fail gracefully)
+    # The important thing is it doesn't interpret :8080 as line number
+    [[ "$output" != *"+8080"* ]]
+}

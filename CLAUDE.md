@@ -222,13 +222,20 @@ Uses a **composable filter model** where all filters AND together:
 
 **Basic usage:**
 - `e file.txt`: Open or create file
+- `e file.txt:42`: Open at line 42 (works with vim/nvim/emacs/nano/gedit/micro)
+- `e docs/*.md`: Open multiple files via shell glob
 - `e -m`, `e -u`, `e -mu`: Modified/untracked files
 - `e -d`, `e -d dev`, `e -d branch1..branch2`: Diff (mirrors git diff)
 - `e -r`, `e -r 20`: Recent files (default 10)
 - `e -ai`: Browse all tracked files
-- Piped input: `find . -name "*.py" | e`
 - Detects default branch automatically (main/master)
 - Falls back to regular `grep`/`find` outside git repos
+
+**Piped input & grep integration:**
+- `find . -name "*.py" | e`: Open found files
+- `git ls-files | e`: Open tracked files
+- `grep -rn "TODO" | fzf | e`: Select grep match, open at line number
+- `grep -rn "pattern" src/ | e`: Open all matches at their line numbers
 
 ### Configuration Files
 
