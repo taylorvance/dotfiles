@@ -322,34 +322,20 @@ return {
 		end,
 	},
 	{'nvim-treesitter/nvim-treesitter',
+		branch = 'main',
+		lazy = false,
 		build = ':TSUpdate',
 		config = function()
-			require('nvim-treesitter.configs').setup({
-				-- Install parsers for these languages
-				ensure_installed = {
-					'vim', 'vimdoc', 'lua',
-					'python', 'javascript', 'typescript', 'tsx',
-					'html', 'css', 'json', 'yaml',
-					'php', 'c_sharp',
-					'bash', 'markdown', 'regex',
-				},
-				auto_install = true, -- auto-install missing parsers when entering buffer
-				highlight = {
-					enable = true,
-					additional_vim_regex_highlighting = false,
-				},
-				indent = {
-					enable = true,
-				},
-				incremental_selection = {
-					enable = true,
-					keymaps = {
-						init_selection = '<cr>',
-						node_incremental = '<cr>',
-						node_decremental = '<bs>',
-						scope_incremental = '<c-s>',
-					},
-				},
+			require('nvim-treesitter').install({
+				'vim', 'lua',
+				'python', 'javascript', 'typescript', 'tsx',
+				'html', 'css', 'json', 'yaml',
+				'bash', 'markdown',
+			})
+			vim.api.nvim_create_autocmd('FileType', {
+				callback = function()
+					pcall(vim.treesitter.start)
+				end,
 			})
 		end,
 	},
