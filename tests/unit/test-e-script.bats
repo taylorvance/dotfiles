@@ -758,3 +758,218 @@ run_e_from_subdir() {
     [[ "$output" == *"my component.js"* ]]
     [[ "$output" != *"other component.js"* ]]
 }
+
+# ============================================================================
+# GLOB PATTERN TESTS - Shell expansion (e docs/*)
+# ============================================================================
+
+@test "e docs/*: opens files via shell glob expansion" {
+    # Setup: create directory with files
+    mkdir -p docs
+    echo "readme content" > docs/readme.md
+    echo "guide content" > docs/guide.md
+    echo "api content" > docs/api.txt
+    git add .
+    git commit -q -m "initial"
+
+    # Run with glob expansion (shell expands docs/* to multiple args)
+    cd "$TEST_REPO"
+    run "$TEST_DIR/e" docs/*
+
+    # Assert: all files in docs/ should be opened
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"docs/readme.md"* ]]
+    [[ "$output" == *"docs/guide.md"* ]]
+    [[ "$output" == *"docs/api.txt"* ]]
+}
+
+@test "e *.txt: opens files via glob in current directory" {
+    # Setup
+    echo "file1" > file1.txt
+    echo "file2" > file2.txt
+    echo "other" > other.md
+    git add .
+    git commit -q -m "initial"
+
+    # Run with glob
+    cd "$TEST_REPO"
+    run "$TEST_DIR/e" *.txt
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file2.txt"* ]]
+    [[ "$output" != *"other.md"* ]]
+}
+
+@test "e src/**/*.js: opens nested files via glob" {
+    # Setup: create nested structure
+    mkdir -p src/components src/utils
+    echo "button" > src/components/Button.js
+    echo "modal" > src/components/Modal.js
+    echo "helper" > src/utils/helper.js
+    echo "styles" > src/components/Button.css
+    git add .
+    git commit -q -m "initial"
+
+    # Run with recursive glob (requires bash globstar or shell expansion)
+    cd "$TEST_REPO"
+    # Use find to simulate what user would get with **/*.js
+    run "$TEST_DIR/e" src/components/Button.js src/components/Modal.js src/utils/helper.js
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Button.js"* ]]
+    [[ "$output" == *"Modal.js"* ]]
+    [[ "$output" == *"helper.js"* ]]
+    [[ "$output" != *"Button.css"* ]]
+}
+
+@test "e handles glob with spaces in directory name" {
+    # Setup
+    mkdir -p "my docs"
+    echo "readme" > "my docs/readme.md"
+    echo "guide" > "my docs/guide.md"
+    git add .
+    git commit -q -m "initial"
+
+    # Run (need to quote properly for glob with spaces)
+    cd "$TEST_REPO"
+    run "$TEST_DIR/e" "my docs/readme.md" "my docs/guide.md"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"my docs/readme.md"* ]]
+    [[ "$output" == *"my docs/guide.md"* ]]
+}
+
+# ============================================================================
+# PIPED INPUT TESTS - Reading file list from stdin
+# ============================================================================
+
+@test "piped input: find | e opens found files" {
+    # Setup
+    mkdir -p src
+    echo "js1" > src/app.js
+    echo "js2" > src/util.js
+    echo "css" > src/style.css
+    git add .
+    git commit -q -m "initial"
+
+    # Run with piped input
+    cd "$TEST_REPO"
+    run bash -c 'find src -name "*.js" | '"$TEST_DIR/e"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"app.js"* ]]
+    [[ "$output" == *"util.js"* ]]
+    [[ "$output" != *"style.css"* ]]
+}
+
+@test "piped input: echo paths | e opens files" {
+    # Setup
+    echo "file1" > file1.txt
+    echo "file2" > file2.txt
+    git add .
+    git commit -q -m "initial"
+
+    # Run with echo piped
+    cd "$TEST_REPO"
+    run bash -c 'echo -e "file1.txt\nfile2.txt" | '"$TEST_DIR/e"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file2.txt"* ]]
+}
+
+@test "piped input: git ls-files | e opens tracked files" {
+    # Setup
+    echo "tracked1" > tracked1.txt
+    echo "tracked2" > tracked2.txt
+    echo "untracked" > untracked.txt
+    git add tracked1.txt tracked2.txt
+    git commit -q -m "initial"
+
+    # Run with git ls-files piped
+    cd "$TEST_REPO"
+    run bash -c 'git ls-files | '"$TEST_DIR/e"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tracked1.txt"* ]]
+    [[ "$output" == *"tracked2.txt"* ]]
+    [[ "$output" != *"untracked.txt"* ]]
+}
+
+@test "piped input: handles files with spaces" {
+    # Setup
+    echo "content1" > "file one.txt"
+    echo "content2" > "file two.txt"
+    git add .
+    git commit -q -m "initial"
+
+    # Run with piped paths containing spaces
+    cd "$TEST_REPO"
+    run bash -c 'echo -e "file one.txt\nfile two.txt" | '"$TEST_DIR/e"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file one.txt"* ]]
+    [[ "$output" == *"file two.txt"* ]]
+}
+
+@test "piped input: cannot combine with flags" {
+    # Setup
+    echo "content" > file.txt
+    git add file.txt
+    git commit -q -m "initial"
+
+    # Run with pipe AND flags (should error)
+    cd "$TEST_REPO"
+    run bash -c 'echo "file.txt" | '"$TEST_DIR/e"' -m'
+
+    # Assert: should fail
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Cannot use stdin input"* ]]
+}
+
+@test "piped input: cannot combine with positional args" {
+    # Setup
+    echo "content" > file.txt
+    git add file.txt
+    git commit -q -m "initial"
+
+    # Run with pipe AND positional args (should error)
+    cd "$TEST_REPO"
+    run bash -c 'echo "file.txt" | '"$TEST_DIR/e"' other.txt'
+
+    # Assert: should fail
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Cannot use stdin input with positional"* ]]
+}
+
+@test "piped input: works with interactive mode" {
+    # Setup: mock fzf
+    cat > "$TEST_DIR/fzf" <<'EOF'
+#!/bin/bash
+cat
+EOF
+    chmod +x "$TEST_DIR/fzf"
+    export PATH="$TEST_DIR:$PATH"
+
+    echo "file1" > file1.txt
+    echo "file2" > file2.txt
+    git add .
+    git commit -q -m "initial"
+
+    # Run with piped input and -i flag
+    cd "$TEST_REPO"
+    run bash -c 'echo -e "file1.txt\nfile2.txt" | '"$TEST_DIR/e"' -i'
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" == *"file2.txt"* ]]
+}

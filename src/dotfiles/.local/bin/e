@@ -119,7 +119,7 @@ diff_ref=""
 recent_count=10
 use_fzf=false
 include_untracked=false
-positional_filters=""
+positional_args=()  # Array to properly handle files with spaces and globs
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -229,42 +229,42 @@ while [ $# -gt 0 ]; do
 			fi
 			;;
 		*)
-			# Collect positional argument (only one allowed with filters, multiple for direct file opening)
-			if [ -n "$positional_filters" ]; then
-				positional_filters="$positional_filters $1"
-			else
-				positional_filters="$1"
-			fi
+			# Collect positional arguments (multiple allowed for direct file opening)
+			positional_args+=("$1")
 			shift
 			;;
 	esac
 done
 
 # Validate: if using filters, only one positional arg allowed
-if [ -n "$file_set" -o -n "$grep_pattern" -o -n "$name_pattern" ]; then
-	# Count words in positional_filters
-	word_count=$(echo "$positional_filters" | wc -w | tr -d ' ')
-	if [ "$word_count" -gt 1 ]; then
-		die "Only one positional filter allowed. Use regex for complex patterns (e.g., 'test.*component')"
+if [ -n "$file_set" ] || [ -n "$grep_pattern" ] || [ -n "$name_pattern" ]; then
+	if [ "${#positional_args[@]}" -gt 1 ]; then
+		die "Only one positional filter allowed when using flags. Use regex for complex patterns (e.g., 'test.*component')"
 	fi
 fi
 
+# Convert array to newline-separated string for filter mode, or keep as array for direct mode
+positional_filter=""
+if [ "${#positional_args[@]}" -eq 1 ]; then
+	positional_filter="${positional_args[0]}"
+fi
+
 # Check for stdin input (piped data)
-# Use timeout to check if stdin has data without blocking
-has_stdin=false
+# When stdin is not a terminal (piped/redirected), read all available data
+stdin_files=""
 if [ ! -t 0 ]; then
-	# Try to read stdin with 0.01s timeout - if data available, read it all
-	stdin_files=$(timeout 0.01 cat 2>/dev/null || true)
+	stdin_files=$(cat)
 
 	if [ -n "$stdin_files" ]; then
-		has_stdin=true
-
-		# Error if trying to use stdin with file set or filter flags
+		# Error if trying to use stdin with file set or filter flags (except -i for interactive)
 		if [ -n "$file_set" ] || [ -n "$grep_pattern" ] || [ -n "$name_pattern" ]; then
 			die "Cannot use stdin input with file set or filter flags"
 		fi
 
-		positional_filters="$positional_filters $stdin_files"
+		# Error if positional args were also provided
+		if [ "${#positional_args[@]}" -gt 0 ]; then
+			die "Cannot use stdin input with positional arguments"
+		fi
 	fi
 fi
 
@@ -362,8 +362,11 @@ case "$file_set" in
 		;;
 	"")
 		# No file set specified
-		# If we have filters or interactive mode, default to all tracked files (or all files if not in git repo)
-		if [ -n "$grep_pattern" ] || [ -n "$name_pattern" ] || [ "$use_fzf" = true ]; then
+		if [ -n "$stdin_files" ]; then
+			# Use stdin input (already newline-separated)
+			file_list="$stdin_files"
+		elif [ -n "$grep_pattern" ] || [ -n "$name_pattern" ] || [ "$use_fzf" = true ]; then
+			# Have filters or interactive mode - default to all tracked files (or all files if not in git repo)
 			if [ "$is_git_repo" = true ]; then
 				file_list=$(git ls-files --full-name)
 				file_list=$(make_paths_relative "$file_list")
@@ -371,9 +374,10 @@ case "$file_set" in
 				# Outside git repo, find all files
 				file_list=$(find . -type f 2>/dev/null | sed 's|^\./||' || true)
 			fi
-		else
-			# No file set and no filters - use positional args as files to open
-			file_list="$positional_filters"
+		elif [ "${#positional_args[@]}" -gt 0 ]; then
+			# No file set and no filters - use positional args as files to open directly
+			# Convert array to newline-separated string for consistent handling
+			file_list=$(printf '%s\n' "${positional_args[@]}")
 		fi
 		;;
 esac
@@ -389,11 +393,11 @@ if [ -n "$file_list" ]; then
 		fi
 	fi
 
-	# Apply positional filter if provided (only when using filters, not for direct file opening)
-	if [ -n "$positional_filters" ] && [ -n "$file_set" -o -n "$grep_pattern" -o -n "$name_pattern" -o "$use_fzf" = true ]; then
-		file_list=$(echo "$file_list" | grep "$positional_filters" || true)
+	# Apply positional filter if provided (only when using flags, not for direct file opening)
+	if [ -n "$positional_filter" ] && { [ -n "$file_set" ] || [ -n "$grep_pattern" ] || [ -n "$name_pattern" ] || [ "$use_fzf" = true ]; }; then
+		file_list=$(echo "$file_list" | grep "$positional_filter" || true)
 		if [ -z "$file_list" ]; then
-			die "No files matching filter '$positional_filters'"
+			die "No files matching filter '$positional_filter'"
 		fi
 	fi
 fi
