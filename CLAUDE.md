@@ -18,7 +18,7 @@ make setup
 
 - **Complete bootstrap**: Installs all required tools + creates symlinks
 - Detects OS (macOS/Linux) and package manager (brew/apt/dnf/pacman)
-- Installs: nvim, git, tmux, zsh, fzf, bat, zoxide, eza, fd, ripgrep, delta, atuin, node, python3
+- Installs: nvim, git, tmux, zsh, fzf, bat, zoxide, eza, fd, ripgrep, delta, atuin, starship, node, python3
 - Creates symlinks from `src/dotfiles/` to `~/` for files listed in `config`
 - Idempotent: safe to run multiple times
 - Backs up conflicting files to `backups/YYYY-MM-DD_HH-MM-SS_PID/`
@@ -68,7 +68,7 @@ make test-clean        # Remove test Docker images and containers
 ### Tool Dependencies
 
 - **Core**: nvim, git, tmux, zsh, fzf, curl/wget, gcc/make, unzip
-- **Modern CLI**: zoxide, eza, fd, ripgrep, delta, atuin, bat
+- **Modern CLI**: zoxide, eza, fd, ripgrep, delta, atuin, bat, starship
 - **Development**: node/npm, python3
 - **Optional**: ollama (AI completions), dotnet (C#), php (PHP)
 - **Note**: All tools have graceful fallbacks in `.zshrc` if not installed
@@ -243,7 +243,7 @@ Uses a **composable filter model** where all filters AND together:
 
 - Uses Antigen plugin manager with oh-my-zsh
 - Vi mode enabled with `jk`/`kj` escape to normal mode
-- Custom theme showing user@host, path, git branch, vi mode, command duration (configurable via `CMD_DURATION_THRESHOLD`), exit code
+- Starship prompt (config in `.config/starship.toml`) with user@host, path, git branch, vi mode, command duration, exit code
 - Key bindings: ↑/↓ for history search, `^r` for atuin/history search
 - Modern CLI tools: `zoxide` (z), `eza` (ls/ll/la/lt), `fd` (f), `ripgrep` (rg), `atuin` (history)
 - Aliases: `r` (bat/less), `python` (python3), `f` (fd)

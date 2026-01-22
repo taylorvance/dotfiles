@@ -1,0 +1,5 @@
+# Starship prompt - https://starship.rs/config/
+
+# More visible vi normal mode
+[character]
+vimcmd_symbol = "[❮](bold purple)"

@@ -327,6 +327,7 @@ main() {
 	install_optional_tool rg ripgrep
 	install_optional_tool delta git-delta
 	install_optional_tool atuin
+	install_optional_tool starship
 
 	echo ""
 	echo -e "${BLUE}Installing development tools...${NC}"

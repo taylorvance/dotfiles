@@ -58,98 +58,10 @@ bindkey -M viins 'kj' vi-cmd-mode
 bindkey -M viins '^r' history-incremental-search-backward
 bindkey -M vicmd '^r' history-incremental-search-backward
 
-# CUSTOM THEME
-
-# NORMAL or INSERT mode
-function vi_prompt_info {
-	echo "${${KEYMAP/vicmd/$ZSH_THEME_VI_PROMPT_NORMAL}/(main|viins)/$ZSH_THEME_VI_PROMPT_INSERT}"
-}
-
-# hostname or nickname (set this up in ~/.zprofile)
-function hostnickname {
-	echo "$([ -z "$HOSTNICKNAME" ] && echo "$(hostname)" || echo "$HOSTNICKNAME")"
-}
-
-# Left prompt
-PROMPT=''
-# user@host
-PROMPT+='%F{blue}[%f%F{magenta}%n%f%F{blue}@%f%F{magenta}$(hostnickname)%f%F{blue}]%f'
-# ~/path/from/home
-PROMPT+='%F{blue} [%f%F{cyan}%~%f%F{blue}]%f'
-# git branch
-ZSH_THEME_GIT_PROMPT_PREFIX=" %F{blue}[%f%F{magenta}"
-ZSH_THEME_GIT_PROMPT_SUFFIX="%f%F{blue}]%f"
-ZSH_THEME_GIT_PROMPT_DIRTY="*"
-PROMPT+='$(git_prompt_info)'
-# vi mode
-ZSH_THEME_VI_PROMPT_INSERT=""
-ZSH_THEME_VI_PROMPT_NORMAL=" %B%F{cyan}-- NORMAL --%f%b"
-PROMPT+='$(vi_prompt_info)'
-# command duration (shown if >= CMD_DURATION_THRESHOLD seconds)
-CMD_DURATION_THRESHOLD=2
-PROMPT+='$ZSH_THEME_PROMPT_DURATION'
-# newline and down-right line thing
-PROMPT+=$'\n'
-PROMPT+='%F{blue}└─%f'
-# green or red % prompt (red shows last exit code)
-PROMPT+=' %(?.%F{green}%#%f.%F{red}%# [%?]%f) '
-
-# Secondary prompt arrow
-PROMPT2='   %F{cyan}>%f '
-
-# Right prompt
-#RPROMPT=''
-# green √ or red X (last cmd's status)
-#RPROMPT+='%B%(?.%F{green}√%f.%F{red}X%f)%b'
-# timestamp of previous command
-#RPROMPT+=' $ZSH_THEME_PROMPT_CMD_TIME'
-
-# Reset prompt when switching modes
-function zle-line-init zle-keymap-select {
-	zle reset-prompt
-	zle -R
-}
-zle -N zle-line-init
-zle -N zle-keymap-select
-
-# Before executing a command, store start time for duration calculation
-preexec() {
-	local cmd="$1"
-	local interactive=(vim nvim e man less bat r lt top htop btop claude)
-
-	# Get first command (or command after sudo)
-	local first="${cmd%% *}"
-	[[ "$first" == "sudo" ]] && first="${${cmd#sudo }%% *}"
-
-	# Skip if first cmd or anything after a pipe is interactive
-	for prog in $interactive; do
-		[[ "$first" == "$prog" ]] && return
-		# Glob pattern: append space to cmd so "| prog" at end becomes "| prog "
-		[[ "$cmd " == *"| $prog "* || "$cmd " == *"|$prog "* ]] && return
-	done
-
-	# Git pagers
-	[[ "$cmd" =~ ^git\ (diff|di|log|lg|show) ]] && return
-	# Package managers with prompts
-	[[ "$cmd" =~ ^sudo\ (apt|dnf|yum|pacman)\ install ]] && return
-
-	ZSH_THEME_PROMPT_CMD_START=$SECONDS
-}
-
-# After command completes, calculate duration
-precmd() {
-	if [ -n "$ZSH_THEME_PROMPT_CMD_START" ]; then
-		local duration=$((SECONDS - ZSH_THEME_PROMPT_CMD_START))
-		if [ $duration -ge $CMD_DURATION_THRESHOLD ]; then
-			ZSH_THEME_PROMPT_DURATION=" %F{yellow}[${duration}s]%f"
-		else
-			ZSH_THEME_PROMPT_DURATION=""
-		fi
-		unset ZSH_THEME_PROMPT_CMD_START
-	else
-		ZSH_THEME_PROMPT_DURATION=""
-	fi
-}
+# Starship prompt (config in ~/.config/starship.toml)
+if command -v starship >/dev/null 2>&1; then
+	eval "$(starship init zsh)"
+fi
 
 
 # MISC

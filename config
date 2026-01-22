@@ -3,6 +3,7 @@
 .config/nvim/init.vim
 .config/nvim/lua/config/lazy.lua
 .config/nvim/lua/plugins/init.lua
+.config/starship.toml
 .gitconfig
 .gitignore
 .local/bin/e
