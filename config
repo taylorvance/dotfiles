@@ -11,6 +11,5 @@
 .local/bin/sysinfo
 .local/bin/tmp
 .tmux.conf
-.zlogin
 .zsh/functions.zsh
 .zshrc
