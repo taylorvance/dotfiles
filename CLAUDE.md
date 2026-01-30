@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Critical Rules for Claude
+
+**Run tests through make targets, not `bats` directly:**
+- `make test-file F=tests/unit/test-foo.bats` - Single file with safety check
+- `make test-local` - All unit tests with safety check
+- `make test` - Full suite in Docker
+
 ## Repository Overview
 
 This is a personal dotfiles repository using a custom symlink-based management system. Files in `src/dotfiles/` are symlinked to `~/` via a Makefile that calls the `src/symlink-manager.sh` helper script, based on paths listed in `config`.
@@ -236,6 +243,12 @@ Uses a **composable filter model** where all filters AND together:
 - `git ls-files | e`: Open tracked files
 - `grep -rn "TODO" | fzf | e`: Select grep match, open at line number
 - `grep -rn "pattern" src/ | e`: Open all matches at their line numbers
+
+**Stdin as content (using `-`):**
+- `echo "hello" | e -`: Open stdin content in new buffer
+- `cat log.txt | e -`: View file content in editor
+- `curl url | e -`: Edit fetched content
+- `pbpaste | e -`: Edit clipboard content
 
 ### Configuration Files
 

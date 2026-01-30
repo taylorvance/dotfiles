@@ -64,6 +64,12 @@ PIPING:
     grep -rn "TODO" | fzf | e  Select grep match, open at line
     make 2>&1 | grep error | e  Open compiler errors at line
 
+STDIN AS CONTENT:
+    echo "hello" | e -       Open stdin content in new buffer
+    cat log.txt | e -        View file content in editor
+    curl url | e -           Edit fetched content
+    pbpaste | e -            Edit clipboard content
+
 EDITOR: Uses \$EDITOR (currently: ${EDITOR:-vi})
 EOF
 }
@@ -203,6 +209,11 @@ while [ $# -gt 0 ]; do
 			use_fzf=true
 			shift
 			;;
+		-)
+			# Special case: "-" means read stdin as content
+			positional_args+=("-")
+			shift
+			;;
 		-*)
 			# Handle combined short flags (e.g., -mu, -mi)
 			if [ "${#1}" -gt 2 ] && [ "${1#--}" = "$1" ]; then
@@ -265,7 +276,28 @@ fi
 # Check for stdin input (piped data)
 # When stdin is not a terminal (piped/redirected), read all available data
 stdin_files=""
+stdin_as_content=false
+
+# Check if "-" was passed as a positional argument (meaning "read stdin as content")
+for arg in "${positional_args[@]}"; do
+	if [ "$arg" = "-" ]; then
+		stdin_as_content=true
+		# Remove "-" from positional args
+		new_args=()
+		for a in "${positional_args[@]}"; do
+			[ "$a" != "-" ] && new_args+=("$a")
+		done
+		positional_args=("${new_args[@]}")
+		break
+	fi
+done
+
 if [ ! -t 0 ]; then
+	if [ "$stdin_as_content" = true ]; then
+		# Pass stdin directly to editor as content (not filenames)
+		exec ${EDITOR:-vi} -
+	fi
+
 	stdin_files=$(cat)
 
 	if [ -n "$stdin_files" ]; then

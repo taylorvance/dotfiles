@@ -71,6 +71,12 @@ test-local-yolo: ## Run local tests without confirmation (use after dryrun)
 	@echo ""
 	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
 	@bats tests/unit/*.bats
+test-file: ## Run single test file locally: make test-file F=tests/unit/test-clean-script.bats
+	@tests/check-test-safety.sh
+	@echo ""
+	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
+	@if [ -z "$(F)" ]; then echo "Usage: make test-file F=path/to/test.bats"; exit 1; fi
+	@bats $(F)
 test-clean: ## Remove test Docker images and containers
 	@docker ps -a | grep dotfiles-test | awk '{print $$1}' | xargs -r docker rm 2>/dev/null || true
 	@docker images | grep dotfiles-test | awk '{print $$3}' | xargs -r docker rmi 2>/dev/null || true

@@ -1131,3 +1131,70 @@ EOF
     # The important thing is it doesn't interpret :8080 as line number
     [[ "$output" != *"+8080"* ]]
 }
+
+# ============================================================================
+# STDIN AS CONTENT TESTS - Using "-" to pipe content to editor
+# ============================================================================
+
+@test "e -: passes stdin content to editor" {
+    # Create a mock editor that captures stdin content
+    cat > "$EDITOR" <<'EOF'
+#!/bin/bash
+# Mock editor that reads stdin when given -
+if [ "$1" = "-" ]; then
+    echo "STDIN_CONTENT:"
+    cat
+else
+    for arg in "$@"; do
+        echo "$arg"
+    done
+fi
+EOF
+    chmod +x "$EDITOR"
+
+    # Run with piped content and -
+    cd "$TEST_REPO"
+    run bash -c 'echo "hello world" | '"$TEST_DIR/e"' -'
+
+    # Assert: editor should receive stdin content
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"STDIN_CONTENT:"* ]]
+    [[ "$output" == *"hello world"* ]]
+}
+
+@test "e - with multi-line input" {
+    # Create a mock editor that captures stdin content
+    cat > "$EDITOR" <<'EOF'
+#!/bin/bash
+if [ "$1" = "-" ]; then
+    echo "LINES:"
+    cat
+fi
+EOF
+    chmod +x "$EDITOR"
+
+    # Run with multi-line piped content
+    cd "$TEST_REPO"
+    run bash -c 'printf "line1\nline2\nline3" | '"$TEST_DIR/e"' -'
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"line1"* ]]
+    [[ "$output" == *"line2"* ]]
+    [[ "$output" == *"line3"* ]]
+}
+
+@test "e - differs from piped filenames" {
+    # Setup: create a file
+    echo "file content" > myfile.txt
+    git add myfile.txt
+    git commit -q -m "initial"
+
+    # Without -, piped input is treated as filenames
+    cd "$TEST_REPO"
+    run bash -c 'echo "myfile.txt" | '"$TEST_DIR/e"
+
+    # Assert: should open myfile.txt (filename mode)
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"myfile.txt"* ]]
+}
