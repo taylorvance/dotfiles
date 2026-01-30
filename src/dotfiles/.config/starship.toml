@@ -1,5 +1,4 @@
-# Starship prompt - https://starship.rs/config/
+"$schema" = 'https://starship.rs/config-schema.json'
 
-# More visible vi normal mode
 [character]
-vimcmd_symbol = "[❮](bold purple)"
+vimcmd_symbol = "[❮](blue)"

@@ -29,9 +29,9 @@
 	diffFilter = delta --color-only
 
 [delta]
-	navigate = true    # use n and N to move between diff sections
-	light = false      # set to true if you use a light terminal background
-	side-by-side = true
+	navigate = true  # use n and N to move between diff sections
+	dark = true
+	side-by-side = false
 	line-numbers = true
 	syntax-theme = base16
 
