@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# clean - Remove build dependencies and cache directories
+#
+# Usage: clean [-r] [-n] [PATH]
+#
+# Options:
+#   -r, --recursive    Search recursively (default: top-level projects only)
+#   -n, --dry-run      Show what would be deleted without prompting
+#   -h, --help         Show this help message
+#
+# Targets: node_modules, __pycache__, .venv, venv, .pytest_cache, *.egg-info
+
+show_help() {
+    cat <<'EOF'
+Usage: clean [-r] [-n] [PATH]
+
+Remove common build dependency and cache directories.
+
+Options:
+  -r, --recursive    Search recursively (default: top-level projects only)
+  -n, --dry-run      Show what would be deleted without prompting
+  -h, --help         Show this help message
+
+Targets: node_modules, __pycache__, .venv, venv, .pytest_cache, *.egg-info
+EOF
+    exit 0
+}
+
+format_size() {
+    local kb=$1
+    if [[ $kb -ge 1048576 ]]; then
+        awk "BEGIN {printf \"%.1f GB\", $kb / 1048576}"
+    elif [[ $kb -ge 1024 ]]; then
+        awk "BEGIN {printf \"%.0f MB\", $kb / 1024}"
+    else
+        printf "%d KB" "$kb"
+    fi
+}
+
+# Defaults
+RECURSIVE=false
+DRY_RUN=false
+TARGET_DIR="."
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -r|--recursive) RECURSIVE=true; shift ;;
+        -n|--dry-run) DRY_RUN=true; shift ;;
+        -h|--help) show_help ;;
+        -*) echo "Error: Unknown option: $1" >&2; exit 1 ;;
+        *) TARGET_DIR="$1"; shift ;;
+    esac
+done
+
+# Resolve to absolute path
+if [[ ! -d "$TARGET_DIR" ]]; then
+    echo "Error: '$TARGET_DIR' is not a directory" >&2
+    exit 1
+fi
+TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
+
+# Find matching directories (bash 3 compatible)
+find_dirs() {
+    if [[ "$RECURSIVE" == false ]]; then
+        find "$TARGET_DIR" -maxdepth 2 -type d \( \
+            -name "node_modules" \
+            -o -name "__pycache__" \
+            -o -name ".venv" \
+            -o -name "venv" \
+            -o -name ".pytest_cache" \
+            -o -name "*.egg-info" \
+        \) -prune -print 2>/dev/null
+    else
+        find "$TARGET_DIR" -type d \( \
+            -name "node_modules" \
+            -o -name "__pycache__" \
+            -o -name ".venv" \
+            -o -name "venv" \
+            -o -name ".pytest_cache" \
+            -o -name "*.egg-info" \
+        \) -prune -print 2>/dev/null
+    fi
+}
+
+DIRS=()
+while IFS= read -r dir; do
+    [[ -n "$dir" ]] && DIRS+=("$dir")
+done < <(find_dirs | sort)
+
+if [[ ${#DIRS[@]} -eq 0 ]]; then
+    echo "No cleanable directories found."
+    exit 0
+fi
+
+# Get sizes (store as "size_kb|path")
+echo "Scanning..." >&2
+ITEMS=()
+TOTAL_KB=0
+
+for dir in "${DIRS[@]}"; do
+    size_kb=$(du -sk "$dir" 2>/dev/null | cut -f1)
+    TOTAL_KB=$((TOTAL_KB + size_kb))
+    ITEMS+=("$size_kb|$dir")
+done
+
+# Sort by size descending (bash 3 compatible)
+SORTED=()
+while IFS= read -r item; do
+    [[ -n "$item" ]] && SORTED+=("$item")
+done < <(printf '%s\n' "${ITEMS[@]}" | sort -t'|' -k1 -rn)
+
+# Display results
+echo ""
+echo "Found ${#DIRS[@]} directories ($(format_size $TOTAL_KB) total):"
+echo ""
+
+for item in "${SORTED[@]}"; do
+    size_kb="${item%%|*}"
+    path="${item#*|}"
+    rel_path="${path#$TARGET_DIR/}"
+    printf "  %10s  %s\n" "$(format_size $size_kb)" "$rel_path"
+done
+
+echo ""
+
+# Dry run exits here
+if [[ "$DRY_RUN" == true ]]; then
+    exit 0
+fi
+
+# Prompt for action
+while true; do
+    read -rp "Delete all? [y/N/i] " choice
+    # Lowercase the choice (bash 3 compatible)
+    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+    case "$choice" in
+        y|yes)
+            for item in "${SORTED[@]}"; do
+                path="${item#*|}"
+                rel_path="${path#$TARGET_DIR/}"
+                echo "Deleting $rel_path..."
+                rm -rf "$path"
+            done
+            echo "Freed $(format_size $TOTAL_KB)."
+            exit 0
+            ;;
+        n|no|"")
+            echo "Aborted."
+            exit 0
+            ;;
+        i|interactive)
+            if ! command -v fzf &>/dev/null; then
+                echo "Error: fzf required for interactive mode" >&2
+                continue
+            fi
+
+            # Build fzf input with index for reliable path lookup
+            FZF_INPUT=""
+            idx=0
+            for item in "${SORTED[@]}"; do
+                size_kb="${item%%|*}"
+                path="${item#*|}"
+                rel_path="${path#$TARGET_DIR/}"
+                FZF_INPUT+="$(printf "%d|%10s  %s" "$idx" "$(format_size $size_kb)" "$rel_path")"$'\n'
+                idx=$((idx + 1))
+            done
+
+            SELECTED=$(echo -n "$FZF_INPUT" | \
+                fzf --multi \
+                    --with-nth=2.. \
+                    --delimiter='|' \
+                    --header="TAB to select, ENTER to confirm" \
+                    --reverse) || {
+                echo "Aborted."
+                exit 0
+            }
+
+            [[ -z "$SELECTED" ]] && { echo "Nothing selected."; exit 0; }
+
+            # Delete selected items
+            FREED_KB=0
+            while IFS= read -r line; do
+                idx="${line%%|*}"
+                item="${SORTED[$idx]}"
+                size_kb="${item%%|*}"
+                path="${item#*|}"
+                rel_path="${path#$TARGET_DIR/}"
+                echo "Deleting $rel_path..."
+                rm -rf "$path"
+                FREED_KB=$((FREED_KB + size_kb))
+            done <<< "$SELECTED"
+
+            echo "Freed $(format_size $FREED_KB)."
+            exit 0
+            ;;
+        *)
+            echo "Please enter y, n, or i"
+            ;;
+    esac
+done

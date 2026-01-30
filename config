@@ -6,6 +6,7 @@
 .config/starship.toml
 .gitconfig
 .gitignore
+.local/bin/clean
 .local/bin/e
 .local/bin/proj
 .local/bin/sysinfo

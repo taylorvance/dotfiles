@@ -174,10 +174,26 @@ The safety check (`tests/check-test-safety.sh`) audits BOTH test files AND sourc
 | `tmp` | `sed` replaces `TMP_BASE` with test directory |
 | `e` | Runs in `$TEST_REPO` (inside `$TEST_DIR`), mock `$EDITOR` |
 | `proj` | `$HOME` overridden, mock `zoxide` in `$PATH` |
+| `clean` | Runs in `$TEST_DIR`, only deletes test directories |
 | `sysinfo` | Read-only, no file writes |
 | `install-tools.sh` | Only syntax-checked (`bash -n`), never executed |
 
 ### Custom Scripts (`src/dotfiles/.local/bin/`)
+
+**`clean`** - Remove build dependencies and cache directories
+
+Reclaim disk space by removing common dependency folders across projects:
+
+- **Basic usage**: `clean` - scan current directory's immediate subdirs
+- **Recursive**: `clean -r` - search all nested directories
+- **Dry run**: `clean -n` - show what would be deleted, no prompt
+- **Custom path**: `clean ~/projects` - specify directory to scan
+- **Prompt options**: `y` (delete all), `N` (abort), `i` (interactive fzf selection)
+- **Targets**: `node_modules`, `__pycache__`, `.venv`, `venv`, `.pytest_cache`, `*.egg-info`
+- **Features**:
+  - Shows size of each directory, sorted largest first
+  - Displays total reclaimable space
+  - Interactive mode uses fzf for multi-select (TAB to select)
 
 **`tmp`** - Quick temporary workspace creator
 
