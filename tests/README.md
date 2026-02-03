@@ -8,11 +8,6 @@ Comprehensive Docker-based testing framework for the dotfiles installation and m
 # Run all tests (fastest way to verify everything works)
 make test
 
-# Run specific test suites
-make test-unit         # Unit tests only (~10s)
-make test-integration  # Integration tests (~30s)
-make test-configs      # Config verification tests
-
 # Interactive debugging
 make test-shell        # Drop into test container
 
@@ -61,7 +56,7 @@ tests/
 
 ## Test Coverage
 
-### Unit Tests (43 tests)
+### Unit Tests
 
 **symlink-manager.sh**
 - ✓ Install mode: fresh installs, idempotency, parent directory creation
@@ -77,7 +72,7 @@ tests/
 - ✓ Array tracking and summary formatting
 - ℹ️ Platform-specific tests skipped (need real package managers)
 
-### Integration Tests (68 tests)
+### Integration Tests
 
 **Fresh Setup**
 - ✓ Clean system installation
@@ -107,9 +102,7 @@ tests/
 
 ## Test Results Summary
 
-**Current Status: 111/111 passing (100% pass rate)** ✅
-
-All tests pass! The test suite successfully validates:
+All tests pass! The test suite validates:
 - ✅ Symlink creation and management
 - ✅ Conflict detection and resolution with full path preservation
 - ✅ Backup and restore functionality
@@ -168,10 +161,9 @@ bats -t tests/unit/test-symlink-manager.bats
 ### Test-Driven Development
 
 1. Write failing test for new feature
-2. Run `make test-unit` to confirm it fails
+2. Run `make test` to confirm it fails
 3. Implement feature in `src/`
-4. Run `make test-unit` to verify fix
-5. Run `make test` for full validation
+4. Run `make test` to verify fix
 
 ## CI/CD Integration (Future)
 
@@ -196,8 +188,6 @@ Exit codes:
 ## Benefits
 
 ✅ **Safety**: Never touches your actual system
-✅ **Speed**: Full suite in ~45s, unit tests in ~10s
-✅ **Coverage**: 111 tests across unit and integration levels
 ✅ **Confidence**: Make changes without fear of breaking things
 ✅ **Documentation**: Tests serve as executable specifications
 ✅ **Debugging**: Interactive shell for troubleshooting

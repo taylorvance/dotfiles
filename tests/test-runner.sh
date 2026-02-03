@@ -27,22 +27,16 @@ usage() {
     echo "Usage: $0 [MODE]"
     echo ""
     echo "Test Modes:"
-    echo "  all            Run all tests (unit + integration + configs)"
-    echo "  unit           Run only unit tests"
-    echo "  integration    Run integration tests"
-    echo "  configs        Run config verification tests"
+    echo "  all            Run all tests (unit + integration)"
     echo "  shell          Drop into interactive shell in test container (Alpine)"
     echo ""
     echo "Development Modes:"
     echo "  dev            Interactive shell with dotfiles pre-installed (Ubuntu)"
-    echo "  dev-fresh      Interactive shell with dotfiles present but not installed (Ubuntu)"
     echo ""
     echo "Examples:"
     echo "  make test              # Run all tests"
-    echo "  make test-unit         # Run only unit tests"
     echo "  make test-shell        # Interactive debugging"
     echo "  make dev-shell         # Try your dotfiles (pre-installed)"
-    echo "  make dev-shell-fresh   # Test fresh installation manually"
     exit 1
 }
 
@@ -127,31 +121,19 @@ run_docker_tests() {
 }
 
 run_dev_shell() {
-    local mode=$1
-
     echo -e "${CYAN}═══════════════════════════════════════${NC}"
     echo -e "${CYAN}  Dotfiles Development Environment${NC}"
     echo -e "${CYAN}═══════════════════════════════════════${NC}"
     echo ""
 
-    if [ "$mode" = "dev-fresh" ]; then
-        # Use Ubuntu base without pre-installed dotfiles
-        echo -e "${BLUE}→${NC} Building fresh Ubuntu container..."
-        docker build -f "$PROJECT_ROOT/tests/docker/Dockerfile.ubuntu" -t dotfiles-dev:latest "$PROJECT_ROOT"
-        echo -e "${BLUE}→${NC} Starting fresh environment..."
-        echo -e "${YELLOW}Dotfiles are in ~/dotfiles but not installed${NC}"
-        echo -e "${YELLOW}Try: cd dotfiles && make setup${NC}"
-        docker run --rm -it dotfiles-dev:latest /bin/bash
-    else
-        # Use dev Dockerfile with pre-installed dotfiles
-        echo -e "${BLUE}→${NC} Building dev container with pre-installed dotfiles..."
-        echo -e "${YELLOW}This may take a few minutes on first build...${NC}"
-        docker build -f "$PROJECT_ROOT/tests/docker/Dockerfile.dev" -t dotfiles-dev:latest "$PROJECT_ROOT"
-        echo -e "${BLUE}→${NC} Starting pre-configured environment..."
-        echo -e "${GREEN}Dotfiles are already installed and configured!${NC}"
-        echo -e "${YELLOW}Try: ls -la ~ or run 'sysinfo'${NC}"
-        docker run --rm -it dotfiles-dev:latest
-    fi
+    # Use dev Dockerfile with pre-installed dotfiles
+    echo -e "${BLUE}→${NC} Building dev container with pre-installed dotfiles..."
+    echo -e "${YELLOW}This may take a few minutes on first build...${NC}"
+    docker build -f "$PROJECT_ROOT/tests/docker/Dockerfile.dev" -t dotfiles-dev:latest "$PROJECT_ROOT"
+    echo -e "${BLUE}→${NC} Starting pre-configured environment..."
+    echo -e "${GREEN}Dotfiles are already installed and configured!${NC}"
+    echo -e "${YELLOW}Try: ls -la ~ or run 'sysinfo'${NC}"
+    docker run --rm -it dotfiles-dev:latest
 }
 
 run_tests() {
@@ -172,21 +154,6 @@ run_tests() {
     cd "$PROJECT_ROOT"
 
     case $mode in
-        unit)
-            echo -e "${YELLOW}Running unit tests...${NC}"
-            echo ""
-            bats tests/unit/*.bats
-            ;;
-        integration)
-            echo -e "${YELLOW}Running integration tests...${NC}"
-            echo ""
-            bats tests/integration/*.bats
-            ;;
-        configs)
-            echo -e "${YELLOW}Running config verification tests...${NC}"
-            echo ""
-            bats tests/integration/test-configs.bats
-            ;;
         all)
             echo -e "${YELLOW}Running all tests...${NC}"
             echo ""
@@ -227,8 +194,8 @@ if $IS_DOCKER; then
 else
     # Outside Docker, build and run container
     case "$MODE" in
-        dev|dev-fresh)
-            run_dev_shell "$MODE"
+        dev)
+            run_dev_shell
             ;;
         *)
             run_docker_tests "$MODE"

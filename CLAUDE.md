@@ -45,9 +45,6 @@ make help          # Show all available targets with descriptions
 
 ```bash
 make test              # Run all tests in Docker (unit + integration + config verification)
-make test-unit         # Run only unit tests (fast, ~10s)
-make test-integration  # Run integration tests (medium, ~30s)
-make test-configs      # Run config verification tests (nvim, tmux, zsh)
 make test-shell        # Drop into test container for interactive debugging
 make test-clean        # Remove test Docker images and containers
 ```
@@ -84,7 +81,7 @@ make test-clean        # Remove test Docker images and containers
 
 **`tests/docker/`** - Docker infrastructure for isolated testing
 
-- **`Dockerfile.alpine`**: Fast, minimal Alpine Linux base (~200MB, tests run in ~45s)
+- **`Dockerfile.alpine`**: Fast, minimal Alpine Linux base
 - **`Dockerfile.ubuntu`**: Ubuntu base for broader compatibility testing
 
 **`tests/unit/`** - Unit tests for individual components
@@ -326,15 +323,13 @@ Uses a **composable filter model** where all filters AND together:
 
 1. **Before modifying**: Run `make test` to establish baseline
 2. **Make changes**: Edit files in `src/` or `src/dotfiles/`
-3. **Test locally**: Use `make test-unit` for quick feedback during development
-4. **Test fully**: Run `make test` for comprehensive verification
-5. **Debug issues**: Use `make test-shell` to explore the test environment interactively
-6. **Clean up**: Run `make test-clean` to remove Docker artifacts
+3. **Test**: Run `make test` to verify nothing broke
+4. **Debug issues**: Use `make test-shell` to explore the test environment interactively
+5. **Clean up**: Run `make test-clean` to remove Docker artifacts
 
 ### Test Suite Benefits
 
 - **Safe**: Never touches your actual system, runs entirely in Docker
-- **Fast**: Unit tests complete in ~10s, full suite in ~45s
 - **Comprehensive**: Tests installation, symlinking, conflicts, backups, and actual config functionality
 - **Debuggable**: Interactive shell mode for troubleshooting
 - **CI-ready**: Exit codes and TAP format for future automation

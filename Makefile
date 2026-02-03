@@ -38,37 +38,23 @@ unlink: ## Remove all dotfile symlinks
 restore: ## Restore files from a backup directory
 	@src/symlink-manager.sh restore
 
-.PHONY: test test-unit test-integration test-configs test-shell test-clean test-local test-local-yolo
+.PHONY: test test-shell test-clean test-local test-file
 test: ## Run all tests in Docker (unit + integration + config)
 	@tests/test-runner.sh all
-test-unit: ## Run only unit tests (fast)
-	@tests/test-runner.sh unit
-test-integration: ## Run integration tests
-	@tests/test-runner.sh integration
-test-configs: ## Run config verification tests (nvim, tmux, zsh)
-	@tests/test-runner.sh configs
 test-shell: ## Drop into test container for debugging
 	@tests/test-runner.sh shell
-test-local-dryrun: ## Verify tests are safe by running in container first
-	@tests/test-local-dryrun.sh
-test-local: ## Run unit tests locally on macOS (no Docker, faster)
+test-local: ## Run unit tests locally (no Docker, faster)
 	@tests/check-test-safety.sh
 	@echo ""
 	@echo "\033[1;33m════════════════════════════════════════════════════════════════\033[0m"
 	@echo "\033[1;33m  ⚠  WARNING: About to run tests directly on your system\033[0m"
 	@echo "\033[1;33m════════════════════════════════════════════════════════════════\033[0m"
 	@echo ""
-	@echo "  Tests passed static safety checks, but if tests have changed"
-	@echo "  since last verified, run '\033[36mmake test-local-dryrun\033[0m' first."
+	@echo "  Tests passed static safety checks."
 	@echo ""
 	@printf "  Type 'yes' to continue: " && read ans && [ "$$ans" = "yes" ]
 	@echo ""
 	@echo "Running unit tests locally..."
-	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
-	@bats tests/unit/*.bats
-test-local-yolo: ## Run local tests without confirmation (use after dryrun)
-	@tests/check-test-safety.sh
-	@echo ""
 	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
 	@bats tests/unit/*.bats
 test-file: ## Run single test file locally: make test-file F=tests/unit/test-clean-script.bats
@@ -82,8 +68,6 @@ test-clean: ## Remove test Docker images and containers
 	@docker images | grep dotfiles-test | awk '{print $$3}' | xargs -r docker rmi 2>/dev/null || true
 	@echo "✓ Test containers and images removed"
 
-.PHONY: dev-shell dev-shell-fresh
+.PHONY: dev-shell
 dev-shell: ## Interactive shell with dotfiles pre-installed (Ubuntu)
 	@tests/test-runner.sh dev
-dev-shell-fresh: ## Interactive shell with fresh Ubuntu (test installation manually)
-	@tests/test-runner.sh dev-fresh

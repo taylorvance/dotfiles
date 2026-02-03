@@ -35,9 +35,7 @@ _\* If the file has already been installed/symlinked, it will be skipped. You wi
 Before deploying changes to your actual system, test them safely in Docker:
 
 ```bash
-make test              # Run all 111 tests (~45s)
-make test-unit         # Quick unit tests (~10s)
-make test-integration  # Integration tests (~30s)
+make test              # Run all tests in Docker
 make test-shell        # Interactive debugging
 ```
 
@@ -57,12 +55,9 @@ Run `make help` to see all available commands:
 - `make status` - Show installation status of tools and dotfiles
 - `make restore` - Restore files from a backup directory
 
-**Testing (safe - runs in Docker, vever touches your system):**
+**Testing (safe - runs in Docker, never touches your system):**
 
 - `make test` - Run all tests in Docker
-- `make test-unit` - Quick unit tests
-- `make test-integration` - Integration tests
-- `make test-configs` - Config verification tests
 - `make test-shell` - Interactive debugging shell
 - `make test-clean` - Remove Docker test artifacts
 
