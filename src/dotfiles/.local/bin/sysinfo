@@ -10,7 +10,6 @@ Usage: sysinfo [OPTIONS]
 Cross-platform system information utility that displays hardware specs.
 
 OPTIONS:
-    -m, --more               Show extended information (network, display, etc.)
     -h, --help               Show this help message
 
 SUPPORTED PLATFORMS:
@@ -99,15 +98,43 @@ get_gpu() {
 	esac
 }
 
-# Get storage info
+# Get storage info (used / total)
 get_storage() {
-	local avail=$(df -h / 2>/dev/null | tail -1 | awk '{print $4}')
-	local total=$(df -h / 2>/dev/null | tail -1 | awk '{print $2}')
-	if [ -n "$avail" ] && [ -n "$total" ]; then
-		echo "${avail}B / ${total}B"
+	local platform="$1"
+	local path="/"
+	# macOS APFS: user data lives on /System/Volumes/Data
+	[ "$platform" = "macos" ] && [ -d "/System/Volumes/Data" ] && path="/System/Volumes/Data"
+	local used=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $3}')
+	local total=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $2}')
+	local pct=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $5}')
+	if [ -n "$used" ] && [ -n "$total" ]; then
+		echo "${used}B / ${total}B ($pct)"
 	else
 		echo "Unknown"
 	fi
+}
+
+# Get display resolution
+get_display() {
+	local platform="$1"
+	case "$platform" in
+		macos)
+			system_profiler SPDisplaysDataType 2>/dev/null | grep "Resolution:" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//' || echo "Unknown"
+			;;
+		linux)
+			if command -v xrandr >/dev/null 2>&1 && [ -n "$DISPLAY" ]; then
+				xrandr 2>/dev/null | grep '\*' | head -1 | awk '{print $1}' || echo "Unknown"
+			else
+				echo "Unknown (no display or xrandr)"
+			fi
+			;;
+		wsl)
+			echo "N/A (WSL)"
+			;;
+		*)
+			echo "Unknown"
+			;;
+	esac
 }
 
 # Get OS info
@@ -146,60 +173,14 @@ get_arch() {
 	uname -m
 }
 
-# Get kernel
-get_kernel() {
-	uname -r
-}
-
 # Get hostname
 get_hostname() {
 	hostname 2>/dev/null || cat /etc/hostname 2>/dev/null || echo "Unknown"
 }
 
-# Get uptime
-get_uptime() {
-	local platform="$1"
-	case "$platform" in
-		macos)
-			local boot=$(sysctl -n kern.boottime 2>/dev/null | awk -F'[ ,]' '{print $4}')
-			if [ -n "$boot" ]; then
-				local now=$(date +%s)
-				local secs=$((now - boot))
-				local days=$((secs / 86400))
-				local hours=$(((secs % 86400) / 3600))
-				local mins=$(((secs % 3600) / 60))
-				if [ $days -gt 0 ]; then
-					echo "${days}d ${hours}h ${mins}m"
-				elif [ $hours -gt 0 ]; then
-					echo "${hours}h ${mins}m"
-				else
-					echo "${mins}m"
-				fi
-			else
-				echo "Unknown"
-			fi
-			;;
-		linux|wsl)
-			if [ -f /proc/uptime ]; then
-				local secs=$(cut -d. -f1 /proc/uptime)
-				local days=$((secs / 86400))
-				local hours=$(((secs % 86400) / 3600))
-				local mins=$(((secs % 3600) / 60))
-				if [ $days -gt 0 ]; then
-					echo "${days}d ${hours}h ${mins}m"
-				elif [ $hours -gt 0 ]; then
-					echo "${hours}h ${mins}m"
-				else
-					echo "${mins}m"
-				fi
-			else
-				echo "Unknown"
-			fi
-			;;
-		*)
-			echo "Unknown"
-			;;
-	esac
+# Get username
+get_username() {
+	whoami 2>/dev/null || echo "${USER:-Unknown}"
 }
 
 # Get local IP
@@ -230,71 +211,13 @@ get_public_ip() {
 	echo "Unavailable"
 }
 
-# Get display resolution
-get_display() {
-	local platform="$1"
-	case "$platform" in
-		macos)
-			system_profiler SPDisplaysDataType 2>/dev/null | grep "Resolution:" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//' || echo "Unknown"
-			;;
-		linux)
-			if command -v xrandr >/dev/null 2>&1 && [ -n "$DISPLAY" ]; then
-				xrandr 2>/dev/null | grep '\*' | head -1 | awk '{print $1}' || echo "Unknown"
-			else
-				echo "Unknown (no display or xrandr)"
-			fi
-			;;
-		wsl)
-			echo "N/A (WSL)"
-			;;
-		*)
-			echo "Unknown"
-			;;
-	esac
-}
-
-# Get disk breakdown
-get_disks() {
-	local platform="$1"
-	case "$platform" in
-		macos)
-			df -h 2>/dev/null | grep "^/dev/" | awk '{printf "  %-20s %s / %s (%s used)\n", $9, $4, $2, $5}'
-			;;
-		linux|wsl)
-			df -h 2>/dev/null | grep "^/dev/" | awk '{printf "  %-20s %s / %s (%s used)\n", $6, $4, $2, $5}'
-			;;
-	esac
-}
-
-# Get shell
-get_shell() {
-	basename "$SHELL"
-}
-
-# Get terminal
-get_terminal() {
-	if [ -n "$TERM_PROGRAM" ]; then
-		echo "$TERM_PROGRAM"
-	elif [ -n "$TERM" ]; then
-		echo "$TERM"
-	else
-		echo "Unknown"
-	fi
-}
-
 # Main
 main() {
-	local show_more=false
-
 	while [ $# -gt 0 ]; do
 		case "$1" in
 			-h|--help)
 				show_help
 				exit 0
-				;;
-			-m|--more)
-				show_more=true
-				shift
 				;;
 			*)
 				echo "Unknown option: $1" >&2
@@ -309,26 +232,16 @@ main() {
 	printf "%-12s %s\n" "CPU:" "$(get_cpu "$platform")"
 	printf "%-12s %s\n" "RAM:" "$(get_ram "$platform")"
 	printf "%-12s %s\n" "GPU:" "$(get_gpu "$platform")"
-	printf "%-12s %s\n" "Storage:" "$(get_storage)"
+	printf "%-12s %s\n" "Storage:" "$(get_storage "$platform")"
+	printf "%-12s %s\n" "Display:" "$(get_display "$platform")"
+	echo ""
 	printf "%-12s %s\n" "OS:" "$(get_os "$platform")"
 	printf "%-12s %s\n" "Arch:" "$(get_arch)"
-
-	if [ "$show_more" = true ]; then
-		echo ""
-		printf "%-12s %s\n" "Kernel:" "$(get_kernel)"
-		printf "%-12s %s\n" "Hostname:" "$(get_hostname)"
-		printf "%-12s %s\n" "Uptime:" "$(get_uptime "$platform")"
-		printf "%-12s %s\n" "Shell:" "$(get_shell)"
-		printf "%-12s %s\n" "Terminal:" "$(get_terminal)"
-		echo ""
-		printf "%-12s %s\n" "Local IP:" "$(get_local_ip "$platform")"
-		printf "%-12s %s\n" "Public IP:" "$(get_public_ip)"
-		printf "%-12s %s\n" "Display:" "$(get_display "$platform")"
-		echo ""
-		echo "Volumes:"
-		get_disks "$platform"
-	fi
-
+	printf "%-12s %s\n" "Hostname:" "$(get_hostname)"
+	printf "%-12s %s\n" "User:" "$(get_username)"
+	echo ""
+	printf "%-12s %s\n" "Local IP:" "$(get_local_ip "$platform")"
+	printf "%-12s %s\n" "Public IP:" "$(get_public_ip)"
 	echo ""
 }
 

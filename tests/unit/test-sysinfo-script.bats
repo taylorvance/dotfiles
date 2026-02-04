@@ -19,7 +19,7 @@ run_sysinfo() {
 }
 
 # ============================================================================
-# BASIC OUTPUT TESTS
+# HARDWARE INFO TESTS
 # ============================================================================
 
 @test "sysinfo: runs without errors" {
@@ -57,6 +57,17 @@ run_sysinfo() {
     [[ "$output" == *"Storage:"* ]]
 }
 
+@test "sysinfo: shows display information" {
+    run run_sysinfo
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Display:"* ]]
+}
+
+# ============================================================================
+# SYSTEM INFO TESTS
+# ============================================================================
+
 @test "sysinfo: shows OS information" {
     run run_sysinfo
 
@@ -73,47 +84,36 @@ run_sysinfo() {
     [[ "$output" =~ (x86_64|arm64|aarch64|i686) ]]
 }
 
-# ============================================================================
-# EXTENDED INFO TESTS (-m/--more flag)
-# ============================================================================
-
-@test "sysinfo -m: shows extended information" {
-    run run_sysinfo -m
+@test "sysinfo: shows hostname" {
+    run run_sysinfo
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Kernel:"* ]]
     [[ "$output" == *"Hostname:"* ]]
-    [[ "$output" == *"Uptime:"* ]]
 }
 
-@test "sysinfo --more: shows extended information" {
-    run run_sysinfo --more
+@test "sysinfo: shows username" {
+    run run_sysinfo
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Shell:"* ]]
-    [[ "$output" == *"Terminal:"* ]]
+    [[ "$output" == *"User:"* ]]
 }
 
-@test "sysinfo -m: shows network information" {
-    run run_sysinfo -m
+# ============================================================================
+# NETWORK INFO TESTS
+# ============================================================================
+
+@test "sysinfo: shows local IP" {
+    run run_sysinfo
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Local IP:"* ]]
+}
+
+@test "sysinfo: shows public IP" {
+    run run_sysinfo
+
+    [ "$status" -eq 0 ]
     [[ "$output" == *"Public IP:"* ]]
-}
-
-@test "sysinfo -m: shows display information" {
-    run run_sysinfo -m
-
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Display:"* ]]
-}
-
-@test "sysinfo -m: shows volumes" {
-    run run_sysinfo -m
-
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Volumes:"* ]]
 }
 
 # ============================================================================
@@ -125,7 +125,6 @@ run_sysinfo() {
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Usage: sysinfo"* ]]
-    [[ "$output" == *"-m, --more"* ]]
     [[ "$output" == *"-h, --help"* ]]
 }
 
@@ -187,12 +186,13 @@ run_sysinfo() {
     [[ "$output" =~ [0-9]+[[:space:]]GB ]]
 }
 
-@test "sysinfo: storage shows available/total" {
+@test "sysinfo: storage shows used/total with percentage" {
     run run_sysinfo
 
     [ "$status" -eq 0 ]
-    # Should show format like "500GB / 1TB" or similar
+    # Should show format like "500GiB / 1TiB (50%)" or similar
     [[ "$output" =~ Storage:[[:space:]]+[0-9]+.*[[:space:]]/[[:space:]][0-9]+ ]]
+    [[ "$output" =~ \([0-9]+%\) ]]
 }
 
 # ============================================================================
@@ -224,8 +224,7 @@ run_sysinfo() {
     sleep 0.5
     output2=$(run_sysinfo)
 
-    # Core system info shouldn't change between runs (uptime will differ with -m)
-    # Compare just the basic fields
+    # Core system info shouldn't change between runs
     cpu1=$(echo "$output1" | grep "CPU:")
     cpu2=$(echo "$output2" | grep "CPU:")
     [ "$cpu1" = "$cpu2" ]
@@ -233,26 +232,4 @@ run_sysinfo() {
     ram1=$(echo "$output1" | grep "RAM:")
     ram2=$(echo "$output2" | grep "RAM:")
     [ "$ram1" = "$ram2" ]
-}
-
-@test "sysinfo: uptime changes over time" {
-    skip_if_not_extended_mode
-
-    output1=$(run_sysinfo -m | grep "Uptime:")
-    sleep 2
-    output2=$(run_sysinfo -m | grep "Uptime:")
-
-    # Uptime should be different (or at least not identical to the second)
-    # This is a weak test but verifies uptime is dynamic
-    [ "$status" -eq 0 ]
-}
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-skip_if_not_extended_mode() {
-    if [ -z "$EXTENDED_TESTS" ]; then
-        skip "Extended tests not enabled"
-    fi
 }
