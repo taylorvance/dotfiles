@@ -2,9 +2,10 @@
 local vim = vim -- suppress "Undefined global `vim`."
 
 return {
-	{'hrsh7th/nvim-cmp',
-		dependencies = {'hrsh7th/cmp-nvim-lsp'},
-		event = {'InsertEnter'},
+	{
+		'hrsh7th/nvim-cmp',
+		dependencies = { 'hrsh7th/cmp-nvim-lsp' },
+		event = { 'InsertEnter' },
 		config = function()
 			local cmp = require('cmp')
 			local sources = { { name = 'nvim_lsp', priority = 80 }, { name = 'supermaven' } }
@@ -19,13 +20,13 @@ return {
 					completion = cmp.config.window.bordered(),
 					documentation = cmp.config.window.bordered(),
 				},
-				experimental = {ghost_text=true},
-				completion = {keyword_length=0},  -- Trigger even with no characters typed
+				experimental = { ghost_text = true },
+				completion = { keyword_length = 0 }, -- Trigger even with no characters typed
 				mapping = cmp.mapping.preset.insert({
 					['<c-space>'] = cmp.mapping.complete(),
 					['<c-j>'] = cmp.mapping.select_next_item(),
 					['<c-k>'] = cmp.mapping.select_prev_item(),
-					['<cr>'] = cmp.mapping.confirm({ select=true }),
+					['<cr>'] = cmp.mapping.confirm({ select = true }),
 					['<esc>'] = cmp.mapping.abort(),
 				}),
 				sources = cmp.config.sources(sources),
@@ -49,7 +50,8 @@ return {
 		},
 	},
 	'tpope/vim-fugitive',
-	{'lewis6991/gitsigns.nvim',
+	{
+		'lewis6991/gitsigns.nvim',
 		config = function()
 			require('gitsigns').setup({
 				attach_to_untracked = true,
@@ -62,27 +64,27 @@ return {
 					end
 					-- Navigate hunks
 					map('n', ']c', function()
-					  if vim.wo.diff then
-						vim.cmd.normal({']c', bang = true})
-					  else
-						gitsigns.nav_hunk('next')
-					  end
+						if vim.wo.diff then
+							vim.cmd.normal({ ']c', bang = true })
+						else
+							gitsigns.nav_hunk('next')
+						end
 					end)
 					map('n', '[c', function()
-					  if vim.wo.diff then
-						vim.cmd.normal({'[c', bang = true})
-					  else
-						gitsigns.nav_hunk('prev')
-					  end
+						if vim.wo.diff then
+							vim.cmd.normal({ '[c', bang = true })
+						else
+							gitsigns.nav_hunk('prev')
+						end
 					end)
 					-- Stage/reset
 					map('n', '<leader>hs', gitsigns.stage_hunk)
 					map('n', '<leader>hr', gitsigns.reset_hunk)
 					map('v', '<leader>hs', function()
-					  gitsigns.stage_hunk({ vim.fn.line('.'), vim.fn.line('v') })
+						gitsigns.stage_hunk({ vim.fn.line('.'), vim.fn.line('v') })
 					end)
 					map('v', '<leader>hr', function()
-					  gitsigns.reset_hunk({ vim.fn.line('.'), vim.fn.line('v') })
+						gitsigns.reset_hunk({ vim.fn.line('.'), vim.fn.line('v') })
 					end)
 					map('n', '<leader>hS', gitsigns.stage_buffer)
 					map('n', '<leader>hR', gitsigns.reset_buffer)
@@ -91,34 +93,37 @@ return {
 					map('n', '<leader>hi', gitsigns.preview_hunk_inline)
 					-- Show blame
 					map('n', '<leader>hb', function()
-					  gitsigns.blame_line({ full = true })
+						gitsigns.blame_line({ full = true })
 					end)
 					-- Show diff
 					map('n', '<leader>hd', gitsigns.diffthis)
 					map('n', '<leader>hD', function()
-					  gitsigns.diffthis('~')
+						gitsigns.diffthis('~')
 					end)
 				end
 			})
 		end,
 	},
 	'jeetsukumaran/vim-indentwise',
-	{'nvim-lualine/lualine.nvim', --.TODO: show Lazy status updates https://youtu.be/6pAG3BHurdM?si=GWEB_1be31_UZHZM&t=2465
-		dependencies = {'nvim-tree/nvim-web-devicons', 'nvim-lua/lsp-status.nvim'},
+	{
+		'nvim-lualine/lualine.nvim', --.TODO: show Lazy status updates https://youtu.be/6pAG3BHurdM?si=GWEB_1be31_UZHZM&t=2465
+		dependencies = { 'nvim-tree/nvim-web-devicons', 'nvim-lua/lsp-status.nvim' },
 		opts = {
 			options = {
 				theme = 'tokyonight',
 			},
 			sections = {
 				lualine_b = {
-					{'branch',
+					{
+						'branch',
 						on_click = function()
 							-- open git fugitive
 							vim.cmd('G')
 						end,
 					},
 					'diff',
-					{'diagnostics',
+					{
+						'diagnostics',
 						on_click = function(_, _, mod)
 							if mod:find('s') then
 								-- open snacks diagnostics
@@ -130,12 +135,13 @@ return {
 						end,
 					},
 				},
-				lualine_c = {{'filename', path=1}},
+				lualine_c = { { 'filename', path = 1 } },
 				lualine_x = {
-					{'lsp_status',
+					{
+						'lsp_status',
 						icon = '',
 						symbols = {
-							spinner = {'⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'},
+							spinner = { '⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏' },
 							done = '✓',
 							separator = ',',
 						},
@@ -154,8 +160,9 @@ return {
 			},
 		},
 	},
-	{'williamboman/mason.nvim',--.TODO: review josean https://www.youtube.com/watch?v=6pAG3BHurdM&t=3647s
-		dependencies = {'williamboman/mason-lspconfig.nvim','neovim/nvim-lspconfig'},
+	{
+		'williamboman/mason.nvim', --.TODO: review josean https://www.youtube.com/watch?v=6pAG3BHurdM&t=3647s
+		dependencies = { 'williamboman/mason-lspconfig.nvim', 'neovim/nvim-lspconfig' },
 		config = function()
 			-- Set up Mason (LSP installer).
 			require('mason').setup()
@@ -165,7 +172,7 @@ return {
 			local util = require('lspconfig.util')
 			require('mason-lspconfig').setup({
 				--                  Python    pylint JS      PHP            C#          Vim     Lua      HTML
-				ensure_installed = {'pyright','ruff','ts_ls','intelephense','omnisharp','vimls','lua_ls','html'},
+				ensure_installed = { 'pyright', 'ruff', 'ts_ls', 'intelephense', 'omnisharp', 'vimls', 'lua_ls', 'html' },
 				automatic_installation = true,
 				-- Set up LSP servers after installation.
 				handlers = {
@@ -173,10 +180,18 @@ return {
 						lspconfig.intelephense.setup({
 							settings = {
 								intelephense = {
-									environment = {shortOpenTag=true},
+									environment = { shortOpenTag = true },
 									stubs = {
 										-- 2025-03-20 defaults per https://github.com/bmewburn/intelephense-docs/blob/master/gettingStarted.md#environment
-										'apache','bcmath','bz2','calendar','com_dotnet','Core','ctype','curl','date','dba','dom','enchant','exif','FFI','fileinfo','filter','fpm','ftp','gd','gettext','gmp','hash','iconv','imap','intl','json','ldap','libxml','mbstring','meta','mysqli','oci8','odbc','openssl','pcntl','pcre','PDO','pdo_ibm','pdo_mysql','pdo_pgsql','pdo_sqlite','pgsql','Phar','posix','pspell','readline','Reflection','session','shmop','SimpleXML','snmp','soap','sockets','sodium','SPL','sqlite3','standard','superglobals','sysvmsg','sysvsem','sysvshm','tidy','tokenizer','xml','xmlreader','xmlrpc','xmlwriter','xsl','Zend OPcache','zip','zlib',
+										'apache', 'bcmath', 'bz2', 'calendar', 'com_dotnet', 'Core', 'ctype', 'curl',
+										'date', 'dba', 'dom', 'enchant', 'exif', 'FFI', 'fileinfo', 'filter', 'fpm',
+										'ftp', 'gd', 'gettext', 'gmp', 'hash', 'iconv', 'imap', 'intl', 'json', 'ldap',
+										'libxml', 'mbstring', 'meta', 'mysqli', 'oci8', 'odbc', 'openssl', 'pcntl',
+										'pcre', 'PDO', 'pdo_ibm', 'pdo_mysql', 'pdo_pgsql', 'pdo_sqlite', 'pgsql', 'Phar',
+										'posix', 'pspell', 'readline', 'Reflection', 'session', 'shmop', 'SimpleXML',
+										'snmp', 'soap', 'sockets', 'sodium', 'SPL', 'sqlite3', 'standard', 'superglobals',
+										'sysvmsg', 'sysvsem', 'sysvshm', 'tidy', 'tokenizer', 'xml', 'xmlreader',
+										'xmlrpc', 'xmlwriter', 'xsl', 'Zend OPcache', 'zip', 'zlib',
 										'mongodb', -- for "Undefined class \MongoDB\..."
 										'random', -- for rand() and friends
 									},
@@ -188,8 +203,10 @@ return {
 						lspconfig.lua_ls.setup({
 							settings = {
 								Lua = {
-									diagnostics = {
-										globals = {'vim'}, -- recognize vim as a global variable
+									runtime = { version = 'LuaJIT' },
+									workspace = {
+										library = vim.api.nvim_get_runtime_file('', true),
+										checkThirdParty = false,
 									},
 								},
 							},
@@ -239,43 +256,45 @@ return {
 			})
 		end,
 	},
-	{'mfussenegger/nvim-lint',
-		event = {'BufReadPost','BufNewFile'},
+	{
+		'mfussenegger/nvim-lint',
+		event = { 'BufReadPost', 'BufNewFile' },
 		dependencies = {
-			{"rshkarin/mason-nvim-lint", opts={ensure_installed={"eslint_d"}}},
+			{ "rshkarin/mason-nvim-lint", opts = { ensure_installed = { "eslint_d" } } },
 		},
 		config = function()
 			local lint = require('lint')
 			lint.linters_by_ft = {
 				-- python uses ruff LSP instead (configured via mason-lspconfig)
-				javascript = {'eslint_d'},
-				javascriptreact = {'eslint_d'},
-				typescript = {'eslint_d'},
-				typescriptreact = {'eslint_d'},
+				javascript = { 'eslint_d' },
+				javascriptreact = { 'eslint_d' },
+				typescript = { 'eslint_d' },
+				typescriptreact = { 'eslint_d' },
 			}
-			vim.api.nvim_create_autocmd({'BufWritePost'}, {
+			vim.api.nvim_create_autocmd({ 'BufWritePost' }, {
 				callback = function() lint.try_lint() end,
 			})
 		end,
 	},
-	{'stevearc/conform.nvim',
-		event = {'BufWritePre'},
-		cmd = {'ConformInfo'},
+	{
+		'stevearc/conform.nvim',
+		event = { 'BufWritePre' },
+		cmd = { 'ConformInfo' },
 		dependencies = {
-			{'zapling/mason-conform.nvim', opts={ensure_installed={'prettier','black'}}},
+			{ 'zapling/mason-conform.nvim', opts = { ensure_installed = { 'prettier', 'black' } } },
 		},
 		opts = {
 			formatters_by_ft = {
-				javascript = {'prettier'},
-				javascriptreact = {'prettier'},
-				typescript = {'prettier'},
-				typescriptreact = {'prettier'},
-				css = {'prettier'},
-				html = {'prettier'},
-				json = {'prettier'},
-				yaml = {'prettier'},
-				markdown = {'prettier'},
-				python = {'black'},
+				javascript = { 'prettier' },
+				javascriptreact = { 'prettier' },
+				typescript = { 'prettier' },
+				typescriptreact = { 'prettier' },
+				css = { 'prettier' },
+				html = { 'prettier' },
+				json = { 'prettier' },
+				yaml = { 'prettier' },
+				markdown = { 'prettier' },
+				python = { 'black' },
 			},
 			format_on_save = {
 				timeout_ms = 500,
@@ -285,7 +304,8 @@ return {
 	},
 	'tpope/vim-repeat',
 	'tpope/vim-surround',
-	{'folke/snacks.nvim',
+	{
+		'folke/snacks.nvim',
 		priority = 1000,
 		lazy = false,
 		opts = {
@@ -305,16 +325,18 @@ return {
 			},
 		},
 	},
-	{'folke/tokyonight.nvim', lazy=false, priority=1000}, -- colorschemes should be loaded first
-	{"nvim-tree/nvim-tree.lua",
-		dependencies = {"nvim-tree/nvim-web-devicons"},
+	{ 'folke/tokyonight.nvim', lazy = false, priority = 1000 }, -- colorschemes should be loaded first
+	{
+		"nvim-tree/nvim-tree.lua",
+		dependencies = { "nvim-tree/nvim-web-devicons" },
 		version = "*",
 		lazy = false,
 		config = function()
 			require("nvim-tree").setup {}
 		end,
 	},
-	{'nvim-treesitter/nvim-treesitter',
+	{
+		'nvim-treesitter/nvim-treesitter',
 		branch = 'main',
 		lazy = false,
 		build = ':TSUpdate',
@@ -332,7 +354,8 @@ return {
 			})
 		end,
 	},
-	{'folke/trouble.nvim',
+	{
+		'folke/trouble.nvim',
 		cmd = 'Trouble',
 		opts = {
 			focus = true,
@@ -342,7 +365,7 @@ return {
 				['<esc>'] = 'close',
 				['<c-b>'] = { -- 2025-04-08 copied from "gb" key in https://github.com/folke/trouble.nvim/tree/main?tab=readme-ov-file#setup
 					action = function(view)
-						view:filter({buf=0},{toggle=true})
+						view:filter({ buf = 0 }, { toggle = true })
 					end,
 					desc = "Toggle Current Buffer Filter",
 				},
@@ -351,7 +374,8 @@ return {
 			},
 		},
 	},
-	{'folke/which-key.nvim',
+	{
+		'folke/which-key.nvim',
 		event = 'VeryLazy',
 		opts = {
 			preset = 'modern',
