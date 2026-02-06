@@ -1,3 +1,6 @@
+---@diagnostic disable-next-line: undefined-global
+local vim = vim -- suppress "Undefined global `vim`."
+
 return {
 	{'hrsh7th/nvim-cmp',
 		dependencies = {'hrsh7th/cmp-nvim-lsp'},
