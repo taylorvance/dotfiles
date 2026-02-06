@@ -7,7 +7,7 @@ return {
 		event = {'InsertEnter'},
 		config = function()
 			local cmp = require('cmp')
-			local sources = { { name = 'nvim_lsp', priority = 80 } }
+			local sources = { { name = 'nvim_lsp', priority = 80 }, { name = 'supermaven' } }
 
 			cmp.setup({
 				snippet = { -- "you must specify a snippet engine"
@@ -37,25 +37,15 @@ return {
 			})
 		end,
 	},
-	{'meeehdi-dev/bropilot.nvim', -- ollama-based code completion (copilot-style inline suggestions)
-		--[[
-		-- `brew install ollama` to install Ollama
-		-- `ollama pull [model]` to download a model
-		-- `ollama serve` to start the server
-		-- `ollama list` to see available models
-		--]]
-		dependencies = {'nvim-lua/plenary.nvim', 'j-hui/fidget.nvim'},
+	{
+		'supermaven-inc/supermaven-nvim',
 		opts = {
-			provider = 'ollama',
-			--model = 'deepseek-coder-v2:latest',
-			model = 'qwen2.5-coder:1.5b',
-			--model = 'codellama:7b-code',
-			keymap = {
-				suggest = '<c-y>',
+			keymaps = {
+				accept_suggestion = '<tab>',
 				accept_word = '<right>',
-				accept_line = '<s-right>',
-				accept_block = '<tab>',
+				clear_suggestion = '<esc>',
 			},
+			disable_inline_completion = false,
 		},
 	},
 	'tpope/vim-fugitive',
