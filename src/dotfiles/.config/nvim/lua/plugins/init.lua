@@ -8,7 +8,7 @@ return {
 		event = { 'InsertEnter' },
 		config = function()
 			local cmp = require('cmp')
-			local sources = { { name = 'nvim_lsp', priority = 80 }, { name = 'supermaven' } }
+			local sources = { { name = 'nvim_lsp', priority = 80 } }
 
 			cmp.setup({
 				snippet = { -- "you must specify a snippet engine"

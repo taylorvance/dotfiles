@@ -61,11 +61,11 @@ teardown() {
 
     # First run
     bash src/symlink-manager.sh install
-    [ ! -d "$TEST_DOTFILES/backups" ]
+    [ ! -d "$TEST_DOTFILES/.backups" ]
 
     # Second run
     bash src/symlink-manager.sh install
-    [ ! -d "$TEST_DOTFILES/backups" ]
+    [ ! -d "$TEST_DOTFILES/.backups" ]
 }
 
 @test "idempotency: status remains success after multiple link runs" {

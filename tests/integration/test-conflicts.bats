@@ -41,7 +41,7 @@ teardown() {
     # Should succeed and backup old file
     [ "$status" -eq 0 ]
     [ -L "$TEST_HOME/.testfile" ]
-    [ -d "$TEST_DOTFILES/backups" ]
+    [ -d "$TEST_DOTFILES/.backups" ]
 }
 
 @test "conflicts: detects conflicting directory" {
@@ -80,8 +80,8 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Assert backup created
-    [ -d "$TEST_DOTFILES/backups" ]
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    [ -d "$TEST_DOTFILES/.backups" ]
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ -f "$backup_dir/.testfile" ]
     [ "$(cat "$backup_dir/.testfile")" = "important data" ]
 }
@@ -95,7 +95,7 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Assert backup preserves structure
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     # cp -RL creates the full path in the backup
     [ -f "$backup_dir/.config/test.conf" ]
     [ "$(cat "$backup_dir/.config/test.conf")" = "data1" ]
@@ -109,7 +109,7 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Check backup directory name format: YYYY-MM-DD_HH-MM-SS_PID
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     backup_name=$(basename "$backup_dir")
     [[ "$backup_name" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}_[0-9]+$ ]]
 }
@@ -124,11 +124,11 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Assert single backup directory
-    backup_count=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+    backup_count=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
     [ "$backup_count" -eq 1 ]
 
     # Both files backed up with full paths
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ -f "$backup_dir/.testfile" ]
     [ -f "$backup_dir/.config/test.conf" ]
 }
@@ -147,7 +147,7 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Assert two backup directories
-    backup_count=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | wc -l)
+    backup_count=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | wc -l)
     [ "$backup_count" -eq 2 ]
 }
 
@@ -160,7 +160,7 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Backup should dereference symlink (cp -RL)
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ -f "$backup_dir/.testfile" ]
     [ ! -L "$backup_dir/.testfile" ]  # Should be regular file, not symlink
     [ "$(cat "$backup_dir/.testfile")" = "target content" ]
@@ -213,7 +213,7 @@ teardown() {
 
     # Should backup directory and create file symlink
     [ -L "$TEST_HOME/.testfile" ]
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ -f "$backup_dir/.testfile/subfile" ]
 }
 
@@ -227,7 +227,7 @@ teardown() {
 
     # Should backup file and create directory symlink
     [ -L "$TEST_HOME/.config/test.conf" ]
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ -f "$backup_dir/.config" ]
     [ "$(cat "$backup_dir/.config")" = "file content" ]
 }
@@ -241,7 +241,7 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Check backup preserves permissions
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ -x "$backup_dir/.testfile" ]
 }
 
@@ -256,7 +256,7 @@ teardown() {
 
     # Should handle spaces
     [ -L "$TEST_HOME/.test file" ]
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ -f "$backup_dir/.test file" ]
 }
 
@@ -283,7 +283,7 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Check backup has original content
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ "$(cat "$backup_dir/.testfile")" = "precious data that must not be lost" ]
 }
 
@@ -298,6 +298,6 @@ teardown() {
     echo "modified" > "$TEST_DOTFILES/src/dotfiles/.testfile"
 
     # Backup should still have original content (not affected by source change)
-    backup_dir=$(find "$TEST_DOTFILES/backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
     [ "$(cat "$backup_dir/.testfile")" = "original" ]
 }

@@ -26,7 +26,7 @@ BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 DESTINATIONDIR=$HOME
 SOURCEDIR=$BASEDIR/src/dotfiles
 CONFIGFILE=$BASEDIR/config
-BACKUPSDIR=$BASEDIR/backups
+BACKUPSDIR=$BASEDIR/.backups
 
 # Color codes for output
 RED='\033[0;31m'

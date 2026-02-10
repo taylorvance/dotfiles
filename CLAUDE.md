@@ -28,7 +28,7 @@ make setup
 - Installs: nvim, git, tmux, zsh, fzf, bat, zoxide, eza, fd, ripgrep, delta, atuin, starship, node, python3
 - Creates symlinks from `src/dotfiles/` to `~/` for files listed in `config`
 - Idempotent: safe to run multiple times
-- Backs up conflicting files to `backups/YYYY-MM-DD_HH-MM-SS_PID/`
+- Backs up conflicting files to `.backups/YYYY-MM-DD_HH-MM-SS_PID/`
 
 ### Individual Operations
 
@@ -66,7 +66,7 @@ make test-clean        # Remove test Docker images and containers
 - **`src/symlink-manager.sh`**: Helper script that handles symlink operations (install, uninstall, status, restore)
 - **`src/dotfiles/`**: Source directory containing all dotfiles, organized exactly as they should appear under `~/`
 - **`config`**: Text file listing paths to symlink (relative to `src/dotfiles/` and `~/`)
-- **`backups/`**: Auto-generated backup directory for conflicting files
+- **`.backups/`**: Auto-generated backup directory for conflicting files
 - **`tests/`**: Comprehensive test suite with Docker infrastructure
 
 ### Tool Dependencies

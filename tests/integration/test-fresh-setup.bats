@@ -78,7 +78,7 @@ teardown() {
     bash src/symlink-manager.sh install
 
     # Assert
-    [ ! -d "$TEST_DOTFILES/backups" ]
+    [ ! -d "$TEST_DOTFILES/.backups" ]
 }
 
 @test "fresh setup: status shows all linked" {

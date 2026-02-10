@@ -24,7 +24,7 @@ Simply clone the repo and run `make setup`.
 git clone https://github.com/taylorvance/dotfiles.git && cd dotfiles && make setup
 ```
 
-This will install required CLI tools (nvim, git, tmux, zsh, etc.) and create symlinks in your home directory for everything located in `src/dotfiles/` and configured in `config`. If there are any conflicts\*, your original files will be backed up in `backups/` with full path preservation.
+This will install required CLI tools (nvim, git, tmux, zsh, etc.) and create symlinks in your home directory for everything located in `src/dotfiles/` and configured in `config`. If there are any conflicts\*, your original files will be backed up in `.backups/` with full path preservation.
 
 Installation is [idempotent](https://en.wikipedia.org/wiki/Idempotence), which is a [word](https://github.com/anishathalye/dotfiles) [that](https://medium.com/@webprolific/getting-started-with-dotfiles-43c3602fd789) [dotfile](https://umanovskis.se/blog/post/dotfiles/) [authors](https://www.geekytidbits.com/dotfiles/) [love](https://unhexium.net/dotfiles/the-dotfile-drama/) [to](https://bananamafia.dev/post/dotfile-deployment/) [flaunt](https://www.evanjones.ca/dotfiles-personal-software-configuration.html).
 
@@ -127,7 +127,7 @@ dotfiles/
 │   ├── integration/        # Integration tests
 │   ├── test-runner.sh      # Test orchestration
 │   └── README.md           # Testing documentation
-├── backups/                # Auto-generated backups
+├── .backups/               # Auto-generated backups
 │   └── 2025-01-20_10-30-45_12345/
 │       └── .vimrc          # Your original files
 ├── config                  # Paths to symlink
@@ -138,7 +138,7 @@ dotfiles/
 
 ### Backups
 
-When you run `make setup`, files that would be overwritten are automatically backed up to `backups/` with full path preservation. Each backup is in a timestamped directory (format: `YYYY-MM-DD_HH-MM-SS_PID`) so you never lose data.
+When you run `make setup`, files that would be overwritten are automatically backed up to `.backups/` with full path preservation. Each backup is in a timestamped directory (format: `YYYY-MM-DD_HH-MM-SS_PID`) so you never lose data.
 
 Use `make restore` to interactively restore from any backup.
 

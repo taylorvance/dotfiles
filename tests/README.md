@@ -89,7 +89,7 @@ tests/
 **Conflicts & Backups**
 - ✓ Conflict detection (files, directories, symlinks)
 - ✓ Backup directory creation and naming
-- ✓ Structure preservation in backups
+- ✓ Structure preservation in .backups
 - ✓ Restore functionality
 - ✓ Data integrity verification
 

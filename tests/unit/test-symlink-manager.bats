@@ -9,7 +9,7 @@ setup() {
     export TEST_DOTFILES="$TEST_DIR/dotfiles"
     export TEST_SOURCE="$TEST_DOTFILES/src/dotfiles"
     export TEST_CONFIG="$TEST_DOTFILES/config"
-    export TEST_BACKUPS="$TEST_DOTFILES/backups"
+    export TEST_BACKUPS="$TEST_DOTFILES/.backups"
 
     mkdir -p "$TEST_HOME"
     mkdir -p "$TEST_SOURCE"
