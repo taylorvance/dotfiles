@@ -31,6 +31,7 @@ BACKUPSDIR=$BASEDIR/.backups
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+DIM='\033[0;90m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
@@ -65,7 +66,7 @@ install_dotfiles() {
 
         # If the file is already correctly symlinked, skip.
         if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
-            printf "  ${GREEN}✓${NC} ${filepath} (already linked)\n"
+            printf "  ${DIM}✓${NC} ${filepath}\n"
             continue
         fi
 
