@@ -8,6 +8,7 @@
 .gitignore
 .local/bin/clean
 .local/bin/e
+.local/bin/git-prune-branches
 .local/bin/proj
 .local/bin/sysinfo
 .local/bin/tmp

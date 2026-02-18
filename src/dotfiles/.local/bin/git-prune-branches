@@ -1,0 +1,261 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# git-prune-branches - Remove local branches that are no longer needed
+#
+# Usage: git prune-branches [-n] [-a]
+#
+# Categories:
+#   [merged]        Merged into the default branch
+#   [gone]          Remote tracking branch was deleted
+#   [squash-merged] Changes integrated via squash/rebase (detected by git cherry)
+#
+# Options:
+#   -n, --dry-run   Show branches without prompting for deletion
+#   -a, --all       Include squash-merged branches (slower, uses git cherry)
+#   -h, --help      Show this help message
+
+show_help() {
+    cat <<'EOF'
+Usage: git prune-branches [-n] [-a]
+
+Remove local branches that are no longer needed.
+
+Detects branches in these states:
+  [merged]        Merged into the default branch
+  [gone]          Remote tracking branch was deleted
+  [squash-merged] Changes integrated via squash/rebase
+
+Options:
+  -n, --dry-run   Show branches without prompting for deletion
+  -a, --all       Include squash-merged branches (slower, uses git cherry)
+  -h, --help      Show this help message
+
+Prompt options:
+  y   Delete all listed branches
+  N   Abort (default)
+  i   Interactive selection via fzf
+EOF
+    exit 0
+}
+
+# Defaults
+DRY_RUN=false
+INCLUDE_SQUASH=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--dry-run) DRY_RUN=true; shift ;;
+        -a|--all) INCLUDE_SQUASH=true; shift ;;
+        -h|--help) show_help ;;
+        -*) echo "Error: Unknown option: $1" >&2; exit 1 ;;
+        *) echo "Error: Unexpected argument: $1" >&2; exit 1 ;;
+    esac
+done
+
+# Must be in a git repo
+if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    echo "Error: Not a git repository" >&2
+    exit 1
+fi
+
+# Detect default branch
+detect_default_branch() {
+    # Try origin/HEAD first
+    local ref
+    ref=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || true)
+    if [[ -n "$ref" ]]; then
+        echo "${ref##*/}"
+        return
+    fi
+    # Fall back to checking common names
+    for name in main master; do
+        if git show-ref --verify --quiet "refs/heads/$name" 2>/dev/null; then
+            echo "$name"
+            return
+        fi
+    done
+    echo "Error: Could not detect default branch (tried origin/HEAD, main, master)" >&2
+    exit 1
+}
+
+DEFAULT_BRANCH=$(detect_default_branch)
+CURRENT_BRANCH=$(git branch --show-current)
+
+# Parallel arrays for branch data (bash 3 compatible)
+BRANCHES=()
+TAGS=()
+FLAGS=()
+
+# Find index of a branch, or return 1 if not found
+find_branch() {
+    local name="$1"
+    [[ ${#BRANCHES[@]} -eq 0 ]] && return 1
+    for i in "${!BRANCHES[@]}"; do
+        if [[ "${BRANCHES[$i]}" == "$name" ]]; then
+            echo "$i"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Add or update a branch entry
+add_branch() {
+    local name="$1" tag="$2" flag="$3"
+    local idx
+    if idx=$(find_branch "$name"); then
+        TAGS[$idx]="${TAGS[$idx]}, $tag"
+        # Escalate to -D if needed
+        [[ "$flag" == "D" ]] && FLAGS[$idx]="D"
+    else
+        BRANCHES+=("$name")
+        TAGS+=("$tag")
+        FLAGS+=("$flag")
+    fi
+}
+
+should_skip() {
+    local branch="$1"
+    [[ -z "$branch" ]] && return 0
+    [[ "$branch" == "$DEFAULT_BRANCH" ]] && return 0
+    [[ "$branch" == "$CURRENT_BRANCH" ]] && return 0
+    [[ "$branch" == \** ]] && return 0
+    return 1
+}
+
+# Find merged branches
+while IFS= read -r branch; do
+    branch=$(echo "$branch" | xargs)  # trim whitespace
+    should_skip "$branch" && continue
+    add_branch "$branch" "merged" "d"
+done < <(git branch --merged "$DEFAULT_BRANCH" 2>/dev/null)
+
+# Find gone branches (remote tracking branch deleted)
+while IFS= read -r line; do
+    branch=$(echo "$line" | awk '{print $1}')
+    should_skip "$branch" && continue
+    if echo "$line" | grep -q '\[.*: gone\]'; then
+        add_branch "$branch" "gone" "D"
+    fi
+done < <(git branch -vv 2>/dev/null)
+
+# Find squash-merged branches (optional, slower)
+if [[ "$INCLUDE_SQUASH" == true ]]; then
+    while IFS= read -r branch; do
+        branch=$(echo "$branch" | xargs)
+        should_skip "$branch" && continue
+        # Skip branches already detected as merged
+        if idx=$(find_branch "$branch") && [[ "${TAGS[$idx]}" == *"merged"* ]]; then
+            continue
+        fi
+        # git cherry: lines starting with - are already applied
+        local_cherry=$(git cherry "$DEFAULT_BRANCH" "$branch" 2>/dev/null || true)
+        [[ -z "$local_cherry" ]] && continue
+        # If ALL lines start with -, branch is fully integrated
+        if ! echo "$local_cherry" | grep -q '^+'; then
+            add_branch "$branch" "squash-merged" "D"
+        fi
+    done < <(git branch --format='%(refname:short)' 2>/dev/null)
+fi
+
+# Nothing to do?
+if [[ ${#BRANCHES[@]} -eq 0 ]]; then
+    echo "No branches to prune."
+    exit 0
+fi
+
+# Build sorted display entries as "tags|branch"
+DISPLAY_ENTRIES=()
+for i in "${!BRANCHES[@]}"; do
+    DISPLAY_ENTRIES+=("${TAGS[$i]}|${BRANCHES[$i]}")
+done
+
+# Display grouped branches
+echo ""
+echo "Branches to prune (default branch: $DEFAULT_BRANCH):"
+echo ""
+
+current_group=""
+while IFS= read -r entry; do
+    tags="${entry%%|*}"
+    branch="${entry#*|}"
+    if [[ "$tags" != "$current_group" ]]; then
+        [[ -n "$current_group" ]] && echo ""
+        echo "  [$tags]"
+        current_group="$tags"
+    fi
+    echo "    $branch"
+done < <(printf '%s\n' "${DISPLAY_ENTRIES[@]}" | sort)
+echo ""
+
+echo "${#BRANCHES[@]} branch(es) found."
+echo ""
+
+# Dry run exits here
+if [[ "$DRY_RUN" == true ]]; then
+    exit 0
+fi
+
+# Prompt for action
+while true; do
+    read -rp "Delete all? [y/N/i] " choice
+    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+    case "$choice" in
+        y|yes)
+            for i in "${!BRANCHES[@]}"; do
+                branch="${BRANCHES[$i]}"
+                flag="${FLAGS[$i]}"
+                if git branch "-$flag" "$branch" 2>/dev/null; then
+                    echo "Deleted $branch"
+                else
+                    echo "Failed to delete $branch (try: git branch -D $branch)" >&2
+                fi
+            done
+            exit 0
+            ;;
+        n|no|"")
+            echo "Aborted."
+            exit 0
+            ;;
+        i|interactive)
+            if ! command -v fzf &>/dev/null; then
+                echo "Error: fzf required for interactive mode" >&2
+                continue
+            fi
+
+            # Build fzf input
+            FZF_INPUT=""
+            for i in "${!BRANCHES[@]}"; do
+                FZF_INPUT+="$(printf "%-40s [%s]" "${BRANCHES[$i]}" "${TAGS[$i]}")"$'\n'
+            done
+
+            SELECTED=$(echo -n "$FZF_INPUT" | \
+                fzf --multi \
+                    --header="TAB to select, ENTER to confirm" \
+                    --reverse) || {
+                echo "Aborted."
+                exit 0
+            }
+
+            [[ -z "$SELECTED" ]] && { echo "Nothing selected."; exit 0; }
+
+            while IFS= read -r line; do
+                sel_branch=$(echo "$line" | awk '{print $1}')
+                if sel_idx=$(find_branch "$sel_branch"); then
+                    flag="${FLAGS[$sel_idx]}"
+                    if git branch "-$flag" "$sel_branch" 2>/dev/null; then
+                        echo "Deleted $sel_branch"
+                    else
+                        echo "Failed to delete $sel_branch (try: git branch -D $sel_branch)" >&2
+                    fi
+                fi
+            done <<< "$SELECTED"
+            exit 0
+            ;;
+        *)
+            echo "Please enter y, n, or i"
+            ;;
+    esac
+done

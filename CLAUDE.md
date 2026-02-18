@@ -173,6 +173,7 @@ The safety check (`tests/check-test-safety.sh`) audits BOTH test files AND sourc
 | `proj` | `$HOME` overridden, mock `zoxide` in `$PATH` |
 | `clean` | Runs in `$TEST_DIR`, only deletes test directories |
 | `sysinfo` | Read-only, no file writes |
+| `git-prune-branches` | Runs in cloned test repo inside `$TEST_DIR`, `$HOME` overridden |
 | `install-tools.sh` | Only syntax-checked (`bash -n`), never executed |
 
 ### Custom Scripts (`src/dotfiles/.local/bin/`)
@@ -206,6 +207,25 @@ Create timestamped temporary directories for scratch work:
   - Timestamped directories: `/tmp/tmp-workspaces/YYYYMMDD-HHMMSS/`
   - Shell wrapper function handles cd and editor invocation
   - Perfect for quick experiments, scratch files, or temporary work
+
+**`git-prune-branches`** - Remove local git branches that are no longer needed
+
+Auto-discovered by git as `git prune-branches` (no alias needed):
+
+- **Basic usage**: `git prune-branches` - find and delete stale branches
+- **Dry run**: `git prune-branches -n` - show branches without prompting
+- **Squash detection**: `git prune-branches -a` - also detect squash-merged branches (slower)
+- **Prompt options**: `y` (delete all), `N` (abort, default), `i` (interactive fzf selection)
+- **Branch states detected**:
+  - `[merged]` — merged into default branch (safe `-d` delete)
+  - `[gone]` — remote tracking branch was deleted (force `-D` delete)
+  - `[merged, gone]` — both merged and remote deleted (most common after PR workflow)
+  - `[squash-merged]` — changes integrated via squash/rebase, detected by `git cherry` (with `-a`)
+- **Features**:
+  - Auto-detects default branch (origin/HEAD, main, master)
+  - Groups branches by state
+  - Skips current and default branches
+  - Bash 3.2 compatible (no associative arrays)
 
 **`proj`** - Project-aware workflow manager with tmux integration
 
