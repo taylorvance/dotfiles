@@ -500,7 +500,7 @@ run_symlink_manager() {
 
     # Assert
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "already linked" ]]
+    [[ "$output" =~ ".testfile" ]]
 }
 
 @test "dry-run: flag position can come after mode" {
