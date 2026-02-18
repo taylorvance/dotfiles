@@ -4,10 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Critical Rules for Claude
 
-**Run tests through make targets, not `bats` directly:**
-- `make test-file F=tests/unit/test-foo.bats` - Single file with safety check
-- `make test-local` - All unit tests with safety check
+**Run tests in Docker via make targets, not `bats` directly:**
 - `make test` - Full suite in Docker
+- `make test F=tests/unit/test-foo.bats` - Single file in Docker
 
 ## Repository Overview
 
@@ -41,12 +40,13 @@ make restore       # Interactively restore from backups
 make help          # Show all available targets with descriptions
 ```
 
-### Testing (Safe, Never Touches Your System)
+### Testing (All Tests Run in Docker)
 
 ```bash
-make test              # Run all tests in Docker (unit + integration + config verification)
-make test-shell        # Drop into test container for interactive debugging
-make test-clean        # Remove test Docker images and containers
+make test                                        # Run all tests in Docker
+make test F=tests/unit/test-clean-script.bats    # Run single test file in Docker
+make test-shell                                  # Drop into test container for debugging
+make test-clean                                  # Remove test Docker images and containers
 ```
 
 ### Adding New Dotfiles
@@ -103,78 +103,23 @@ make test-clean        # Remove test Docker images and containers
 - Runs selected test suites
 - Provides interactive shell for debugging
 
-### ⚠️ CRITICAL: Unit Test Safety Rules
+### Unit Test Conventions
 
-**Unit tests can run locally via `make test-local`. They MUST be fully isolated and NEVER touch the real filesystem outside temp directories.**
-
-#### How Test Isolation Works
-
-Each BATS test file follows this pattern:
+Tests run in Docker, but each test still isolates itself with temp directories for clean setup/teardown:
 
 ```bash
 setup() {
-    export TEST_DIR=$(mktemp -d)      # Create isolated temp directory
-    export HOME="$TEST_DIR/home"       # Override HOME if needed
+    export TEST_DIR=$(mktemp -d)
+    export HOME="$TEST_DIR/home"
     mkdir -p "$HOME"
-    # Copy scripts to TEST_DIR, never run from real locations
 }
 
 teardown() {
-    rm -rf "$TEST_DIR"                 # Clean up everything
+    rm -rf "$TEST_DIR"
 }
 ```
 
-All file operations happen inside `$TEST_DIR`. Scripts are copied there and modified (e.g., via `sed`) to use test paths instead of real paths.
-
-#### REQUIRED for ALL Unit Tests
-
-1. **Create isolated test directory**: `export TEST_DIR=$(mktemp -d)`
-2. **Override HOME if test touches home directory**: `export HOME="$TEST_DIR/home"`
-3. **Copy scripts to TEST_DIR**: Never execute scripts from `src/` directly
-4. **Clean up in teardown**: `rm -rf "$TEST_DIR"`
-5. **Use variables for ALL paths**: `$TEST_DIR`, `$TEST_HOME`, `$TEST_REPO`, etc.
-
-#### FORBIDDEN in Unit Tests
-
-- ❌ `rm -rf /path` - Never use absolute paths with rm
-- ❌ `> /tmp/file` - Never write to real /tmp (use `$TEST_DIR`)
-- ❌ `mkdir /path` - Never create directories at absolute paths
-- ❌ Running scripts that write to `$HOME` without overriding it
-- ❌ Any operation on `/Users/`, `/home/`, or `~` without override
-- ❌ `tmux kill-server` - Kills ALL user tmux sessions, not just test ones!
-- ❌ `killall`, `pkill` - May kill user processes outside test scope
-
-#### Adding New Tests Checklist
-
-Before adding any unit test:
-- [ ] Does `setup()` create `TEST_DIR=$(mktemp -d)`?
-- [ ] Is `HOME` overridden if the script uses `$HOME`?
-- [ ] Are all file paths relative to `$TEST_DIR`?
-- [ ] Does `teardown()` run `rm -rf "$TEST_DIR"`?
-- [ ] Run `grep -n "rm -rf\|> /\|mkdir /" tests/unit/new-test.bats` and verify all matches use variables
-
-#### Script Safety Requirements
-
-Scripts in `src/` and `src/dotfiles/.local/bin/` that are tested MUST:
-- Use `$HOME` not `~/` for home directory (tilde may not respect overrides)
-- Use `${TMPDIR:-/tmp}` not hardcoded `/tmp`
-- Never hardcode paths like `/Users/...` or `/home/...`
-- Accept paths via environment variables that tests can override
-
-The safety check (`tests/check-test-safety.sh`) audits BOTH test files AND source scripts.
-
-#### How Test Isolation Works Per Script
-
-| Script | Isolation Method |
-|--------|------------------|
-| `symlink-manager.sh` | `$HOME` overridden → `DESTINATIONDIR=$HOME` uses test path |
-| `tmp` | `sed` replaces `TMP_BASE` with test directory |
-| `e` | Runs in `$TEST_REPO` (inside `$TEST_DIR`), mock `$EDITOR` |
-| `proj` | `$HOME` overridden, mock `zoxide` in `$PATH` |
-| `clean` | Runs in `$TEST_DIR`, only deletes test directories |
-| `sysinfo` | Read-only, no file writes |
-| `git-prune-branches` | Runs in cloned test repo inside `$TEST_DIR`, `$HOME` overridden |
-| `install-tools.sh` | Only syntax-checked (`bash -n`), never executed |
+Follow this pattern when adding new tests. See existing tests in `tests/unit/` for examples.
 
 ### Custom Scripts (`src/dotfiles/.local/bin/`)
 
@@ -341,15 +286,6 @@ Uses a **composable filter model** where all filters AND together:
 
 ### Testing Workflow
 
-1. **Before modifying**: Run `make test` to establish baseline
-2. **Make changes**: Edit files in `src/` or `src/dotfiles/`
-3. **Test**: Run `make test` to verify nothing broke
-4. **Debug issues**: Use `make test-shell` to explore the test environment interactively
-5. **Clean up**: Run `make test-clean` to remove Docker artifacts
-
-### Test Suite Benefits
-
-- **Safe**: Never touches your actual system, runs entirely in Docker
-- **Comprehensive**: Tests installation, symlinking, conflicts, backups, and actual config functionality
-- **Debuggable**: Interactive shell mode for troubleshooting
-- **CI-ready**: Exit codes and TAP format for future automation
+1. **Make changes**: Edit files in `src/` or `src/dotfiles/`
+2. **Test**: `make test` (all) or `make test F=tests/unit/test-foo.bats` (single file)
+3. **Debug issues**: Use `make test-shell` to explore the test environment interactively

@@ -38,31 +38,11 @@ unlink: ## Remove all dotfile symlinks
 restore: ## Restore files from a backup directory
 	@src/symlink-manager.sh restore
 
-.PHONY: test test-shell test-clean test-local test-file
-test: ## Run all tests in Docker (unit + integration + config)
-	@tests/test-runner.sh all
+.PHONY: test test-shell test-clean
+test: ## Run tests in Docker (all, or F=path/to/test.bats for single file)
+	@tests/test-runner.sh $(if $(F),$(F),all)
 test-shell: ## Drop into test container for debugging
 	@tests/test-runner.sh shell
-test-local: ## Run unit tests locally (no Docker, faster)
-	@tests/check-test-safety.sh
-	@echo ""
-	@echo "\033[1;33m════════════════════════════════════════════════════════════════\033[0m"
-	@echo "\033[1;33m  ⚠  WARNING: About to run tests directly on your system\033[0m"
-	@echo "\033[1;33m════════════════════════════════════════════════════════════════\033[0m"
-	@echo ""
-	@echo "  Tests passed static safety checks."
-	@echo ""
-	@printf "  Type 'yes' to continue: " && read ans && [ "$$ans" = "yes" ]
-	@echo ""
-	@echo "Running unit tests locally..."
-	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
-	@bats tests/unit/*.bats
-test-file: ## Run single test file locally: make test-file F=tests/unit/test-clean-script.bats
-	@tests/check-test-safety.sh
-	@echo ""
-	@command -v bats >/dev/null || (echo "Installing bats via brew..." && brew install bats-core)
-	@if [ -z "$(F)" ]; then echo "Usage: make test-file F=path/to/test.bats"; exit 1; fi
-	@bats $(F)
 test-clean: ## Remove test Docker images and containers
 	@docker ps -a | grep dotfiles-test | awk '{print $$1}' | xargs -r docker rm 2>/dev/null || true
 	@docker images | grep dotfiles-test | awk '{print $$3}' | xargs -r docker rmi 2>/dev/null || true

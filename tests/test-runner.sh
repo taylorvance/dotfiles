@@ -28,15 +28,17 @@ usage() {
     echo ""
     echo "Test Modes:"
     echo "  all            Run all tests (unit + integration)"
+    echo "  <file.bats>    Run a single test file"
     echo "  shell          Drop into interactive shell in test container (Alpine)"
     echo ""
     echo "Development Modes:"
     echo "  dev            Interactive shell with dotfiles pre-installed (Ubuntu)"
     echo ""
     echo "Examples:"
-    echo "  make test              # Run all tests"
-    echo "  make test-shell        # Interactive debugging"
-    echo "  make dev-shell         # Try your dotfiles (pre-installed)"
+    echo "  make test                                        # Run all tests"
+    echo "  make test F=tests/unit/test-clean-script.bats    # Run single file"
+    echo "  make test-shell                                  # Interactive debugging"
+    echo "  make dev-shell                                   # Try your dotfiles (pre-installed)"
     exit 1
 }
 
@@ -158,6 +160,15 @@ run_tests() {
             echo -e "${YELLOW}Running all tests...${NC}"
             echo ""
             bats tests/unit/*.bats tests/integration/*.bats
+            ;;
+        *.bats)
+            if [ ! -f "$mode" ]; then
+                echo -e "${RED}✗${NC} Test file not found: $mode"
+                exit 1
+            fi
+            echo -e "${YELLOW}Running: $mode${NC}"
+            echo ""
+            bats "$mode"
             ;;
         *)
             echo -e "${RED}✗${NC} Unknown mode: $mode"
