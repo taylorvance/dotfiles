@@ -238,7 +238,7 @@ Uses a **composable filter model** where all filters AND together:
 - Key bindings: ↑/↓ for history search, `^r` for atuin/history search
 - Modern CLI tools: `zoxide` (z), `eza` (ls/ll/la/lt), `fd` (f), `ripgrep` (rg), `atuin` (history)
 - Aliases: `r` (bat/less), `python` (python3), `f` (fd)
-- Functions: `mkcd`, `extract`, `backup`, `fcd` (fzf directory jump), `lt` (tree view)
+- Functions: `mkcd`, `extract`, `backup`, `fcd` (fzf directory jump), `lt` (tree view), `gw` (git worktree cd)
 - Integrations: fzf (multi-select by default), nvm
 - Default editor: `nvim`
 - Graceful fallbacks if modern tools not installed

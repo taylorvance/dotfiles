@@ -157,3 +157,38 @@ lt() {
 		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --level=$level --ignore-glob="$ignore_patterns" "$@" | r
 	fi
 }
+
+# gw - cd to a git worktree
+# Usage: gw         → cd to main worktree (repo root)
+#        gw <query> → cd to worktree matching query
+#        gw -l      → fzf picker to browse all worktrees
+gw() {
+	if ! git rev-parse --git-dir >/dev/null 2>&1; then
+		echo "Not in a git repository" >&2
+		return 1
+	fi
+
+	local dir
+
+	if [[ "$1" == "-l" ]]; then
+		if ! command -v fzf >/dev/null 2>&1; then
+			git worktree list
+			return 0
+		fi
+		dir=$(git worktree list | fzf --height=40% | awk '{print $1}')
+	elif [[ -n "$1" ]]; then
+		dir=$(git worktree list | awk -v q="$1" '$0 ~ q {print $1; exit}')
+		if [[ -z "$dir" ]]; then
+			echo "No worktree matching '$1'" >&2
+			git worktree list >&2
+			return 1
+		fi
+	else
+		# No args: go to main worktree (first listed)
+		dir=$(git worktree list | head -1 | awk '{print $1}')
+	fi
+
+	if [[ -n "$dir" ]]; then
+		cd "$dir"
+	fi
+}
