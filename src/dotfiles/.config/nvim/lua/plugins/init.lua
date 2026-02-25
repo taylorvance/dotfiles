@@ -27,7 +27,10 @@ return {
 					['<c-j>'] = cmp.mapping.select_next_item(),
 					['<c-k>'] = cmp.mapping.select_prev_item(),
 					['<cr>'] = cmp.mapping.confirm({ select = true }),
-					['<esc>'] = cmp.mapping.abort(),
+					['<esc>'] = cmp.mapping(function(fallback)
+						cmp.abort()
+						fallback()
+					end),
 				}),
 				sources = cmp.config.sources(sources),
 				performance = {
@@ -44,7 +47,7 @@ return {
 			keymaps = {
 				accept_suggestion = '<tab>',
 				accept_word = '<right>',
-				clear_suggestion = '<esc>',
+				clear_suggestion = '<c-]>',
 			},
 			disable_inline_completion = false,
 		},

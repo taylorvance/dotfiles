@@ -29,11 +29,10 @@
 	diffFilter = delta --color-only
 
 [delta]
-	navigate = true  # use n and N to move between diff sections
-	dark = true
-	side-by-side = false
 	line-numbers = true
-	syntax-theme = base16
+	syntax-theme = tokyonight_night
+	file-decoration-style = magenta box
+	hunk-header-decoration-style = cyan box
 
 [core]
 	editor = nvim
