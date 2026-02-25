@@ -118,6 +118,16 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"
 [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"
 
+# Auto-switch node version when entering a directory with .nvmrc
+autoload -U add-zsh-hook
+_nvm_auto_use() {
+    if [ -f .nvmrc ]; then
+        nvm use
+    fi
+}
+add-zsh-hook chpwd _nvm_auto_use
+_nvm_auto_use  # run on shell startup too
+
 # Initialize completion system (must be after all fpath modifications)
 # Force rebuild of completion cache
 autoload -Uz compinit && compinit -i
