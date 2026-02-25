@@ -88,6 +88,7 @@ make test-clean                                  # Remove test Docker images and
 
 - **`test-symlink-manager.bats`**: Tests symlink creation, conflict handling, backups, status checking
 - **`test-install-tools.bats`**: Tests tool installation logic and error handling
+- **`test-git-prune-worktrees.bats`**: Tests worktree state detection and removal
 
 **`tests/integration/`** - End-to-end integration tests
 
@@ -170,6 +171,30 @@ Auto-discovered by git as `git prune-branches` (no alias needed):
   - Auto-detects default branch (origin/HEAD, main, master)
   - Groups branches by state
   - Skips current and default branches
+  - Bash 3.2 compatible (no associative arrays)
+
+**`git-prune-worktrees`** - Remove worktrees that are fully synced with upstream
+
+Auto-discovered by git as `git prune-worktrees` (no alias needed):
+
+- **Basic usage**: `git prune-worktrees` - find and remove synced worktrees
+- **Dry run**: `git prune-worktrees -n` - show worktrees without prompting
+- **Prompt options**: `y` (remove all safe), `N` (abort, default), `i` (interactive fzf selection)
+- **Safety model**: A worktree is safe to remove only if:
+  - Branch has an upstream tracking branch
+  - Branch is in sync with upstream (0 ahead, 0 behind)
+  - Working tree is clean (no uncommitted changes)
+- **Worktree states**:
+  - `[synced]` — clean and in sync with upstream (safe to remove)
+  - `[dirty]` — uncommitted changes (skipped)
+  - `[ahead]` — unpushed commits (skipped)
+  - `[behind]` — behind upstream (skipped)
+  - `[diverged]` — ahead and behind upstream (skipped)
+  - `[unpublished]` — no upstream tracking branch (skipped)
+- **Features**:
+  - Only removes worktrees, not branches (use `git prune-branches` for branch cleanup)
+  - Skips main worktree automatically
+  - Separate "Safe to remove" and "Skipped (unsafe)" sections
   - Bash 3.2 compatible (no associative arrays)
 
 **`proj`** - Project-aware workflow manager with tmux integration

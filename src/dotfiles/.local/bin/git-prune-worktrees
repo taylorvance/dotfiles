@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# git-prune-worktrees - Remove worktrees that are fully synced with upstream
+#
+# Usage: git prune-worktrees [-n]
+#
+# States:
+#   [synced]       Clean, in sync with upstream — safe to remove
+#   [dirty]        Uncommitted changes — skipped
+#   [ahead]        Unpushed commits — skipped
+#   [behind]       Behind upstream — skipped
+#   [diverged]     Ahead and behind upstream — skipped
+#   [unpublished]  No upstream tracking branch — skipped
+#
+# Options:
+#   -n, --dry-run   Show worktrees without prompting for removal
+#   -h, --help      Show this help message
+
+show_help() {
+    cat <<'EOF'
+Usage: git prune-worktrees [-n]
+
+Remove worktrees that are fully synced with their upstream tracking branch.
+
+A worktree is safe to remove only if:
+  - Branch has an upstream tracking branch
+  - Branch is in sync with upstream (0 ahead, 0 behind)
+  - Working tree is clean (no uncommitted changes)
+
+States:
+  [synced]       Clean, in sync with upstream — safe to remove
+  [dirty]        Uncommitted changes — skipped
+  [ahead]        Unpushed commits — skipped
+  [behind]       Behind upstream — skipped
+  [diverged]     Ahead and behind upstream — skipped
+  [unpublished]  No upstream tracking branch — skipped
+
+Options:
+  -n, --dry-run   Show worktrees without prompting for removal
+  -h, --help      Show this help message
+
+Prompt options:
+  y   Remove all safe worktrees
+  N   Abort (default)
+  i   Interactive selection via fzf
+
+Note: Only removes worktrees, not branches. Use git prune-branches
+for branch cleanup.
+EOF
+    exit 0
+}
+
+# Defaults
+DRY_RUN=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n|--dry-run) DRY_RUN=true; shift ;;
+        -h|--help) show_help ;;
+        -*) echo "Error: Unknown option: $1" >&2; exit 1 ;;
+        *) echo "Error: Unexpected argument: $1" >&2; exit 1 ;;
+    esac
+done
+
+# Must be in a git repo
+if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    echo "Error: Not a git repository" >&2
+    exit 1
+fi
+
+# Analyze a worktree's state
+# Outputs one of: synced, dirty, ahead, behind, diverged, unpublished
+analyze_worktree() {
+    local path="$1" branch="$2"
+
+    # Check for dirty working tree
+    local status_output
+    if ! status_output=$(git -C "$path" status --porcelain 2>&1); then
+        echo "dirty"
+        return
+    fi
+    if [[ -n "$status_output" ]]; then
+        echo "dirty"
+        return
+    fi
+
+    # Check for upstream tracking
+    local upstream merge_ref
+    upstream=$(git config "branch.${branch}.remote" 2>/dev/null || true)
+    merge_ref=$(git config "branch.${branch}.merge" 2>/dev/null || true)
+
+    if [[ -z "$upstream" || -z "$merge_ref" ]]; then
+        echo "unpublished"
+        return
+    fi
+
+    # Check ahead/behind
+    local upstream_branch="${merge_ref#refs/heads/}"
+    local upstream_ref="${upstream}/${upstream_branch}"
+    local counts
+    counts=$(git rev-list --left-right --count "${branch}...${upstream_ref}" 2>/dev/null || echo "0 0")
+    local ahead behind
+    ahead=$(echo "$counts" | awk '{print $1}')
+    behind=$(echo "$counts" | awk '{print $2}')
+
+    if [[ "$ahead" -gt 0 && "$behind" -gt 0 ]]; then
+        echo "diverged"
+    elif [[ "$ahead" -gt 0 ]]; then
+        echo "ahead"
+    elif [[ "$behind" -gt 0 ]]; then
+        echo "behind"
+    else
+        echo "synced"
+    fi
+}
+
+# Find worktree index by branch name
+find_worktree() {
+    local branch="$1"
+    [[ ${#BRANCH_NAMES[@]} -eq 0 ]] && return 1
+    for i in "${!BRANCH_NAMES[@]}"; do
+        if [[ "${BRANCH_NAMES[$i]}" == "$branch" ]]; then
+            echo "$i"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Parallel arrays for worktree data
+WORKTREES=()
+BRANCH_NAMES=()
+TAGS=()
+SAFE=()
+
+# Parse git worktree list --porcelain
+current_path=""
+current_branch=""
+
+while IFS= read -r line; do
+    if [[ "$line" =~ ^worktree\ (.+) ]]; then
+        current_path="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^branch\ refs/heads/(.+) ]]; then
+        current_branch="${BASH_REMATCH[1]}"
+    elif [[ -z "$line" ]]; then
+        # End of worktree block
+        if [[ -n "$current_path" ]]; then
+            # Skip main worktree (.git is a directory; secondary worktrees have a .git file)
+            if [[ -d "$current_path/.git" ]]; then
+                current_path=""
+                current_branch=""
+                continue
+            fi
+
+            # Skip detached HEAD worktrees (no branch)
+            if [[ -z "$current_branch" ]]; then
+                current_path=""
+                current_branch=""
+                continue
+            fi
+
+            # Skip if worktree path doesn't exist
+            if [[ ! -d "$current_path" ]]; then
+                current_path=""
+                current_branch=""
+                continue
+            fi
+
+            tag=$(analyze_worktree "$current_path" "$current_branch")
+            is_safe=false
+            [[ "$tag" == "synced" ]] && is_safe=true
+
+            WORKTREES+=("$current_path")
+            BRANCH_NAMES+=("$current_branch")
+            TAGS+=("$tag")
+            SAFE+=("$is_safe")
+        fi
+        current_path=""
+        current_branch=""
+    fi
+done < <(git worktree list --porcelain; echo "")
+
+# Nothing to do?
+if [[ ${#WORKTREES[@]} -eq 0 ]]; then
+    echo "No worktrees to prune."
+    exit 0
+fi
+
+# Build safe/unsafe display entries as "tag|branch|path"
+SAFE_ENTRIES=()
+UNSAFE_ENTRIES=()
+safe_count=0
+unsafe_count=0
+
+for i in "${!WORKTREES[@]}"; do
+    entry="${TAGS[$i]}|${BRANCH_NAMES[$i]}|${WORKTREES[$i]}"
+    if [[ "${SAFE[$i]}" == "true" ]]; then
+        SAFE_ENTRIES+=("$entry")
+        safe_count=$((safe_count + 1))
+    else
+        UNSAFE_ENTRIES+=("$entry")
+        unsafe_count=$((unsafe_count + 1))
+    fi
+done
+
+# Display grouped worktrees
+display_section() {
+    local current_group=""
+    while IFS= read -r entry; do
+        local tag="${entry%%|*}"
+        local rest="${entry#*|}"
+        local branch="${rest%%|*}"
+        local path="${rest#*|}"
+        if [[ "$tag" != "$current_group" ]]; then
+            [[ -n "$current_group" ]] && echo ""
+            echo "  [$tag]"
+            current_group="$tag"
+        fi
+        echo "    $branch  ($path)"
+    done < <(printf '%s\n' "$@" | sort)
+}
+
+echo ""
+if [[ ${#SAFE_ENTRIES[@]} -gt 0 ]]; then
+    echo "Safe to remove:"
+    echo ""
+    display_section "${SAFE_ENTRIES[@]}"
+    echo ""
+fi
+
+if [[ ${#UNSAFE_ENTRIES[@]} -gt 0 ]]; then
+    echo "Skipped (unsafe):"
+    echo ""
+    display_section "${UNSAFE_ENTRIES[@]}"
+    echo ""
+fi
+
+echo "$safe_count safe, $unsafe_count skipped."
+echo ""
+
+# Nothing safe to remove?
+if [[ $safe_count -eq 0 ]]; then
+    exit 0
+fi
+
+# Dry run exits here
+if [[ "$DRY_RUN" == true ]]; then
+    exit 0
+fi
+
+# Prompt for action
+while true; do
+    read -rp "Remove all safe worktrees? [y/N/i] " choice
+    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+    case "$choice" in
+        y|yes)
+            for i in "${!WORKTREES[@]}"; do
+                [[ "${SAFE[$i]}" != "true" ]] && continue
+                if git worktree remove --force "${WORKTREES[$i]}" 2>/dev/null; then
+                    echo "Removed ${BRANCH_NAMES[$i]} (${WORKTREES[$i]})"
+                else
+                    echo "Failed to remove ${WORKTREES[$i]}" >&2
+                fi
+            done
+            exit 0
+            ;;
+        n|no|"")
+            echo "Aborted."
+            exit 0
+            ;;
+        i|interactive)
+            if ! command -v fzf &>/dev/null; then
+                echo "Error: fzf required for interactive mode" >&2
+                continue
+            fi
+
+            # Build fzf input (only safe worktrees)
+            FZF_INPUT=""
+            for i in "${!WORKTREES[@]}"; do
+                [[ "${SAFE[$i]}" != "true" ]] && continue
+                FZF_INPUT+="$(printf "%-30s  %s" "${BRANCH_NAMES[$i]}" "${WORKTREES[$i]}")"$'\n'
+            done
+
+            SELECTED=$(echo -n "$FZF_INPUT" | \
+                fzf --multi \
+                    --header="TAB to select, ENTER to confirm" \
+                    --reverse) || {
+                echo "Aborted."
+                exit 0
+            }
+
+            [[ -z "$SELECTED" ]] && { echo "Nothing selected."; exit 0; }
+
+            while IFS= read -r line; do
+                sel_branch=$(echo "$line" | awk '{print $1}')
+                if sel_idx=$(find_worktree "$sel_branch"); then
+                    if git worktree remove --force "${WORKTREES[$sel_idx]}" 2>/dev/null; then
+                        echo "Removed ${BRANCH_NAMES[$sel_idx]} (${WORKTREES[$sel_idx]})"
+                    else
+                        echo "Failed to remove ${WORKTREES[$sel_idx]}" >&2
+                    fi
+                fi
+            done <<< "$SELECTED"
+            exit 0
+            ;;
+        *)
+            echo "Please enter y, n, or i"
+            ;;
+    esac
+done
