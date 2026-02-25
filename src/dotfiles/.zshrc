@@ -92,6 +92,9 @@ alias python='python3'
 #poetry completions zsh > ~/.zfunc/_poetry
 #fpath+=~/.zfunc
 
+alias ytaudio='yt-dlp -x --audio-format mp3 --audio-quality 0 --embed-metadata --embed-thumbnail'
+alias ytvideo='yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b" --merge-output-format mp4 --embed-metadata --embed-thumbnail'
+
 # Use nvim as default editor
 export EDITOR=nvim
 export VISUAL=nvim
