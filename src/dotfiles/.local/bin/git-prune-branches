@@ -69,9 +69,9 @@ detect_default_branch() {
         echo "${ref##*/}"
         return
     fi
-    # Fall back to checking common names
+    # Fall back to checking common names on origin
     for name in main master; do
-        if git show-ref --verify --quiet "refs/heads/$name" 2>/dev/null; then
+        if git show-ref --verify --quiet "refs/remotes/origin/$name" 2>/dev/null; then
             echo "$name"
             return
         fi

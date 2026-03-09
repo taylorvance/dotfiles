@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Critical Rules for Claude
 
 **Run tests in Docker via make targets, not `bats` directly:**
+
 - `make test` - Full suite in Docker
 - `make test F=tests/unit/test-foo.bats` - Single file in Docker
 
@@ -197,20 +198,15 @@ Auto-discovered by git as `git prune-worktrees` (no alias needed):
   - Separate "Safe to remove" and "Skipped (unsafe)" sections
   - Bash 3.2 compatible (no associative arrays)
 
-**`proj`** - Project-aware workflow manager with tmux integration
+**`proj`** - tmux session manager
 
-Combines **zoxide** (smart directory jumping) with **tmux sessions** for seamless project switching:
+Manage tmux sessions with create/attach/kill operations:
 
-- **Basic usage**: `proj myproject` - cd to project + attach/create tmux session
-- **Detach mode**: `proj -d backend` - cd without tmux (outputs cd command for shell wrapper)
-- **List sessions**: `proj -l` - show all active project sessions
-- **Kill session**: `proj -k myapp` - terminate a project session
-- **Interactive picker**: `proj` - fzf picker of recent projects (via zoxide)
-- **Features**:
-  - One tmux session per project (named after directory)
-  - Smart project matching via zoxide (learns your frequently used projects)
-  - Works inside or outside tmux (switches or attaches intelligently)
-  - Graceful fallbacks when tmux/zoxide not installed
+- **Interactive picker**: `proj` - fzf picker of existing sessions → attach
+- **Attach**: `proj NAME` - attach by name; fzf on multiple matches; prompt to create if none found
+- **Create**: `proj -c [NAME]` - create session from cwd (name defaults to `basename $PWD`)
+- **Kill**: `proj -k [NAME]` - kill named session, current session if in tmux, or fzf picker if not
+- Works inside or outside tmux (switch-client or attach intelligently)
 
 **`e`** - Git-aware editor wrapper with composable filters
 
@@ -223,6 +219,7 @@ Uses a **composable filter model** where all filters AND together:
 - **Interactive**: `-i` (fzf selection)
 
 **Composition examples:**
+
 - `e -m -g TODO`: Modified files containing "TODO"
 - `e -u -n test`: Untracked files with "test" in name
 - `e -g TODO test`: Files containing "TODO" with "test" in filename
@@ -231,6 +228,7 @@ Uses a **composable filter model** where all filters AND together:
 - `e -mui`: Modified+untracked files, interactive selection
 
 **Basic usage:**
+
 - `e file.txt`: Open or create file
 - `e file.txt:42`: Open at line 42 (works with vim/nvim/emacs/nano/gedit/micro)
 - `e docs/*.md`: Open multiple files via shell glob
@@ -242,12 +240,14 @@ Uses a **composable filter model** where all filters AND together:
 - Falls back to regular `grep`/`find` outside git repos
 
 **Piped input & grep integration:**
+
 - `find . -name "*.py" | e`: Open found files
 - `git ls-files | e`: Open tracked files
 - `grep -rn "TODO" | fzf | e`: Select grep match, open at line number
 - `grep -rn "pattern" src/ | e`: Open all matches at their line numbers
 
 **Stdin as content (using `-`):**
+
 - `echo "hello" | e -`: Open stdin content in new buffer
 - `cat log.txt | e -`: View file content in editor
 - `curl url | e -`: Edit fetched content
