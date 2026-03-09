@@ -30,7 +30,7 @@
 
 [delta]
 	line-numbers = true
-	syntax-theme = tokyonight_night
+	syntax-theme = tokyonight_moon
 	file-decoration-style = magenta box
 	hunk-header-decoration-style = cyan box
 
