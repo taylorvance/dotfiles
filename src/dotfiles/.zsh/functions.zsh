@@ -158,6 +158,39 @@ lt() {
 	fi
 }
 
+# lsrepos - list all cloned git repos under a directory
+# Usage: lsrepos [dir]  (defaults to current directory)
+lsrepos() {
+	local dir="${1:-$PWD}"
+	local configs=()
+	while IFS= read -r gitdir; do
+		[[ -f "$gitdir/config" ]] && configs+=("$gitdir/config")
+	done < <(find "$dir" -maxdepth 5 \( -name "node_modules" -o -name ".venv" -o -name "venv" -o -name "__pycache__" \) -prune -o -name ".git" -type d -prune -print 2>/dev/null)
+	[[ ${#configs[@]} -eq 0 ]] && return
+	awk -v base="${dir%/}/" '
+	/url = / {
+		url = $3
+		gh = ""
+		if (url ~ /github\.com/) {
+			gh = url
+			gsub(/^git@github\.com:|^https:\/\/[^@]*github\.com\//, "", gh)
+			gsub(/\.git$/, "", gh)
+		}
+		path = FILENAME
+		sub(/\/config$/, "", path)
+		sub(/\/.git$/, "", path)
+		sub(base, "", path)
+		n++; paths[n]=path; ghs[n]=gh; urls[n]=url
+		if (length(path) > w1) w1 = length(path)
+		if (length(gh)   > w2) w2 = length(gh)
+	}
+	END {
+		for (i=1; i<=n; i++)
+			printf "%-*s  %-*s  %s\n", w1, paths[i], w2, ghs[i], urls[i]
+	}
+	' "${configs[@]}"
+}
+
 # gw - cd to a git worktree
 # Usage: gw         → cd to main worktree (repo root)
 #        gw <query> → cd to worktree matching query
