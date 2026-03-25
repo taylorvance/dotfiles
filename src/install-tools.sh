@@ -318,6 +318,9 @@ main() {
 	echo "(These enhance the shell experience but aren't critical)"
 	echo ""
 
+	# Shell plugin manager
+	install_optional_tool antigen
+
 	# Modern CLI replacements (all have fallbacks in .zshrc)
 	install_optional_tool fzf
 	install_optional_tool bat

@@ -1,8 +1,17 @@
 # Taylor Vance
 
 
+# Homebrew prefix: Apple Silicon = /opt/homebrew, Intel = /usr/local, Linux = /home/linuxbrew/.linuxbrew
+if [[ -x /opt/homebrew/bin/brew ]]; then
+	HOMEBREW_PREFIX=/opt/homebrew
+elif [[ -x /usr/local/bin/brew ]]; then
+	HOMEBREW_PREFIX=/usr/local
+elif [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+	HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew
+fi
+
 # Use Homebrew before system default.
-export PATH=/opt/homebrew/bin:$PATH
+[[ -n $HOMEBREW_PREFIX ]] && export PATH=$HOMEBREW_PREFIX/bin:$PATH
 
 # Fix for less v633+ treating Nerd Font icons (private-use Unicode) as non-printable
 # See: https://github.com/sharkdp/bat/issues/2578
@@ -10,28 +19,31 @@ export LESSUTFCHARDEF=E000-F8FF:p,F0000-FFFFD:p,100000-10FFFD:p
 # Custom scripts
 export PATH=$HOME/.local/bin:$PATH
 
-# Auto-install Antigen
-if [[ ! -f $HOME/.zsh/antigen.zsh ]]; then
-	mkdir -p $HOME/.zsh
-	curl -L git.io/antigen > $HOME/.zsh/antigen.zsh
+# Load antigen (installed via `brew install antigen`)
+# Falls back to ~/.zsh/antigen.zsh for non-Homebrew setups
+ADOTDIR=$HOME/.zsh/antigen
+ANTIGEN_MUTEX=false  # Disable file locking (prevents hangs if a prior session left a lock)
+if [[ -n $HOMEBREW_PREFIX && -f $HOMEBREW_PREFIX/share/antigen/antigen.zsh ]]; then
+	source $HOMEBREW_PREFIX/share/antigen/antigen.zsh
+elif [[ -f $HOME/.zsh/antigen.zsh ]]; then
+	source $HOME/.zsh/antigen.zsh
 fi
 
-# Load antigen within ~/.zsh/
-ADOTDIR=$HOME/.zsh/antigen
-source $HOME/.zsh/antigen.zsh
+# Only configure plugins if antigen loaded successfully
+if typeset -f antigen >/dev/null 2>&1; then
+	# Set oh-my-zsh as the default library
+	antigen use oh-my-zsh
 
-# Set oh-my-zsh as the default library
-antigen use oh-my-zsh
+	# Load oh-my-zsh plugins
+	#antigen bundle vi-mode
 
-# Load oh-my-zsh plugins
-#antigen bundle vi-mode
+	# Load other plugins
+	antigen bundle zsh-users/zsh-syntax-highlighting
+	antigen bundle zsh-users/zsh-autosuggestions
+	antigen bundle mfaerevaag/wd
 
-# Load other plugins
-antigen bundle zsh-users/zsh-syntax-highlighting
-antigen bundle zsh-users/zsh-autosuggestions
-antigen bundle mfaerevaag/wd
-
-antigen apply
+	antigen apply
+fi
 
 
 # Use vi keys
@@ -69,11 +81,11 @@ fi
 # `r` for "read" - smart pager that handles both files and piped colored output
 # bat config sets theme and options via ~/.config/bat/config
 if command -v bat >/dev/null; then
-	# Auto-download bat themes if missing (self-healing setup)
+	# Auto-download bat themes if missing (non-blocking: skipped silently on network failure)
 	if [ ! -f "$HOME/.config/bat/themes/tokyonight_moon.tmTheme" ]; then
 		mkdir -p "$HOME/.config/bat/themes"
 		if command -v curl >/dev/null; then
-			curl -fsSL -o "$HOME/.config/bat/themes/tokyonight_moon.tmTheme" \
+			curl -fsSL --max-time 5 -o "$HOME/.config/bat/themes/tokyonight_moon.tmTheme" \
 				"https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_moon.tmTheme" >/dev/null 2>&1 && \
 				bat cache --build >/dev/null 2>&1
 		fi
@@ -109,27 +121,51 @@ export VISUAL=nvim
 export FZF_DEFAULT_OPTS='--multi'
 
 
-# NVM install (supports both standard install and Homebrew)
+# NVM - lazy load for fast startup
+# node/npm/npx work immediately via PATH; `nvm` command loads the full NVM on first use
 export NVM_DIR="$HOME/.nvm"
-# Standard nvm install location
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-# Homebrew nvm location (macOS)
-[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"
-[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"
+
+# Add the default node version to PATH without loading NVM
+() {
+	local default_alias="$NVM_DIR/alias/default"
+	local version
+	# Resolve alias chain (e.g. "lts/*" -> "lts/iron" -> "v20.x.x")
+	while [[ -f "$default_alias" ]]; do
+		version=$(cat "$default_alias")
+		default_alias="$NVM_DIR/alias/$version"
+	done
+	version="${default_alias##*/}"
+	if [[ -d "$NVM_DIR/versions/node/$version/bin" ]]; then
+		export PATH="$NVM_DIR/versions/node/$version/bin:$PATH"
+	elif [[ -d "$NVM_DIR/versions/node" ]]; then
+		# Fall back to the most recently installed version
+		version=$(ls -t "$NVM_DIR/versions/node" 2>/dev/null | head -1)
+		[[ -n "$version" ]] && export PATH="$NVM_DIR/versions/node/$version/bin:$PATH"
+	elif [[ -n $HOMEBREW_PREFIX && -f "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ]]; then
+		# Homebrew-managed NVM: load it since we can't find the version dir
+		source "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" 2>/dev/null
+	fi
+}
+
+# Load full NVM lazily on first `nvm` invocation
+nvm() {
+	unset -f nvm
+	[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
+	[[ -n $HOMEBREW_PREFIX && -s "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ]] && source "$HOMEBREW_PREFIX/opt/nvm/nvm.sh"
+	nvm "$@"
+}
 
 # Auto-switch node version when entering a directory with .nvmrc
+# Only switches if NVM is already loaded (avoids triggering full NVM load on every cd)
 autoload -U add-zsh-hook
 _nvm_auto_use() {
-    if [ -f .nvmrc ]; then
-        nvm use
-    fi
+	if [[ -f .nvmrc ]] && typeset -f nvm &>/dev/null && [[ $(type nvm 2>/dev/null) != *"unset -f nvm"* ]]; then
+		nvm use
+	fi
 }
 add-zsh-hook chpwd _nvm_auto_use
-_nvm_auto_use  # run on shell startup too
 
 # Initialize completion system (must be after all fpath modifications)
-# Force rebuild of completion cache
 autoload -Uz compinit && compinit -i
 
 
@@ -172,8 +208,8 @@ fi
 
 
 # Command not found handler (suggest packages)
-if [[ -f /opt/homebrew/Library/Taps/homebrew/homebrew-command-not-found/handler.sh ]]; then
-	source /opt/homebrew/Library/Taps/homebrew/homebrew-command-not-found/handler.sh
+if [[ -n $HOMEBREW_PREFIX && -f $HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh ]]; then
+	source $HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh
 fi
 
 # Load local customizations if they exist
