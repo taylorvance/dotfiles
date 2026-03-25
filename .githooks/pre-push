@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Run full test suite before pushing.
+
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    echo "pre-push: Docker is not running — cannot verify tests."
+    echo "  Start Docker and re-push, or skip with: git push --no-verify"
+    exit 1
+fi
+
+make test

@@ -9,13 +9,20 @@ help: ## Show this help message
 	@echo ""
 
 .PHONY: setup teardown
-setup: ## Complete setup: install tools + create symlinks (fresh machine)
+setup: ## Complete setup: install tools + create symlinks + install git hooks (fresh machine)
 	@src/install-tools.sh
 	@echo ""
 	@echo "Tools installed! Now creating symlinks..."
 	@echo ""
 	@src/symlink-manager.sh install
+	@echo ""
+	@$(MAKE) --no-print-directory hooks
 teardown: unlink ## (alias for `unlink`)
+
+.PHONY: hooks
+hooks: ## Install git hooks from .githooks/
+	@git config core.hooksPath .githooks
+	@echo "✓ Git hooks installed (.githooks/)"
 
 .PHONY: status
 status: ## Show installation status of tools and dotfiles
