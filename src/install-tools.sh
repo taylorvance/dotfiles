@@ -425,6 +425,9 @@ main() {
 	echo "  1. Run 'make link' to create dotfile symlinks"
 	echo "  2. Restart your shell or run 'source ~/.zshrc'"
 	echo "  3. For node packages via nvm: install nvm and run 'nvm install --lts'"
+	if ! command_exists docker; then
+		echo "  4. To run 'make test', install Docker: https://docs.docker.com/get-docker/"
+	fi
 }
 
 main "$@"
