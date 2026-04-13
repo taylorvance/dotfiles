@@ -14,7 +14,9 @@ setup() {
     # Sessions state file for mock tmux
     export MOCK_TMUX_SESSIONS="$TEST_DIR/mock_sessions"
     export MOCK_TMUX_CALLS="$TEST_DIR/mock_tmux_calls"
-    touch "$MOCK_TMUX_SESSIONS" "$MOCK_TMUX_CALLS"
+    # Sessions visible to has-session but NOT list-sessions (simulates resurrection in-progress)
+    export MOCK_TMUX_HAS_ONLY_SESSIONS="$TEST_DIR/mock_has_only_sessions"
+    touch "$MOCK_TMUX_SESSIONS" "$MOCK_TMUX_CALLS" "$MOCK_TMUX_HAS_ONLY_SESSIONS"
 
     # Create mock tmux
     cat > "$TEST_DIR/tmux" <<'EOF'
@@ -29,7 +31,7 @@ case "$subcommand" in
         for arg; do
             case "$arg" in -t=*) name="${arg#-t=}" ;; esac
         done
-        grep -qxF "$name" "$MOCK_TMUX_SESSIONS"
+        grep -qxF "$name" "$MOCK_TMUX_SESSIONS" || grep -qxF "$name" "$MOCK_TMUX_HAS_ONLY_SESSIONS"
         ;;
     new-session)
         name=""
@@ -37,9 +39,15 @@ case "$subcommand" in
             case "$1" in
                 -s) shift; name="$1" ;;
                 -c|-t) shift ;;
+                # -A, -d, etc. are flags without args — fall through to shift
             esac
             shift
         done
+        if [ -n "${MOCK_NEW_SESSION_FAIL:-}" ]; then
+            # Simulate: tmux-resurrect fires during new-session, session appears but call "fails"
+            [ -n "$name" ] && echo "$name" >> "$MOCK_TMUX_HAS_ONLY_SESSIONS"
+            exit 1
+        fi
         [ -n "$name" ] && echo "$name" >> "$MOCK_TMUX_SESSIONS"
         ;;
     switch-client)
@@ -376,6 +384,56 @@ run_proj() {
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"fzf"* ]]
+}
+
+# ============================================================================
+# TMUX RESURRECTION TESTS
+# These tests verify that proj handles the race condition where tmux-resurrect
+# (or tmux-continuum) restores sessions asynchronously after the server starts.
+# ============================================================================
+
+@test "proj NAME: resurrection race - session restored before Y is processed, attaches" {
+    unset TMUX
+    # Session exists for has-session but NOT list-sessions (resurrection in-progress)
+    echo "dotfiles" >> "$MOCK_TMUX_HAS_ONLY_SESSIONS"
+
+    run bash -c 'echo "y" | '"$TEST_DIR"'/proj dotfiles'
+
+    [ "$status" -eq 0 ]
+    # Should attach to the resurrected session, not try to create a new one
+    grep -q "attach-session.*dotfiles" "$MOCK_TMUX_CALLS"
+    ! grep -q "new-session" "$MOCK_TMUX_CALLS"
+}
+
+@test "proj NAME: resurrection race - in tmux, new-session fails but session restored, switches" {
+    export TMUX=mock_socket
+    export MOCK_NEW_SESSION_FAIL=1
+    # No session in list-sessions initially (so find_matching_sessions returns nothing)
+
+    run bash -c 'echo "y" | '"$TEST_DIR"'/proj dotfiles'
+
+    [ "$status" -eq 0 ]
+    # new-session -d failed, but session appeared (resurrection), so switch-client is called
+    grep -q "switch-client.*dotfiles" "$MOCK_TMUX_CALLS"
+}
+
+@test "proj NAME: outside tmux, new-session uses -A to handle late resurrection" {
+    unset TMUX
+
+    run bash -c 'echo "y" | '"$TEST_DIR"'/proj brandnew'
+
+    [ "$status" -eq 0 ]
+    grep -q "new-session.*-A" "$MOCK_TMUX_CALLS"
+}
+
+@test "proj -c NAME: explicit create still errors if session already exists" {
+    unset TMUX
+    echo "existing" >> "$MOCK_TMUX_HAS_ONLY_SESSIONS"
+
+    run run_proj -c existing
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"already exists"* ]]
 }
 
 # ============================================================================

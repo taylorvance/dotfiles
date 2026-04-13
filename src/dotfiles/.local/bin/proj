@@ -71,10 +71,16 @@ do_create() {
 	fi
 
 	if in_tmux; then
-		tmux new-session -d -s "$name" -c "$PWD"
+		# new-session -d may fail if tmux-resurrect created the session between our
+		# check above and here; if so, just switch to the existing session
+		if ! tmux new-session -d -s "$name" -c "$PWD" 2>/dev/null; then
+			session_exists "$name" || die "Failed to create session '$name'"
+		fi
 		tmux switch-client -t "$name"
 	else
-		tmux new-session -s "$name" -c "$PWD"
+		# -A attaches to an existing session rather than erroring if one appears
+		# (e.g. created by tmux-resurrect when the server starts)
+		tmux new-session -A -s "$name" -c "$PWD"
 	fi
 }
 
@@ -156,7 +162,14 @@ do_attach() {
 		printf "No session '%s'. Create one here? (cwd: %s) [y/N] " "$name" "$PWD"
 		read -r response
 		case "$response" in
-			[yY]) do_create "$name" ;;
+			[yY])
+				# Re-check: tmux-resurrect may have restored the session while we waited
+				if session_exists "$name"; then
+					attach_session "$name"
+				else
+					do_create "$name"
+				fi
+				;;
 			*) exit 0 ;;
 		esac
 	fi
