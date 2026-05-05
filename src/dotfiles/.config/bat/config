@@ -1,7 +1,7 @@
 # bat configuration
 # See: bat --help
 
-# Set theme (auto-downloaded by .zshrc on first use)
+# Set theme (installed by src/install-tools.sh when bat is available)
 --theme="tokyonight_moon"
 
 # Show line numbers and git modifications

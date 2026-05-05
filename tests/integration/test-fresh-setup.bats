@@ -158,7 +158,7 @@ EOF
 # ERROR HANDLING
 # ============================================================================
 
-@test "fresh setup: continues on missing source file" {
+@test "fresh setup: rejects missing source before linking" {
     # Setup
     echo ".nonexistent" >> "$TEST_DOTFILES/config"
 
@@ -166,10 +166,12 @@ EOF
     cd "$TEST_DOTFILES"
     run bash src/symlink-manager.sh install
 
-    # Assert - should still succeed for other files
-    [ -L "$TEST_HOME/.zshrc" ]
-    [ -L "$TEST_HOME/.gitconfig" ]
+    # Assert - should fail without partially linking other files
+    [ "$status" -eq 1 ]
+    [ ! -e "$TEST_HOME/.zshrc" ]
+    [ ! -e "$TEST_HOME/.gitconfig" ]
     [ ! -e "$TEST_HOME/.nonexistent" ]
+    [[ "$output" =~ "source missing" ]]
 }
 
 @test "fresh setup: handles empty config file" {

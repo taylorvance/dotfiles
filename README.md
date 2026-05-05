@@ -35,6 +35,7 @@ _\* If the file has already been installed/symlinked, it will be skipped. You wi
 Before deploying changes to your actual system, test them safely in Docker:
 
 ```bash
+make doctor            # Fast local validation, no Docker
 make test              # Run all tests in Docker
 make test-shell        # Interactive debugging
 ```
@@ -53,6 +54,8 @@ Run `make help` to see all available commands:
 - `make link` - Create symlinks only (no tool installation)
 - `make unlink` - Remove all dotfile symlinks
 - `make status` - Show installation status of tools and dotfiles
+- `make doctor` - Validate repo wiring and script syntax without touching `$HOME`
+- `make adopt F=.path` - Copy an existing `$HOME` path into `src/dotfiles/`, add it to `config`, and preview linking
 - `make restore` - Restore files from a backup directory
 
 **Testing (safe - runs in Docker, never touches your system):**
@@ -88,24 +91,35 @@ Run `make help` to see all available commands:
 
 3. Test your changes: `make test`
 
+Or adopt an existing file from your home directory:
+
+```bash
+make adopt F=.config/tool/config.toml
+make link
+```
+
 ## What's Included
 
 ### Tools Installed
 
-Core (nvim, git, tmux, zsh, fzf), modern CLI (zoxide, eza, fd, ripgrep, delta, atuin, bat), and development tools (node, python3). Cross-platform: Homebrew on macOS, apt/dnf/pacman on Linux.
+Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where needed. The installer also attempts to install recommended CLI tools (fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship) and development tools (node, python3), but the shell config is designed to degrade gracefully when optional tools are missing.
 
 ### Custom Scripts (`~/.local/bin/`)
 
 - **`e`** - Git-aware editor wrapper with composable filters
-- **`proj`** - Project switching with zoxide + tmux session management
+- **`proj`** - tmux session manager
 - **`tmp`** - Quick temporary workspace creator
+- **`clean`** - Remove common dependency/cache directories
+- **`git-prune-branches`** - Remove stale local git branches
+- **`git-prune-worktrees`** - Remove synced git worktrees
+- **`sysinfo`** - Quick system information summary
 
 ### Configurations
 
 - **zsh** - Vi mode, custom prompt, modern CLI integrations, graceful fallbacks
 - **nvim** - lazy.nvim plugin manager
 - **git** - Common aliases, delta diff integration
-- **tmux** - `C-a` prefix, vim-like navigation
+- **tmux** - `C-Space` prefix, vim-like navigation
 
 ## Project Structure
 
@@ -114,6 +128,8 @@ dotfiles/
 ├── src/                    # All source code
 │   ├── install-tools.sh    # Tool installation script
 │   ├── check-tools.sh      # Tool verification script
+│   ├── doctor.sh           # Local repo/config validator
+│   ├── adopt.sh            # Adopt existing home files into src/dotfiles/
 │   ├── symlink-manager.sh  # Symlink management (install/uninstall/status/restore)
 │   └── dotfiles/           # Your actual dotfiles
 │       ├── .config/
@@ -144,7 +160,7 @@ Use `make restore` to interactively restore from any backup.
 
 ### Config File
 
-`config` is a text file that lists which files/directories to symlink. One path per line, relative to both `src/dotfiles/` and `~/`.
+`config` is a text file that lists which files/directories to symlink. One path per line, relative to both `src/dotfiles/` and `~/`. Empty lines and lines beginning with `#` are ignored.
 
 **Specific files:** `.config/nvim/init.vim` links that file at `~/.config/nvim/init.vim` while leaving the rest of `~/.config/nvim` intact.
 
@@ -159,7 +175,7 @@ All of the content specific to my setup is in `src/dotfiles/` and `config`. To s
 1. Empty out `src/dotfiles/` and `config`
 2. Add your own dotfiles to `src/dotfiles/`
 3. Reference them in `config`
-4. Run `make test` to verify
+4. Run `make doctor` and `make test` to verify
 5. Run `make setup` to deploy
 
 ## Contributing

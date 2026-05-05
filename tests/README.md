@@ -5,6 +5,9 @@ Comprehensive Docker-based testing framework for the dotfiles installation and m
 ## Quick Start
 
 ```bash
+# Fast local validation without Docker
+make doctor
+
 # Run all tests (fastest way to verify everything works)
 make test
 
@@ -20,7 +23,7 @@ make test-clean        # Remove Docker images and containers
 ### Test Runner (`test-runner.sh`)
 - Orchestrates Docker container build and test execution
 - Automatically installs BATS testing framework
-- Supports multiple test modes (unit, integration, configs, all)
+- Supports all tests or a single `.bats` file
 - Provides interactive shell for debugging
 
 ### Docker Infrastructure (`docker/`)
@@ -165,18 +168,20 @@ bats -t tests/unit/test-symlink-manager.bats
 3. Implement feature in `src/`
 4. Run `make test` to verify fix
 
-## CI/CD Integration (Future)
+## CI/CD Integration
 
-The test suite is ready for GitHub Actions:
+The test suite runs in GitHub Actions on pushes to `master`:
 
 ```yaml
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+    branches: [master]
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - run: make test
 ```
 

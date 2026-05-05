@@ -163,15 +163,17 @@ run_symlink_manager() {
     [ -f "$backup_dir/.config/nvim/init.vim" ]
 }
 
-@test "install: skips missing source file" {
+@test "install: rejects missing source file" {
     # Setup
     create_config ".nonexistent"
 
     # Run
     run_symlink_manager install
 
-    # Assert (should not create symlink, but shouldn't fail completely)
+    # Assert
+    [ "$status" -eq 1 ]
     [ ! -e "$TEST_HOME/.nonexistent" ]
+    [[ "$output" =~ "source missing" ]]
 }
 
 @test "install: handles multiple files in config" {
@@ -202,6 +204,33 @@ run_symlink_manager() {
     # Assert
     [ "$status" -eq 0 ]
     [ -L "$TEST_HOME/.testfile" ]
+}
+
+@test "install: skips comments in config" {
+    # Setup
+    echo "content" > "$TEST_SOURCE/.testfile"
+    printf "# comment\n.testfile\n" > "$TEST_CONFIG"
+
+    # Run
+    run_symlink_manager install
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [ -L "$TEST_HOME/.testfile" ]
+}
+
+@test "install: rejects unsafe config path before linking" {
+    # Setup
+    echo "content" > "$TEST_SOURCE/.testfile"
+    printf ".testfile\n../outside\n" > "$TEST_CONFIG"
+
+    # Run
+    run_symlink_manager install
+
+    # Assert
+    [ "$status" -eq 1 ]
+    [ ! -e "$TEST_HOME/.testfile" ]
+    [[ "$output" =~ "unsafe" ]]
 }
 
 @test "install: handles paths with trailing slash" {

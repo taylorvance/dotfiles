@@ -37,7 +37,6 @@ check_tool nvim "required"
 check_tool git "required"
 check_tool tmux "required"
 check_tool zsh "required"
-check_tool fzf "required"
 check_tool curl "required"
 check_tool unzip "required"
 
@@ -47,6 +46,7 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
 fi
 
 printf "\n${BLUE}Optional:${NC}\n"
+check_tool fzf "optional"
 check_tool bat "optional"
 check_tool zoxide "optional"
 check_tool eza "optional"
@@ -63,4 +63,4 @@ check_tool dotnet "optional"
 check_tool php "optional"
 
 printf "\n"
-printf "${YELLOW}Tip: Run 'make install-tools' to install missing tools${NC}\n"
+printf "${YELLOW}Tip: Run 'make install' to install missing tools${NC}\n"

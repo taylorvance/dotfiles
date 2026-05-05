@@ -25,7 +25,7 @@ make setup
 
 - **Complete bootstrap**: Installs all required tools + creates symlinks
 - Detects OS (macOS/Linux) and package manager (brew/apt/dnf/pacman)
-- Installs: nvim, git, tmux, zsh, fzf, bat, zoxide, eza, fd, ripgrep, delta, atuin, starship, node, python3
+- Installs required tools and attempts recommended optional tools: nvim, git, tmux, zsh, curl/wget, unzip, fzf, bat, zoxide, eza, fd, ripgrep, delta, atuin, starship, node, python3
 - Creates symlinks from `src/dotfiles/` to `~/` for files listed in `config`
 - Idempotent: safe to run multiple times
 - Backs up conflicting files to `.backups/YYYY-MM-DD_HH-MM-SS_PID/`
@@ -37,6 +37,8 @@ make install       # Only install CLI tools (no symlinks)
 make link          # Only create symlinks (no tool installation)
 make unlink        # Remove all symlinks
 make status        # Check installation status of all dotfiles
+make doctor        # Validate repo/config/script wiring without touching HOME
+make adopt F=.path # Adopt an existing HOME path into src/dotfiles
 make restore       # Interactively restore from backups
 make help          # Show all available targets with descriptions
 ```
@@ -55,7 +57,7 @@ make test-clean                                  # Remove test Docker images and
 1. Place file in `src/dotfiles/` matching desired path relative to `~/`
 2. Add the relative path to `config` (one path per line)
 3. Run `make link` to create the symlink
-4. Run `make test` to verify it works correctly
+4. Run `make doctor` and `make test` to verify it works correctly
 
 ## Architecture
 
@@ -64,6 +66,8 @@ make test-clean                                  # Remove test Docker images and
 - **`Makefile`**: Standard API with targets: `setup`, `link`, `unlink`, `status`, `restore`, `test`, `help`
 - **`src/install-tools.sh`**: Tool installation script supporting macOS (Homebrew) and Linux (apt/dnf/pacman)
 - **`src/check-tools.sh`**: Verification script that checks installation status of all tools
+- **`src/doctor.sh`**: Static repo/config validator that does not touch `$HOME`
+- **`src/adopt.sh`**: Copies existing `$HOME` files into `src/dotfiles/` and appends `config`
 - **`src/symlink-manager.sh`**: Helper script that handles symlink operations (install, uninstall, status, restore)
 - **`src/dotfiles/`**: Source directory containing all dotfiles, organized exactly as they should appear under `~/`
 - **`config`**: Text file listing paths to symlink (relative to `src/dotfiles/` and `~/`)
@@ -72,8 +76,8 @@ make test-clean                                  # Remove test Docker images and
 
 ### Tool Dependencies
 
-- **Core**: nvim, git, tmux, zsh, fzf, curl/wget, gcc/make, unzip
-- **Modern CLI**: zoxide, eza, fd, ripgrep, delta, atuin, bat, starship
+- **Core**: nvim, git, tmux, zsh, curl/wget, gcc/make, unzip
+- **Recommended/optional CLI**: fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship
 - **Development**: node/npm, python3
 - **Optional**: ollama (AI completions), dotnet (C#), php (PHP)
 - **Note**: All tools have graceful fallbacks in `.zshrc` if not installed
@@ -259,7 +263,7 @@ Uses a **composable filter model** where all filters AND together:
 
 - Uses Antigen plugin manager with oh-my-zsh
 - Vi mode enabled with `jk`/`kj` escape to normal mode
-- Starship prompt (config in `.config/starship.toml`) with user@host, path, git branch, vi mode, command duration, exit code
+- Starship prompt (config in `.config/starship.toml`) with a custom vi-mode character
 - Key bindings: ↑/↓ for history search, `^r` for atuin/history search
 - Modern CLI tools: `zoxide` (z), `eza` (ls/ll/la/lt), `fd` (f), `ripgrep` (rg), `atuin` (history)
 - Aliases: `r` (bat/less), `python` (python3), `f` (fd)
@@ -285,7 +289,7 @@ Uses a **composable filter model** where all filters AND together:
 
 **Tmux (`.tmux.conf`)**
 
-- Prefix: `C-a` (instead of default `C-b`)
+- Prefix: `C-Space` (instead of default `C-b`)
 - Vim-like navigation: `h/j/k/l` for panes, `H/J/K/L` for resizing
 - Smart splits: `|` and `-` open in current directory
 - Vi copy mode with system clipboard integration (macOS: pbcopy)
@@ -301,7 +305,7 @@ Uses a **composable filter model** where all filters AND together:
 - Custom scripts in `src/dotfiles/.local/bin/` are symlinked to `~/.local/bin/` (in PATH)
 - Changes to these scripts affect the live environment immediately
 - The `e` script is referenced in `.zshrc` comments as the sophisticated "edit" command
-- **IMPORTANT**: Always run `make test` after modifying scripts to verify nothing broke
+- **IMPORTANT**: Always run `make doctor` after modifying scripts/config. Run `make test` for the full Docker suite when Docker is available.
 
 ### Working with Config
 
@@ -312,5 +316,5 @@ Uses a **composable filter model** where all filters AND together:
 ### Testing Workflow
 
 1. **Make changes**: Edit files in `src/` or `src/dotfiles/`
-2. **Test**: `make test` (all) or `make test F=tests/unit/test-foo.bats` (single file)
+2. **Test**: `make doctor` locally, then `make test` (all) or `make test F=tests/unit/test-foo.bats` (single file) when Docker is available
 3. **Debug issues**: Use `make test-shell` to explore the test environment interactively

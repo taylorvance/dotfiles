@@ -54,6 +54,45 @@ command_exists() {
 	command -v "$1" >/dev/null 2>&1
 }
 
+# Install bat theme used by ~/.config/bat/config.
+install_bat_theme() {
+	if ! command_exists bat; then
+		return 0
+	fi
+
+	local theme_dir="$HOME/.config/bat/themes"
+	local theme_file="$theme_dir/tokyonight_moon.tmTheme"
+	local theme_url="https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_moon.tmTheme"
+
+	if [ -f "$theme_file" ]; then
+		print_status "$YELLOW" "$PRESENT" "bat theme: tokyonight_moon"
+		return 0
+	fi
+
+	if ! mkdir -p "$theme_dir" 2>/dev/null; then
+		print_status "$YELLOW" "$SKIPPED" "bat theme (could not create theme directory)"
+		return 0
+	fi
+
+	if command_exists curl; then
+		if curl -fsSL --max-time 10 -o "$theme_file" "$theme_url" >/dev/null 2>&1; then
+			bat cache --build >/dev/null 2>&1 || true
+			print_status "$GREEN" "$INSTALLED" "bat theme: tokyonight_moon"
+			return 0
+		fi
+	elif command_exists wget; then
+		if wget -q -T 10 -O "$theme_file" "$theme_url" >/dev/null 2>&1; then
+			bat cache --build >/dev/null 2>&1 || true
+			print_status "$GREEN" "$INSTALLED" "bat theme: tokyonight_moon"
+			return 0
+		fi
+	fi
+
+	rm -f "$theme_file"
+	print_status "$YELLOW" "$SKIPPED" "bat theme: tokyonight_moon (download failed)"
+	return 0
+}
+
 # Detect OS
 detect_os() {
 	if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -331,6 +370,7 @@ main() {
 	install_optional_tool delta git-delta
 	install_optional_tool atuin
 	install_optional_tool starship
+	install_bat_theme
 
 	echo ""
 	echo -e "${BLUE}Installing development tools...${NC}"

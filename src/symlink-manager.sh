@@ -8,15 +8,30 @@ set -e
 
 # Parse flags
 DRY_RUN=false
+MODE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -n|--dry-run)
             DRY_RUN=true
             shift
             ;;
-        *)
+        install|uninstall|status|restore)
+            if [ -n "$MODE" ]; then
+                echo "Usage: $0 [-n|--dry-run] {install|uninstall|status|restore}"
+                exit 1
+            fi
             MODE="$1"
             shift
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [-n|--dry-run] {install|uninstall|status|restore}"
+            exit 1
+            ;;
+        *)
+            echo "Unknown mode: $1"
+            echo "Usage: $0 [-n|--dry-run] {install|uninstall|status|restore}"
+            exit 1
             ;;
     esac
 done
@@ -36,6 +51,99 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+path_exists() {
+    [ -e "$1" ] || [ -L "$1" ]
+}
+
+is_skipped_config_line() {
+    local line="$1"
+    [ -z "$line" ] || [[ "$line" == \#* ]]
+}
+
+normalize_config_path() {
+    local filepath="$1"
+    filepath="${filepath%/}"
+    printf '%s\n' "$filepath"
+}
+
+validate_relative_path() {
+    local filepath="$1"
+
+    if [ -z "$filepath" ]; then
+        printf "  ${RED}✗${NC} invalid empty path in config\n"
+        return 1
+    fi
+
+    case "$filepath" in
+        /*)
+            printf "  ${RED}✗${NC} %s (must be relative to \$HOME)\n" "$filepath"
+            return 1
+            ;;
+        ~|~/*)
+            printf "  ${RED}✗${NC} %s (must not use ~ expansion)\n" "$filepath"
+            return 1
+            ;;
+        .|..|../*|*/..|*/../*|./*|*/./*|*/.|*//*)
+            printf "  ${RED}✗${NC} %s (unsafe or ambiguous path)\n" "$filepath"
+            return 1
+            ;;
+    esac
+
+    if [[ "$filepath" =~ ^[[:space:]] ]] || [[ "$filepath" =~ [[:space:]]$ ]]; then
+        printf "  ${RED}✗${NC} %s (leading/trailing whitespace)\n" "$filepath"
+        return 1
+    fi
+
+    return 0
+}
+
+validate_config() {
+    local check_sources="$1"
+    local filepath line newfile
+    local had_error=false
+
+    if [ ! -f "$CONFIGFILE" ]; then
+        printf "  ${RED}✗${NC} config file missing: %s\n" "$CONFIGFILE"
+        return 1
+    fi
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        is_skipped_config_line "$line" && continue
+
+        filepath="$(normalize_config_path "$line")"
+        if ! validate_relative_path "$filepath"; then
+            had_error=true
+            continue
+        fi
+
+        if [ "$check_sources" = true ]; then
+            newfile=$SOURCEDIR/$filepath
+            if ! path_exists "$newfile"; then
+                printf "  ${RED}✗${NC} %s (source missing)\n" "$filepath"
+                had_error=true
+            fi
+        fi
+    done < "$CONFIGFILE"
+
+    if [ "$had_error" = true ]; then
+        return 1
+    fi
+    return 0
+}
+
+backup_path() {
+    local source_path="$1"
+    local relative_path="$2"
+
+    mkdir -p "$BACKUPDIR/$(dirname "$relative_path")"
+
+    if [ -L "$source_path" ] && [ ! -e "$source_path" ]; then
+        cp -P "$source_path" "$BACKUPDIR/$relative_path"
+    else
+        cp -RL "$source_path" "$BACKUPDIR/$relative_path"
+    fi
+}
+
 install_dotfiles() {
     BACKUPDIR=$BACKUPSDIR/"$(date +%Y-%m-%d_%H-%M-%S)_$$"
 
@@ -50,19 +158,12 @@ install_dotfiles() {
     fi
 
     while IFS= read -r filepath; do
-        # Skip empty lines
-        [ -z "$filepath" ] && continue
+        is_skipped_config_line "$filepath" && continue
 
-        # Remove trailing slash (necessary because ln -s behaves differently for directories with trailing slashes)
-        filepath=${filepath%/}
+        filepath="$(normalize_config_path "$filepath")"
 
         oldfile=$DESTINATIONDIR/$filepath
         newfile=$SOURCEDIR/$filepath
-
-        if [ ! -e "$newfile" ]; then
-            printf "  ${RED}✗${NC} ${filepath} (source missing)\n"
-            continue
-        fi
 
         # If the file is already correctly symlinked, skip.
         if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
@@ -71,14 +172,13 @@ install_dotfiles() {
         fi
 
         # If a file with this name already exists, it will be backed up
-        if [ -e "$oldfile" ]; then
+        if path_exists "$oldfile"; then
             if [ "$DRY_RUN" = true ]; then
                 printf "  ${YELLOW}→${NC} ${filepath} (would backup existing & link)\n"
             else
                 mkdir -p "$BACKUPDIR"
                 # Make a deep, recursive copy, removing symlinks, preserving full path structure
-                mkdir -p "$BACKUPDIR/$(dirname "$filepath")"
-                cp -RL "$oldfile" "$BACKUPDIR/$filepath"
+                backup_path "$oldfile" "$filepath"
                 rm -rf "$oldfile"
             fi
         else
@@ -90,16 +190,15 @@ install_dotfiles() {
         if [ "$DRY_RUN" = false ]; then
             # Create parent directories, removing any conflicting files in the path
             local parent_dir="$(dirname "$oldfile")"
-            if [ -f "$parent_dir" ]; then
+            if path_exists "$parent_dir" && [ ! -d "$parent_dir" ]; then
                 # Parent path is a file, need to back it up and remove it
                 mkdir -p "$BACKUPDIR"
                 local parent_path="${parent_dir#$DESTINATIONDIR/}"
-                mkdir -p "$BACKUPDIR/$(dirname "$parent_path")"
-                cp -RL "$parent_dir" "$BACKUPDIR/$parent_path"
+                backup_path "$parent_dir" "$parent_path"
                 rm -rf "$parent_dir"
             fi
             mkdir -p "$parent_dir"
-            ln -Ffs "$newfile" "$oldfile"
+            ln -s "$newfile" "$oldfile"
             printf "  ${GREEN}✓${NC} ${filepath}\n"
         fi
     done < "$CONFIGFILE"
@@ -115,10 +214,9 @@ uninstall_dotfiles() {
     printf "Unlinking dotfiles...\n\n"
 
     while IFS= read -r filepath; do
-        # Skip empty lines
-        [ -z "$filepath" ] && continue
+        is_skipped_config_line "$filepath" && continue
 
-        filepath=${filepath%/}
+        filepath="$(normalize_config_path "$filepath")"
 
         oldfile=$DESTINATIONDIR/$filepath
         newfile=$SOURCEDIR/$filepath
@@ -145,10 +243,9 @@ show_status() {
     local all_ok=true
 
     while IFS= read -r filepath; do
-        # Skip empty lines
-        [ -z "$filepath" ] && continue
+        is_skipped_config_line "$filepath" && continue
 
-        filepath=${filepath%/}
+        filepath="$(normalize_config_path "$filepath")"
 
         oldfile=$DESTINATIONDIR/$filepath
         newfile=$SOURCEDIR/$filepath
@@ -224,12 +321,24 @@ restore_from_backup() {
 
 case "$MODE" in
     install)
+        if ! validate_config true; then
+            printf "\n${RED}Config validation failed. No changes made.${NC}\n"
+            exit 1
+        fi
         install_dotfiles
         ;;
     uninstall)
+        if ! validate_config false; then
+            printf "\n${RED}Config validation failed. No changes made.${NC}\n"
+            exit 1
+        fi
         uninstall_dotfiles
         ;;
     status)
+        if ! validate_config false; then
+            printf "\n${RED}Config validation failed.${NC}\n"
+            exit 1
+        fi
         show_status
         ;;
     restore)

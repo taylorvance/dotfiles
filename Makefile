@@ -31,6 +31,10 @@ status: ## Show installation status of tools and dotfiles
 	@echo ""
 	@src/symlink-manager.sh status || true
 
+.PHONY: doctor
+doctor: ## Validate repo config, scripts, and dotfile wiring without touching HOME
+	@src/doctor.sh
+
 .PHONY: install
 install: ## Install required CLI tools (via pkg mgr)
 	@src/install-tools.sh
@@ -40,6 +44,11 @@ link: ## Create symlinks for dotfiles
 	@src/symlink-manager.sh install
 unlink: ## Remove all dotfile symlinks
 	@src/symlink-manager.sh uninstall
+
+.PHONY: adopt
+adopt: ## Adopt an existing HOME path into src/dotfiles (use F=.path)
+	@test -n "$(F)" || (echo "Usage: make adopt F=.config/tool/config.toml"; exit 1)
+	@src/adopt.sh $(F)
 
 .PHONY: restore
 restore: ## Restore files from a backup directory
