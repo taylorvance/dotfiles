@@ -4,6 +4,7 @@
 [alias]
 	st = status
 	di = diff
+	a = add .
 	c = commit
 	s = switch
 	g = grep --break --heading --line-number
