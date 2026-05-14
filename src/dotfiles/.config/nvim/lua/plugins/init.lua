@@ -151,10 +151,10 @@ return {
 						on_click = function(_, _, mod)
 							if mod:find('s') then
 								-- restart LSP
-								vim.cmd('LspRestart')
+								vim.cmd('lsp restart')
 							else
 								-- open LSP info
-								vim.cmd('LspInfo')
+								vim.cmd('checkhealth vim.lsp')
 							end
 						end,
 					},
@@ -170,84 +170,98 @@ return {
 			-- Set up Mason (LSP installer).
 			require('mason').setup()
 
+			vim.lsp.config('intelephense', {
+				settings = {
+					intelephense = {
+						environment = { shortOpenTag = true },
+						stubs = {
+							-- 2025-03-20 defaults per https://github.com/bmewburn/intelephense-docs/blob/master/gettingStarted.md#environment
+							'apache', 'bcmath', 'bz2', 'calendar', 'com_dotnet', 'Core', 'ctype', 'curl',
+							'date', 'dba', 'dom', 'enchant', 'exif', 'FFI', 'fileinfo', 'filter', 'fpm',
+							'ftp', 'gd', 'gettext', 'gmp', 'hash', 'iconv', 'imap', 'intl', 'json', 'ldap',
+							'libxml', 'mbstring', 'meta', 'mysqli', 'oci8', 'odbc', 'openssl', 'pcntl',
+							'pcre', 'PDO', 'pdo_ibm', 'pdo_mysql', 'pdo_pgsql', 'pdo_sqlite', 'pgsql', 'Phar',
+							'posix', 'pspell', 'readline', 'Reflection', 'session', 'shmop', 'SimpleXML',
+							'snmp', 'soap', 'sockets', 'sodium', 'SPL', 'sqlite3', 'standard', 'superglobals',
+							'sysvmsg', 'sysvsem', 'sysvshm', 'tidy', 'tokenizer', 'xml', 'xmlreader',
+							'xmlrpc', 'xmlwriter', 'xsl', 'Zend OPcache', 'zip', 'zlib',
+							'mongodb', -- for "Undefined class \MongoDB\..."
+							'random', -- for rand() and friends
+						},
+					},
+				},
+			})
+
+			vim.lsp.config('lua_ls', {
+				settings = {
+					Lua = {
+						runtime = { version = 'LuaJIT' },
+						workspace = {
+							library = vim.api.nvim_get_runtime_file('', true),
+							checkThirdParty = false,
+						},
+					},
+				},
+			})
+
+			-- alternatively, make omnisharp.json with: {"RoslynExtensionsOptions":{"enableAnalyzersSupport":true},"FormattingOptions":{"enableEditorConfigSupport":true}}
+			vim.lsp.config('omnisharp', {
+				settings = {
+					RoslynExtensionsOptions = {
+						EnableAnalyzersSupport = true,
+					},
+					FormattingOptions = {
+						EnableEditorConfigSupport = true,
+					},
+				},
+			})
+
+			local function pyright_python_settings(root_dir)
+				root_dir = root_dir or vim.fn.getcwd()
+				local venv_python = vim.fs.joinpath(root_dir, '.venv', 'bin', 'python')
+				return {
+					venvPath = root_dir,
+					venv = '.venv',
+					pythonPath = vim.fn.filereadable(venv_python) == 1
+						and venv_python
+						or vim.fn.exepath('python3'),
+				}
+			end
+
+			local function pyright_root_dir(config)
+				if config then
+					local root_dir = config.root_dir
+					if not root_dir and config.root_uri then
+						root_dir = vim.uri_to_fname(config.root_uri)
+					end
+					if not root_dir and config.workspace_folders and config.workspace_folders[1] then
+						root_dir = vim.uri_to_fname(config.workspace_folders[1].uri)
+					end
+					if root_dir then
+						return root_dir
+					end
+				end
+				return vim.fn.getcwd()
+			end
+
+			vim.lsp.config('pyright', {
+				before_init = function(_, config)
+					config.settings = vim.tbl_deep_extend('force', config.settings or {}, {
+						python = pyright_python_settings(pyright_root_dir(config)),
+					})
+				end,
+				on_init = function(client)
+					client.settings = vim.tbl_deep_extend('force', client.settings or {}, {
+						python = pyright_python_settings(pyright_root_dir(client.config)),
+					})
+					client:notify('workspace/didChangeConfiguration', { settings = nil })
+				end,
+			})
+
 			-- Set up Mason-LSPConfig bridge.
-			local lspconfig = require('lspconfig')
-			local util = require('lspconfig.util')
 			require('mason-lspconfig').setup({
 				--                  Python    pylint JS      PHP            C#          Vim     Lua      HTML
 				ensure_installed = { 'pyright', 'ruff', 'ts_ls', 'intelephense', 'omnisharp', 'vimls', 'lua_ls', 'html' },
-				automatic_installation = true,
-				-- Set up LSP servers after installation.
-				handlers = {
-					['intelephense'] = function()
-						lspconfig.intelephense.setup({
-							settings = {
-								intelephense = {
-									environment = { shortOpenTag = true },
-									stubs = {
-										-- 2025-03-20 defaults per https://github.com/bmewburn/intelephense-docs/blob/master/gettingStarted.md#environment
-										'apache', 'bcmath', 'bz2', 'calendar', 'com_dotnet', 'Core', 'ctype', 'curl',
-										'date', 'dba', 'dom', 'enchant', 'exif', 'FFI', 'fileinfo', 'filter', 'fpm',
-										'ftp', 'gd', 'gettext', 'gmp', 'hash', 'iconv', 'imap', 'intl', 'json', 'ldap',
-										'libxml', 'mbstring', 'meta', 'mysqli', 'oci8', 'odbc', 'openssl', 'pcntl',
-										'pcre', 'PDO', 'pdo_ibm', 'pdo_mysql', 'pdo_pgsql', 'pdo_sqlite', 'pgsql', 'Phar',
-										'posix', 'pspell', 'readline', 'Reflection', 'session', 'shmop', 'SimpleXML',
-										'snmp', 'soap', 'sockets', 'sodium', 'SPL', 'sqlite3', 'standard', 'superglobals',
-										'sysvmsg', 'sysvsem', 'sysvshm', 'tidy', 'tokenizer', 'xml', 'xmlreader',
-										'xmlrpc', 'xmlwriter', 'xsl', 'Zend OPcache', 'zip', 'zlib',
-										'mongodb', -- for "Undefined class \MongoDB\..."
-										'random', -- for rand() and friends
-									},
-								},
-							},
-						})
-					end,
-					['lua_ls'] = function()
-						lspconfig.lua_ls.setup({
-							settings = {
-								Lua = {
-									runtime = { version = 'LuaJIT' },
-									workspace = {
-										library = vim.api.nvim_get_runtime_file('', true),
-										checkThirdParty = false,
-									},
-								},
-							},
-						})
-					end,
-					['omnisharp'] = function()
-						-- alternatively, make omnisharp.json with: {"RoslynExtensionsOptions":{"enableAnalyzersSupport":true},"FormattingOptions":{"enableEditorConfigSupport":true}}
-						lspconfig.omnisharp.setup({
-							settings = {
-								RoslynExtensionsOptions = {
-									EnableAnalyzersSupport = true,
-								},
-								FormattingOptions = {
-									EnableEditorConfigSupport = true,
-								},
-							},
-						})
-					end,
-					['pyright'] = function()
-						lspconfig.pyright.setup({
-							before_init = function(_, config)
-								local root_dir = config.root_dir or util.find_git_ancestor(vim.fn.getcwd())
-								local venv_python = util.path.join(root_dir, ".venv", "bin", "python")
-								config.settings = vim.tbl_deep_extend('force', config.settings or {}, {
-									python = {
-										pythonPath = vim.fn.filereadable(venv_python) == 1
-											and venv_python
-											or vim.fn.exepath("python3"),
-									},
-								})
-							end,
-						})
-					end,
-					-- Default handler for LSP servers that don't have a dedicated handler above.
-					function(server_name)
-						lspconfig[server_name].setup({})
-					end,
-				},
 			})
 		end,
 	},
