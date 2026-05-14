@@ -232,22 +232,14 @@ return {
 						lspconfig.pyright.setup({
 							before_init = function(_, config)
 								local root_dir = config.root_dir or util.find_git_ancestor(vim.fn.getcwd())
-								config.settings = config.settings or {}
-								config.settings.python = config.settings.python or {}
-								-- Try uv first
-								local uv_python = vim.fn.system("uv venv --python"):gsub("%s+$", "")
-								if vim.fn.filereadable(uv_python) == 1 then
-									config.settings.python.pythonPath = uv_python
-									return
-								end
-								-- Try `.venv/bin/python`
-								local local_venv = util.path.join(root_dir, ".venv", "bin", "python")
-								if vim.fn.filereadable(local_venv) == 1 then
-									config.settings.python.pythonPath = local_venv
-									return
-								end
-								-- Fallback to system python
-								config.settings.python.pythonPath = vim.fn.exepath("python3")
+								local venv_python = util.path.join(root_dir, ".venv", "bin", "python")
+								config.settings = vim.tbl_deep_extend('force', config.settings or {}, {
+									python = {
+										pythonPath = vim.fn.filereadable(venv_python) == 1
+											and venv_python
+											or vim.fn.exepath("python3"),
+									},
+								})
 							end,
 						})
 					end,
