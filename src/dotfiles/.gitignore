@@ -58,3 +58,6 @@ documentation/temp/
 # Applications
 .claude/
 .obsidian/
+
+# Development
+.devhost.md
