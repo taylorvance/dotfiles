@@ -7,10 +7,12 @@
 	a = add .
 	c = commit
 	s = switch
+	p = pull
 	g = grep --break --heading --line-number
 	l = log --graph --oneline --decorate
 	ll = log --graph --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset' --abbrev-commit
 	amend = commit --amend --no-edit
+	smp = "!git switch main && git pull --ff-only"
 
 [diff]
 	tool = nvimdiff
