@@ -6,13 +6,18 @@
 	di = diff
 	a = add .
 	c = commit
+	cm = commit -m
 	s = switch
+	f = fetch
 	p = pull
 	g = grep --break --heading --line-number
 	l = log --graph --oneline --decorate
 	ll = log --graph --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset' --abbrev-commit
+	cfg = config --list
 	amend = commit --amend --no-edit
 	smp = "!git switch main && git pull --ff-only"
+	fmom = "!git fetch && git merge origin/main"
+	from = "!git fetch && git rebase origin/main"
 
 [diff]
 	tool = nvimdiff
