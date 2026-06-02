@@ -1,0 +1,525 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# envsync - Find sample env files and report missing or differing variables
+#
+# Usage: envsync [-d] [-n] [PATH]
+#
+# Default: find variables present in sample files but absent from actual .env
+# With -d: also show variables where sample and actual values differ
+#
+# Options:
+#   -d, --diff     Show variables with different values too (default: missing only)
+#   -n, --dry-run  Show findings without prompting to copy
+#   -h, --help     Show this help message
+
+show_help() {
+    cat <<'EOF'
+Usage: envsync [-d] [-n] [PATH]
+
+Recursively find sample env files and report variables missing from the
+corresponding actual .env files. Optionally copy missing variables.
+
+Options:
+  -d, --diff     Also show variables where sample/actual values differ
+  -n, --dry-run  Show findings without prompting to copy
+  -h, --help     Show this help message
+
+Prompt options (copy missing / overwrite different):
+  y   Apply all
+  N   Skip (default)
+  i   Interactive selection via fzf
+
+Recognized sample file patterns:
+  .env.sample  .env.example  .env.template  .env.dist
+  *.env.sample  *.env.example  example.env  sample.env
+
+Skips: .git  node_modules  .venv  venv  vendor  .next
+EOF
+    exit 0
+}
+
+# ---- Defaults ----
+DIFF_MODE=false
+DRY_RUN=false
+TARGET_DIR="."
+
+# ---- Argument parsing ----
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -d|--diff)    DIFF_MODE=true; shift ;;
+        -n|--dry-run) DRY_RUN=true; shift ;;
+        -h|--help)    show_help ;;
+        -*)           echo "Error: Unknown option: $1" >&2; exit 1 ;;
+        *)            TARGET_DIR="$1"; shift ;;
+    esac
+done
+
+if [[ ! -d "$TARGET_DIR" ]]; then
+    echo "Error: '$TARGET_DIR' is not a directory" >&2
+    exit 1
+fi
+TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
+
+# ---- File discovery ----
+
+find_sample_files() {
+    find "$TARGET_DIR" \
+        \( -name ".git" -o -name "node_modules" -o -name ".venv" \
+           -o -name "venv" -o -name "vendor" -o -name ".next" \) -prune \
+        -o -type f \( \
+            -name ".env.sample" -o -name ".env.example" \
+            -o -name ".env.template" -o -name ".env.dist" \
+            -o -name "*.env.sample" -o -name "*.env.example" \
+            -o -name "example.env" -o -name "sample.env" \
+        \) -print 2>/dev/null | sort
+}
+
+sample_to_actual() {
+    local sample="$1"
+    local dir="${sample%/*}"
+    local base="${sample##*/}"
+    case "$base" in
+        .env.sample|.env.example|.env.template|.env.dist) echo "$dir/.env" ;;
+        *.env.sample)            echo "$dir/${base%.sample}" ;;
+        *.env.example)           echo "$dir/${base%.example}" ;;
+        example.env|sample.env)  echo "$dir/.env" ;;
+        *)                       echo "$dir/.env" ;;
+    esac
+}
+
+# ---- Env file helpers ----
+
+env_keys() {
+    grep -E '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=' "$1" 2>/dev/null \
+        | sed 's/^[[:space:]]*//' \
+        | sed 's/^export[[:space:]]*//' \
+        | cut -d= -f1 \
+        | awk '!seen[$0]++' || true
+}
+
+env_get() {
+    grep -E "^[[:space:]]*(export[[:space:]]+)?${1}=" "$2" 2>/dev/null \
+        | head -1 \
+        | cut -d= -f2- || true
+}
+
+env_has() {
+    grep -qE "^[[:space:]]*(export[[:space:]]+)?${1}=" "$2" 2>/dev/null
+}
+
+# Get block for a key from a sample file: all preceding comment lines + the key line
+sample_block() {
+    local key="$1" file="$2"
+    local line_num
+    line_num=$(grep -n -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$file" 2>/dev/null \
+        | head -1 | cut -d: -f1)
+    [[ -z "$line_num" ]] && return
+    local block_start="$line_num"
+    local check=$((line_num - 1))
+    while [[ "$check" -ge 1 ]]; do
+        local prev
+        prev=$(sed -n "${check}p" "$file")
+        if [[ "$prev" =~ ^[[:space:]]*# ]]; then
+            block_start="$check"
+            check=$((check - 1))
+        else
+            break
+        fi
+    done
+    sed -n "${block_start},${line_num}p" "$file"
+}
+
+# Append missing keys from sample to actual (creates actual if absent)
+append_keys() {
+    local sample_file="$1" actual_file="$2"
+    shift 2
+    local keys=("$@")
+    [[ ${#keys[@]} -eq 0 ]] && return
+    [[ ! -f "$actual_file" ]] && touch "$actual_file"
+    local key
+    {
+        [[ -s "$actual_file" ]] && printf '\n'
+        printf '# envsync added (%s)\n' "$(date +%Y-%m-%d)"
+        for key in "${keys[@]}"; do
+            sample_block "$key" "$sample_file"
+        done
+    } >> "$actual_file"
+}
+
+# Replace a key's value in-place via temp file (preserves export prefix and symlinks)
+env_set() {
+    local key="$1" val="$2" file="$3"
+    local tmp
+    tmp=$(mktemp)
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ ^[[:space:]]*(export[[:space:]]+)?${key}= ]]; then
+            local prefix
+            prefix=$(printf '%s' "$line" | cut -d= -f1)
+            printf '%s\n' "${prefix}=${val}"
+        else
+            printf '%s\n' "$line"
+        fi
+    done < "$file" > "$tmp"
+    # mv would replace a symlink with a regular file, so use cat (writes through) instead;
+    # for regular files mv is preferred because it's atomic (single rename syscall)
+    if [[ -L "$file" ]]; then
+        cat "$tmp" > "$file" && rm -f "$tmp"
+    else
+        mv "$tmp" "$file"
+    fi
+}
+
+# Group space-separated "PAIR_IDX:KEY" tokens by pair index.
+# Outputs "PAIR_IDX KEY1 KEY2 ..." lines (one per group).
+group_tokens() {
+    local tokens="$1"
+    local group_idxs=()
+    local group_keys=()
+    local token pidx key found g
+    for token in $tokens; do
+        pidx="${token%%:*}"
+        key="${token#*:}"
+        found=false
+        for g in "${!group_idxs[@]}"; do
+            if [[ "${group_idxs[$g]}" == "$pidx" ]]; then
+                group_keys[$g]+=" $key"
+                found=true
+                break
+            fi
+        done
+        if [[ "$found" == false ]]; then
+            group_idxs+=("$pidx")
+            group_keys+=("$key")
+        fi
+    done
+    for g in "${!group_idxs[@]}"; do
+        printf '%s %s\n' "${group_idxs[$g]}" "${group_keys[$g]}"
+    done
+}
+
+# ---- Discovery pass ----
+
+SAMPLE_FILES=()
+while IFS= read -r f; do
+    [[ -n "$f" ]] && SAMPLE_FILES+=("$f")
+done < <(find_sample_files)
+
+if [[ ${#SAMPLE_FILES[@]} -eq 0 ]]; then
+    echo "No sample env files found."
+    exit 0
+fi
+
+PAIR_SAMPLES=()
+PAIR_ACTUALS=()
+PAIR_MISS=()
+PAIR_DIFF=()
+PAIR_REQUIRED=()
+MODIFIED_PAIRS=()
+ADDED_REQUIRED=()
+
+TOTAL_MISSING=0
+TOTAL_DIFF=0
+HAS_FINDINGS=false
+
+for sample_file in "${SAMPLE_FILES[@]}"; do
+    actual_file=$(sample_to_actual "$sample_file")
+    rel_sample="${sample_file#$TARGET_DIR/}"
+    rel_actual="${actual_file#$TARGET_DIR/}"
+
+    SKEYS=()
+    while IFS= read -r k; do
+        [[ -n "$k" ]] && SKEYS+=("$k")
+    done < <(env_keys "$sample_file")
+
+    [[ ${#SKEYS[@]} -eq 0 ]] && continue
+
+    MISS=()
+    DIFFERENT=()
+
+    for key in "${SKEYS[@]}"; do
+        if [[ ! -f "$actual_file" ]] || ! env_has "$key" "$actual_file"; then
+            MISS+=("$key")
+        elif [[ "$DIFF_MODE" == true ]]; then
+            sv=$(env_get "$key" "$sample_file")
+            av=$(env_get "$key" "$actual_file")
+            [[ "$sv" != "$av" ]] && DIFFERENT+=("$key")
+        fi
+    done
+
+    [[ ${#MISS[@]} -eq 0 && ${#DIFFERENT[@]} -eq 0 ]] && continue
+
+    HAS_FINDINGS=true
+    echo ""
+    if [[ ! -f "$actual_file" ]]; then
+        echo "  $rel_actual  ←  $rel_sample  [no actual file]"
+    else
+        echo "  $rel_actual  ←  $rel_sample"
+    fi
+
+    REQUIRED=()
+    for key in "${MISS[@]}"; do
+        sv=$(env_get "$key" "$sample_file")
+        [[ -z "$sv" ]] && REQUIRED+=("$key")
+        printf "    %s=%s\n" "$key" "$sv"
+        TOTAL_MISSING=$((TOTAL_MISSING + 1))
+    done
+
+    if [[ "$DIFF_MODE" == true ]]; then
+        for key in "${DIFFERENT[@]}"; do
+            sv=$(env_get "$key" "$sample_file")
+            av=$(env_get "$key" "$actual_file")
+            printf "    [different]  %-30s  (sample: %s  actual: %s)\n" \
+                "$key" "${sv:-<empty>}" "${av:-<empty>}"
+            TOTAL_DIFF=$((TOTAL_DIFF + 1))
+        done
+    fi
+
+    PAIR_SAMPLES+=("$sample_file")
+    PAIR_ACTUALS+=("$actual_file")
+    MISS_STR=""
+    [[ ${#MISS[@]} -gt 0 ]] && MISS_STR="${MISS[*]}"
+    PAIR_MISS+=("$MISS_STR")
+    DIFF_STR=""
+    [[ ${#DIFFERENT[@]} -gt 0 ]] && DIFF_STR="${DIFFERENT[*]}"
+    PAIR_DIFF+=("$DIFF_STR")
+    REQ_STR=""
+    [[ ${#REQUIRED[@]} -gt 0 ]] && REQ_STR="${REQUIRED[*]}"
+    PAIR_REQUIRED+=("$REQ_STR")
+done
+
+echo ""
+
+if [[ "$HAS_FINDINGS" == false ]]; then
+    echo "All env files are in sync."
+    exit 0
+fi
+
+[[ $TOTAL_MISSING -gt 0 ]] && echo "$TOTAL_MISSING missing variable(s)."
+[[ "$DIFF_MODE" == true && $TOTAL_DIFF -gt 0 ]] && echo "$TOTAL_DIFF variable(s) with different values."
+echo ""
+
+[[ "$DRY_RUN" == true ]] && exit 0
+
+# ---- Helper functions for apply actions ----
+
+track_required_added() {
+    local pair_idx="$1" actual_file="$2"
+    shift 2
+    local copied_keys=("$@")
+    local req_str="${PAIR_REQUIRED[$pair_idx]:-}"
+    [[ -z "$req_str" ]] && return
+    local req_arr r k
+    read -r -a req_arr <<< "$req_str"
+    for r in "${req_arr[@]}"; do
+        for k in "${copied_keys[@]}"; do
+            if [[ "$k" == "$r" ]]; then
+                ADDED_REQUIRED+=("${actual_file}:${r}")
+                break
+            fi
+        done
+    done
+}
+
+do_copy_all() {
+    local i miss_str keys
+    for i in "${!PAIR_SAMPLES[@]}"; do
+        miss_str="${PAIR_MISS[$i]}"
+        [[ -z "$miss_str" ]] && continue
+        read -r -a keys <<< "$miss_str"
+        [[ ${#keys[@]} -eq 0 ]] && continue
+        local actual_file="${PAIR_ACTUALS[$i]}"
+        append_keys "${PAIR_SAMPLES[$i]}" "$actual_file" "${keys[@]}"
+        echo "  Added ${#keys[@]} variable(s) to ${actual_file#$TARGET_DIR/}"
+        MODIFIED_PAIRS+=("$i")
+        track_required_added "$i" "$actual_file" "${keys[@]}"
+    done
+}
+
+do_copy_selected() {
+    local line pidx rest keys
+    while IFS= read -r line; do
+        read -r pidx rest <<< "$line"
+        read -r -a keys <<< "$rest"
+        local actual_file="${PAIR_ACTUALS[$pidx]}"
+        append_keys "${PAIR_SAMPLES[$pidx]}" "$actual_file" "${keys[@]}"
+        echo "  Added ${#keys[@]} variable(s) to ${actual_file#$TARGET_DIR/}"
+        MODIFIED_PAIRS+=("$pidx")
+        track_required_added "$pidx" "$actual_file" "${keys[@]}"
+    done < <(group_tokens "$1")
+}
+
+do_overwrite_all() {
+    local i diff_str keys key val
+    for i in "${!PAIR_SAMPLES[@]}"; do
+        diff_str="${PAIR_DIFF[$i]}"
+        [[ -z "$diff_str" ]] && continue
+        read -r -a keys <<< "$diff_str"
+        [[ ${#keys[@]} -eq 0 ]] && continue
+        local actual_file="${PAIR_ACTUALS[$i]}"
+        local rel="${actual_file#$TARGET_DIR/}"
+        cp "$actual_file" "${actual_file}.envsync-bak"
+        echo "  Backed up $rel"
+        MODIFIED_PAIRS+=("$i")
+        for key in "${keys[@]}"; do
+            val=$(env_get "$key" "${PAIR_SAMPLES[$i]}")
+            env_set "$key" "$val" "$actual_file"
+            echo "  Updated $key in $rel"
+        done
+    done
+}
+
+do_overwrite_selected() {
+    local line pidx rest keys key val
+    while IFS= read -r line; do
+        read -r pidx rest <<< "$line"
+        read -r -a keys <<< "$rest"
+        local actual_file="${PAIR_ACTUALS[$pidx]}"
+        local rel="${actual_file#$TARGET_DIR/}"
+        cp "$actual_file" "${actual_file}.envsync-bak"
+        echo "  Backed up $rel"
+        MODIFIED_PAIRS+=("$pidx")
+        for key in "${keys[@]}"; do
+            val=$(env_get "$key" "${PAIR_SAMPLES[$pidx]}")
+            env_set "$key" "$val" "$actual_file"
+            echo "  Updated $key in $rel"
+        done
+    done < <(group_tokens "$1")
+}
+
+# ---- Copy missing variables ----
+
+if [[ $TOTAL_MISSING -gt 0 ]]; then
+    while true; do
+        read -rp "Copy $TOTAL_MISSING missing variable(s)? [y/N/i] " choice
+        choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+        case "$choice" in
+            y|yes)
+                do_copy_all
+                break ;;
+            n|no|"")
+                echo "Skipped."
+                break ;;
+            i|interactive)
+                if ! command -v fzf &>/dev/null; then
+                    echo "Error: fzf required for interactive mode" >&2
+                    continue
+                fi
+                FZF_INPUT=""
+                for i in "${!PAIR_SAMPLES[@]}"; do
+                    miss_str="${PAIR_MISS[$i]}"
+                    [[ -z "$miss_str" ]] && continue
+                    rel_actual="${PAIR_ACTUALS[$i]#$TARGET_DIR/}"
+                    read -r -a keys <<< "$miss_str"
+                    for key in "${keys[@]}"; do
+                        FZF_INPUT+="${i}:${key}|$(printf "%-40s  (%s)" "$key" "$rel_actual")"$'\n'
+                    done
+                done
+                SELECTED=$(echo -n "$FZF_INPUT" | \
+                    fzf --multi \
+                        --with-nth=2.. \
+                        --delimiter='|' \
+                        --header="TAB to select, ENTER to copy" \
+                        --reverse) || { echo "Aborted."; break; }
+                [[ -z "$SELECTED" ]] && { echo "Nothing selected."; break; }
+                SEL_TOKENS=""
+                while IFS= read -r line; do
+                    SEL_TOKENS+="${line%%|*} "
+                done <<< "$SELECTED"
+                do_copy_selected "$SEL_TOKENS"
+                break ;;
+            *)
+                echo "Please enter y, n, or i" ;;
+        esac
+    done
+    echo ""
+fi
+
+# ---- Overwrite different variables (--diff mode only) ----
+
+if [[ "$DIFF_MODE" == true && $TOTAL_DIFF -gt 0 ]]; then
+    echo "WARNING: Overwriting will replace values in your actual .env files with sample values."
+    echo ""
+    while true; do
+        read -rp "Overwrite $TOTAL_DIFF variable(s) with sample values? [y/N/i] " choice
+        choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+        case "$choice" in
+            y|yes)
+                do_overwrite_all
+                break ;;
+            n|no|"")
+                echo "Skipped."
+                break ;;
+            i|interactive)
+                if ! command -v fzf &>/dev/null; then
+                    echo "Error: fzf required for interactive mode" >&2
+                    continue
+                fi
+                FZF_INPUT=""
+                for i in "${!PAIR_SAMPLES[@]}"; do
+                    diff_str="${PAIR_DIFF[$i]}"
+                    [[ -z "$diff_str" ]] && continue
+                    rel_actual="${PAIR_ACTUALS[$i]#$TARGET_DIR/}"
+                    read -r -a keys <<< "$diff_str"
+                    for key in "${keys[@]}"; do
+                        sv=$(env_get "$key" "${PAIR_SAMPLES[$i]}")
+                        av=$(env_get "$key" "${PAIR_ACTUALS[$i]}")
+                        FZF_INPUT+="${i}:${key}|$(printf "%-30s  sample='%s'  actual='%s'  (%s)" \
+                            "$key" "${sv:-<empty>}" "${av:-<empty>}" "$rel_actual")"$'\n'
+                    done
+                done
+                SELECTED=$(echo -n "$FZF_INPUT" | \
+                    fzf --multi \
+                        --with-nth=2.. \
+                        --delimiter='|' \
+                        --header="TAB to select, ENTER to overwrite" \
+                        --reverse) || { echo "Aborted."; break; }
+                [[ -z "$SELECTED" ]] && { echo "Nothing selected."; break; }
+                SEL_TOKENS=""
+                while IFS= read -r line; do
+                    SEL_TOKENS+="${line%%|*} "
+                done <<< "$SELECTED"
+                do_overwrite_selected "$SEL_TOKENS"
+                break ;;
+            *)
+                echo "Please enter y, n, or i" ;;
+        esac
+    done
+fi
+
+# ---- Post-write: required vars summary and editor offer ----
+
+if [[ ${#MODIFIED_PAIRS[@]} -gt 0 ]]; then
+    if [[ ${#ADDED_REQUIRED[@]} -gt 0 ]]; then
+        echo "Requires values (no sample default):"
+        echo ""
+        prev_file=""
+        for entry in "${ADDED_REQUIRED[@]}"; do
+            file="${entry%%:*}"
+            key="${entry#*:}"
+            if [[ "$file" != "$prev_file" ]]; then
+                [[ -n "$prev_file" ]] && echo ""
+                echo "  ${file#$TARGET_DIR/}"
+                prev_file="$file"
+            fi
+            echo "    $key="
+        done
+        echo ""
+    fi
+
+    MODIFIED_FILE_PATHS=()
+    seen_idxs=""
+    for i in "${MODIFIED_PAIRS[@]}"; do
+        if [[ " $seen_idxs " != *" $i "* ]]; then
+            MODIFIED_FILE_PATHS+=("${PAIR_ACTUALS[$i]}")
+            seen_idxs+=" $i"
+        fi
+    done
+
+    OPEN_EDITOR="${VISUAL:-${EDITOR:-vi}}"
+    read -rp "Open ${#MODIFIED_FILE_PATHS[@]} modified file(s) in $OPEN_EDITOR? [y/N] " open_choice || true
+    open_choice=$(echo "$open_choice" | tr '[:upper:]' '[:lower:]')
+    if [[ "$open_choice" == "y" || "$open_choice" == "yes" ]]; then
+        $OPEN_EDITOR "${MODIFIED_FILE_PATHS[@]}"
+    fi
+fi

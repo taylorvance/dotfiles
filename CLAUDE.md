@@ -144,6 +144,20 @@ Reclaim disk space by removing common dependency folders across projects:
   - Displays total reclaimable space
   - Interactive mode uses fzf for multi-select (TAB to select)
 
+**`envsync`** - Compare env files against sample/example counterparts
+
+Recursively find sample env files and report missing or differing variables:
+
+- **Basic usage**: `envsync` - scan current directory for missing vars
+- **Custom path**: `envsync ~/project` - specify directory to scan
+- **Dry run**: `envsync -n` - show findings without prompting
+- **Diff mode**: `envsync -d` - also show variables where values differ (noisy; most will be intentional)
+- **Prompt options**: `y` (apply all), `N` (skip, default), `i` (interactive fzf selection)
+- **Sample patterns recognized**: `.env.sample`, `.env.example`, `.env.template`, `.env.dist`, `*.env.sample`, `*.env.example`, `example.env`, `sample.env`
+- **Skips**: `.git`, `node_modules`, `.venv`, `venv`, `vendor`, `.next`
+- **Copy missing**: appends new vars to actual file with `# envsync added (DATE)` marker; includes preceding comment block from sample for context
+- **Overwrite different** (`-d` mode): backs up actual file to `.envsync-bak` before overwriting values; preserves symlinks
+
 **`tmp`** - Quick temporary workspace creator
 
 Create timestamped temporary directories for scratch work:
