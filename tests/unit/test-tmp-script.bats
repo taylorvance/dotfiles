@@ -368,3 +368,59 @@ run_tmp() {
     # Assert: script uses ${TMPDIR:-/tmp} pattern for fallback
     grep -q 'TMPDIR:-/tmp' "$TEST_DIR/tmp-original"
 }
+
+# ============================================================================
+# SHELL WRAPPER (functions.zsh tmp())
+# ============================================================================
+
+# The wrapper evals the script's "cd" line and handles EDITOR_CMD. These
+# tests source functions.zsh in bash (it is bash-compatible, like the gw
+# tests) with HOME pointed at an isolated dir containing the patched script.
+
+setup_wrapper() {
+    export HOME="$TEST_DIR/home"
+    mkdir -p "$HOME/.local/bin"
+    cp "$TEST_DIR/tmp" "$HOME/.local/bin/tmp"
+    source "$BATS_TEST_DIRNAME/../../src/dotfiles/.zsh/functions.zsh"
+}
+
+@test "tmp wrapper: cds into the new workspace" {
+    setup_wrapper
+
+    tmp > /dev/null
+
+    [[ "$PWD" == "$TMP_BASE/"* ]]
+}
+
+@test "tmp wrapper: passes info output through, consumes the cd line" {
+    setup_wrapper
+
+    output=$(tmp)
+
+    [[ "$output" == *"Created temporary workspace"* ]]
+    [[ "$output" != *'cd "'* ]]
+}
+
+@test "tmp wrapper: -e opens editor with the filename" {
+    setup_wrapper
+    export EDITOR="$TEST_DIR/mock-editor"
+    cat > "$EDITOR" <<EOF
+#!/bin/bash
+echo "EDITED:\$1" > "$TEST_DIR/editor.log"
+EOF
+    chmod +x "$EDITOR"
+
+    tmp -e notes.py > /dev/null
+
+    [ -f "$TEST_DIR/editor.log" ]
+    grep -q "EDITED:notes.py" "$TEST_DIR/editor.log"
+    [[ "$PWD" == "$TMP_BASE/"* ]]
+}
+
+@test "tmp wrapper: propagates failure exit code" {
+    setup_wrapper
+
+    run tmp -r
+
+    [ "$status" -eq 1 ]
+}

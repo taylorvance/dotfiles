@@ -37,22 +37,6 @@ tmp() {
 	fi
 }
 
-# proj - wrapper to handle cd in detach mode
-proj() {
-	# If in detach mode (-d), capture the cd command and eval it
-	if [[ "$*" == *"-d"* ]] || [[ "$*" == *"--detach"* ]]; then
-		local output=$($HOME/.local/bin/proj "$@")
-		if [ $? -eq 0 ] && [[ "$output" == cd\ * ]]; then
-			eval "$output"
-		else
-			echo "$output"
-		fi
-	else
-		# Otherwise, just run the script (tmux handles the context)
-		$HOME/.local/bin/proj "$@"
-	fi
-}
-
 # -----------------------------------------------------------------------------
 # Utility functions
 # -----------------------------------------------------------------------------
@@ -151,10 +135,12 @@ lt() {
 	[[ "$use_gitignore" == true ]] && git_flag="--git-ignore"
 
 	# level=0 means unlimited (omit the --level flag)
+	# Page via $PAGER rather than the `r` alias: aliases only expand here if
+	# this file is sourced after they're defined, which is easy to break
 	if [[ $level -eq 0 ]]; then
-		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --ignore-glob="$ignore_patterns" "$@" | r
+		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --ignore-glob="$ignore_patterns" "$@" | ${PAGER:-less}
 	else
-		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --level=$level --ignore-glob="$ignore_patterns" "$@" | r
+		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --level=$level --ignore-glob="$ignore_patterns" "$@" | ${PAGER:-less}
 	fi
 }
 

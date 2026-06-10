@@ -64,7 +64,9 @@ attach_session() {
 
 do_create() {
 	local name="$1"
-	[ -z "$name" ] && name=$(basename "$PWD" | tr '. ' '__')
+	[ -z "$name" ] && name=$(basename "$PWD")
+	# tmux rejects '.' and ':' in session names; normalize spaces too
+	name=$(printf '%s' "$name" | tr '.: ' '___')
 
 	if session_exists "$name"; then
 		die "Session '$name' already exists"

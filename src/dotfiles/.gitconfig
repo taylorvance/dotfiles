@@ -1,5 +1,8 @@
 [user]
 	name = Taylor Vance
+	# Email intentionally unset here (work/personal split via per-repo config
+	# or ~/.gitconfig.local); refuse to guess an identity instead
+	useConfigOnly = true
 
 [alias]
 	st = status
@@ -15,9 +18,11 @@
 	ll = log --graph --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset' --abbrev-commit
 	cfg = config --list
 	amend = commit --amend --no-edit
-	smp = "!git switch main && git pull --ff-only"
-	fmom = "!git fetch && git merge origin/main"
-	from = "!git fetch && git rebase origin/main"
+	# db = the remote's default branch (main/master/...); requires origin/HEAD
+	db = "!ref=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || { echo 'origin/HEAD not set; run: git remote set-head origin -a' >&2; exit 1; }; echo \"${ref#origin/}\""
+	smp = "!b=$(git db) && git switch \"$b\" && git pull --ff-only"
+	fmom = "!b=$(git db) && git fetch && git merge \"origin/$b\""
+	from = "!b=$(git db) && git fetch && git rebase \"origin/$b\""
 
 [diff]
 	tool = nvimdiff

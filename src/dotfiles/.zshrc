@@ -46,12 +46,23 @@ if typeset -f antigen >/dev/null 2>&1; then
 fi
 
 
+# History (oh-my-zsh sets similar values; explicit so they hold without antigen)
+HISTFILE=$HOME/.zsh_history
+HISTSIZE=50000
+SAVEHIST=50000
+setopt INC_APPEND_HISTORY HIST_IGNORE_DUPS
+
 # Use vi keys
 bindkey -v
 # Lower latency (for switching modes etc)
 export KEYTIMEOUT=10
 
 # Filter command history
+# These widgets ship with zsh but aren't registered by default (oh-my-zsh does
+# it; do it ourselves so arrow keys still work without antigen)
+autoload -U up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
 bindkey "^[[A" up-line-or-beginning-search
 bindkey "^[[B" down-line-or-beginning-search
 bindkey -M vicmd k up-line-or-beginning-search
@@ -88,7 +99,7 @@ else
 fi
 # `e` for "edit" has a more sophisticated implementation in ~/.local/bin/e
 
-# Load custom wrapper functions (tmp, proj, raw)
+# Load custom shell functions (tmp wrapper, mkcd, extract, fcd, lt, gw, ...)
 source $HOME/.zsh/functions.zsh
 
 alias python='python3'
@@ -120,10 +131,13 @@ export NVM_DIR="$HOME/.nvm"
 () {
 	local default_alias="$NVM_DIR/alias/default"
 	local version
-	# Resolve alias chain (e.g. "lts/*" -> "lts/iron" -> "v20.x.x")
-	while [[ -f "$default_alias" ]]; do
+	local hops=0
+	# Resolve alias chain (e.g. "lts/*" -> "lts/iron" -> "v20.x.x");
+	# bounded so a cyclic alias can't hang shell startup
+	while [[ -f "$default_alias" && $hops -lt 5 ]]; do
 		version=$(cat "$default_alias")
 		default_alias="$NVM_DIR/alias/$version"
+		hops=$((hops + 1))
 	done
 	version="${default_alias##*/}"
 	if [[ -d "$NVM_DIR/versions/node/$version/bin" ]]; then
