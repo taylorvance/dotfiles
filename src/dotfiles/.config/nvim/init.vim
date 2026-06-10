@@ -1,7 +1,20 @@
 let mapleader = "\<space>"
 
+" this config relies on 0.11+ APIs (vim.lsp.config, treesitter main branch)
+if !has('nvim-0.11')
+	echohl WarningMsg
+	echom 'This nvim config requires nvim 0.11+; expect plugin/LSP errors.'
+	echohl None
+endif
+
+" all autocmds live in one group that's cleared on re-source, so :source
+" $MYVIMRC doesn't stack duplicates
+augroup vimrc
+	autocmd!
+augroup END
+
 " auto-cd to dotfiles repo when editing symlinked dotfiles
-autocmd BufEnter *
+autocmd vimrc BufEnter *
 	\ let resolved = resolve(expand('%:p')) |
 	\ if resolved =~# $HOME . '/dotfiles/src/dotfiles/' |
 	\   silent! lcd ~/dotfiles |
@@ -27,7 +40,7 @@ set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
 " better indenting for react
 "autocmd FileType javascriptreact,typescriptreact setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 " use spaces for C# (dotnet)
-autocmd FileType cs setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+autocmd vimrc FileType cs setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 
 
 " }}}
@@ -109,10 +122,10 @@ nnoremap <leader>bd <cmd>bdelete<cr>
 nnoremap <leader>fe <cmd>NvimTreeToggle<cr>
 
 " restore cursor position when opening a file
-autocmd BufReadPost * if line("'\"")>0 && line("'\"")<=line("$") | exe "normal! g`\"" | endif
+autocmd vimrc BufReadPost * if line("'\"")>0 && line("'\"")<=line("$") | exe "normal! g`\"" | endif
 " restore cursor position when switching buffers
-autocmd BufLeave * let b:prev_pos = getpos(".")
-autocmd BufEnter * if exists("b:prev_pos") | call setpos('.', b:prev_pos) | endif
+autocmd vimrc BufLeave * let b:prev_pos = getpos(".")
+autocmd vimrc BufEnter * if exists("b:prev_pos") | call setpos('.', b:prev_pos) | endif
 
 " }}}
 

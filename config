@@ -1,6 +1,7 @@
 .config/bat/config
 .config/nvim/README.md
 .config/nvim/init.vim
+.config/nvim/lazy-lock.json
 .config/nvim/lua/config/lazy.lua
 .config/nvim/lua/plugins/init.lua
 .config/starship.toml
