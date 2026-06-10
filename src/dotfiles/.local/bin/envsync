@@ -224,8 +224,8 @@ HAS_FINDINGS=false
 
 for sample_file in "${SAMPLE_FILES[@]}"; do
     actual_file=$(sample_to_actual "$sample_file")
-    rel_sample="${sample_file#$TARGET_DIR/}"
-    rel_actual="${actual_file#$TARGET_DIR/}"
+    rel_sample="${sample_file#"$TARGET_DIR"/}"
+    rel_actual="${actual_file#"$TARGET_DIR"/}"
 
     SKEYS=()
     while IFS= read -r k; do
@@ -330,7 +330,7 @@ do_copy_all() {
         [[ ${#keys[@]} -eq 0 ]] && continue
         local actual_file="${PAIR_ACTUALS[$i]}"
         append_keys "${PAIR_SAMPLES[$i]}" "$actual_file" "${keys[@]}"
-        echo "  Added ${#keys[@]} variable(s) to ${actual_file#$TARGET_DIR/}"
+        echo "  Added ${#keys[@]} variable(s) to ${actual_file#"$TARGET_DIR"/}"
         MODIFIED_PAIRS+=("$i")
         track_required_added "$i" "$actual_file" "${keys[@]}"
     done
@@ -343,7 +343,7 @@ do_copy_selected() {
         read -r -a keys <<< "$rest"
         local actual_file="${PAIR_ACTUALS[$pidx]}"
         append_keys "${PAIR_SAMPLES[$pidx]}" "$actual_file" "${keys[@]}"
-        echo "  Added ${#keys[@]} variable(s) to ${actual_file#$TARGET_DIR/}"
+        echo "  Added ${#keys[@]} variable(s) to ${actual_file#"$TARGET_DIR"/}"
         MODIFIED_PAIRS+=("$pidx")
         track_required_added "$pidx" "$actual_file" "${keys[@]}"
     done < <(group_tokens "$1")
@@ -357,7 +357,7 @@ do_overwrite_all() {
         read -r -a keys <<< "$diff_str"
         [[ ${#keys[@]} -eq 0 ]] && continue
         local actual_file="${PAIR_ACTUALS[$i]}"
-        local rel="${actual_file#$TARGET_DIR/}"
+        local rel="${actual_file#"$TARGET_DIR"/}"
         cp "$actual_file" "${actual_file}.envsync-bak"
         echo "  Backed up $rel"
         MODIFIED_PAIRS+=("$i")
@@ -375,7 +375,7 @@ do_overwrite_selected() {
         read -r pidx rest <<< "$line"
         read -r -a keys <<< "$rest"
         local actual_file="${PAIR_ACTUALS[$pidx]}"
-        local rel="${actual_file#$TARGET_DIR/}"
+        local rel="${actual_file#"$TARGET_DIR"/}"
         cp "$actual_file" "${actual_file}.envsync-bak"
         echo "  Backed up $rel"
         MODIFIED_PAIRS+=("$pidx")
@@ -391,7 +391,11 @@ do_overwrite_selected() {
 
 if [[ $TOTAL_MISSING -gt 0 ]]; then
     while true; do
-        read -rp "Copy $TOTAL_MISSING missing variable(s)? [y/N/i] " choice
+        if ! read -rp "Copy $TOTAL_MISSING missing variable(s)? [y/N/i] " choice; then
+            echo ""
+            echo "Skipped."
+            break
+        fi
         choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
         case "$choice" in
             y|yes)
@@ -409,7 +413,7 @@ if [[ $TOTAL_MISSING -gt 0 ]]; then
                 for i in "${!PAIR_SAMPLES[@]}"; do
                     miss_str="${PAIR_MISS[$i]}"
                     [[ -z "$miss_str" ]] && continue
-                    rel_actual="${PAIR_ACTUALS[$i]#$TARGET_DIR/}"
+                    rel_actual="${PAIR_ACTUALS[$i]#"$TARGET_DIR"/}"
                     read -r -a keys <<< "$miss_str"
                     for key in "${keys[@]}"; do
                         FZF_INPUT+="${i}:${key}|$(printf "%-40s  (%s)" "$key" "$rel_actual")"$'\n'
@@ -441,7 +445,11 @@ if [[ "$DIFF_MODE" == true && $TOTAL_DIFF -gt 0 ]]; then
     echo "WARNING: Overwriting will replace values in your actual .env files with sample values."
     echo ""
     while true; do
-        read -rp "Overwrite $TOTAL_DIFF variable(s) with sample values? [y/N/i] " choice
+        if ! read -rp "Overwrite $TOTAL_DIFF variable(s) with sample values? [y/N/i] " choice; then
+            echo ""
+            echo "Skipped."
+            break
+        fi
         choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
         case "$choice" in
             y|yes)
@@ -459,7 +467,7 @@ if [[ "$DIFF_MODE" == true && $TOTAL_DIFF -gt 0 ]]; then
                 for i in "${!PAIR_SAMPLES[@]}"; do
                     diff_str="${PAIR_DIFF[$i]}"
                     [[ -z "$diff_str" ]] && continue
-                    rel_actual="${PAIR_ACTUALS[$i]#$TARGET_DIR/}"
+                    rel_actual="${PAIR_ACTUALS[$i]#"$TARGET_DIR"/}"
                     read -r -a keys <<< "$diff_str"
                     for key in "${keys[@]}"; do
                         sv=$(env_get "$key" "${PAIR_SAMPLES[$i]}")
@@ -499,7 +507,7 @@ if [[ ${#MODIFIED_PAIRS[@]} -gt 0 ]]; then
             key="${entry#*:}"
             if [[ "$file" != "$prev_file" ]]; then
                 [[ -n "$prev_file" ]] && echo ""
-                echo "  ${file#$TARGET_DIR/}"
+                echo "  ${file#"$TARGET_DIR"/}"
                 prev_file="$file"
             fi
             echo "    $key="

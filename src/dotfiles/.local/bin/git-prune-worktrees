@@ -30,6 +30,8 @@ A worktree is safe to remove only if:
 
 States:
   [synced]       Clean, in sync with upstream — safe to remove
+  [synced +N ignored]  Synced, but contains N gitignored files (e.g. .env,
+                 node_modules) that removal will permanently delete
   [dirty]        Uncommitted changes — skipped
   [ahead]        Unpushed commits — skipped
   [behind]       Behind upstream — skipped
@@ -46,7 +48,9 @@ Prompt options:
   i   Interactive selection via fzf
 
 Note: Only removes worktrees, not branches. Use git prune-branches
-for branch cleanup.
+for branch cleanup. Removal uses 'git worktree remove --force', which
+also deletes gitignored files left in the worktree — check for a
+'+N ignored' flag before confirming.
 EOF
     exit 0
 }
@@ -112,7 +116,14 @@ analyze_worktree() {
     elif [[ "$behind" -gt 0 ]]; then
         echo "behind"
     else
-        echo "synced"
+        # Synced: flag gitignored files, since remove --force deletes them
+        local ignored
+        ignored=$(git -C "$path" status --porcelain --ignored=matching 2>/dev/null | grep -c '^!!') || true
+        if [[ "${ignored:-0}" -gt 0 ]]; then
+            echo "synced +$ignored ignored"
+        else
+            echo "synced"
+        fi
     fi
 }
 
@@ -170,7 +181,7 @@ while IFS= read -r line; do
 
             tag=$(analyze_worktree "$current_path" "$current_branch")
             is_safe=false
-            [[ "$tag" == "synced" ]] && is_safe=true
+            [[ "$tag" == synced* ]] && is_safe=true
 
             WORKTREES+=("$current_path")
             BRANCH_NAMES+=("$current_branch")
@@ -252,7 +263,11 @@ fi
 
 # Prompt for action
 while true; do
-    read -rp "Remove all safe worktrees? [y/N/i] " choice
+    if ! read -rp "Remove all safe worktrees? [y/N/i] " choice; then
+        echo ""
+        echo "Aborted."
+        exit 0
+    fi
     choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
     case "$choice" in
         y|yes)

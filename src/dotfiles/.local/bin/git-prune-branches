@@ -35,6 +35,9 @@ Prompt options:
   y   Delete all listed branches
   N   Abort (default)
   i   Interactive selection via fzf
+
+Note: branches checked out in a worktree are skipped (git refuses to
+delete them); use git prune-worktrees to remove the worktree first.
 EOF
     exit 0
 }
@@ -121,31 +124,40 @@ should_skip() {
     [[ -z "$branch" ]] && return 0
     [[ "$branch" == "$DEFAULT_BRANCH" ]] && return 0
     [[ "$branch" == "$CURRENT_BRANCH" ]] && return 0
-    [[ "$branch" == \** ]] && return 0
     return 1
 }
 
+# Branches are enumerated with for-each-ref: clean names (git-branch output
+# prefixes worktree/current branches with +/* and quotes odd names), plus
+# worktree and upstream state. %09 = tab; refnames can't contain tabs.
+# %(if) markers keep every field non-empty (tab is IFS whitespace, so empty
+# fields would collapse and shift the remaining ones).
+WORKTREE_FIELD='%(if)%(worktreepath)%(then)worktree%(else)-%(end)'
+GONE_FIELD='%(if:equals=[gone])%(upstream:track)%(then)gone%(else)-%(end)'
+
 # Find merged branches
-while IFS= read -r branch; do
-    branch=$(echo "$branch" | xargs)  # trim whitespace
+while IFS=$'\t' read -r branch in_worktree; do
     should_skip "$branch" && continue
+    [[ "$in_worktree" == "worktree" ]] && continue  # deletion would fail while checked out
     add_branch "$branch" "merged" "d"
-done < <(git branch --merged "$DEFAULT_BRANCH" 2>/dev/null)
+done < <(git for-each-ref refs/heads --merged "$DEFAULT_BRANCH" \
+    --format="%(refname:short)%09${WORKTREE_FIELD}" 2>/dev/null)
 
 # Find gone branches (remote tracking branch deleted)
-while IFS= read -r line; do
-    branch=$(echo "$line" | awk '{print $1}')
+while IFS=$'\t' read -r branch in_worktree gone; do
     should_skip "$branch" && continue
-    if echo "$line" | grep -q '\[.*: gone\]'; then
+    [[ "$in_worktree" == "worktree" ]] && continue
+    if [[ "$gone" == "gone" ]]; then
         add_branch "$branch" "gone" "D"
     fi
-done < <(git branch -vv 2>/dev/null)
+done < <(git for-each-ref refs/heads \
+    --format="%(refname:short)%09${WORKTREE_FIELD}%09${GONE_FIELD}" 2>/dev/null)
 
 # Find squash-merged branches (optional, slower)
 if [[ "$INCLUDE_SQUASH" == true ]]; then
-    while IFS= read -r branch; do
-        branch=$(echo "$branch" | xargs)
+    while IFS=$'\t' read -r branch in_worktree; do
         should_skip "$branch" && continue
+        [[ "$in_worktree" == "worktree" ]] && continue
         # Skip branches already detected as merged
         if idx=$(find_branch "$branch") && [[ "${TAGS[$idx]}" == *"merged"* ]]; then
             continue
@@ -157,7 +169,8 @@ if [[ "$INCLUDE_SQUASH" == true ]]; then
         if ! echo "$local_cherry" | grep -q '^+'; then
             add_branch "$branch" "squash-merged" "D"
         fi
-    done < <(git branch --format='%(refname:short)' 2>/dev/null)
+    done < <(git for-each-ref refs/heads \
+        --format="%(refname:short)%09${WORKTREE_FIELD}" 2>/dev/null)
 fi
 
 # Nothing to do?
@@ -200,7 +213,11 @@ fi
 
 # Prompt for action
 while true; do
-    read -rp "Delete all? [y/N/i] " choice
+    if ! read -rp "Delete all? [y/N/i] " choice; then
+        echo ""
+        echo "Aborted."
+        exit 0
+    fi
     choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
     case "$choice" in
         y|yes)

@@ -321,3 +321,43 @@ create_unpublished_worktree() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"Unknown option"* ]]
 }
+
+# ============================================================================
+# IGNORED FILES (remove --force deletes them; they must be flagged)
+# ============================================================================
+
+@test "synced worktree with gitignored files is flagged" {
+    wt_path=$(create_synced_worktree "with-ignored")
+    echo ".env" >> "$REPO_DIR/.git/info/exclude"
+    echo "secret" > "$wt_path/.env"
+
+    cd "$REPO_DIR"
+    run git-prune-worktrees -n
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"synced +1 ignored"* ]]
+    [[ "$output" == *"Safe to remove"* ]]
+}
+
+@test "flagged synced worktree is still removable" {
+    wt_path=$(create_synced_worktree "rm-ignored")
+    echo ".env" >> "$REPO_DIR/.git/info/exclude"
+    echo "secret" > "$wt_path/.env"
+
+    cd "$REPO_DIR"
+    run bash -c "echo y | git-prune-worktrees"
+
+    [ "$status" -eq 0 ]
+    [ ! -d "$wt_path" ]
+}
+
+@test "EOF at prompt aborts safely" {
+    wt_path=$(create_synced_worktree "eof-test")
+
+    cd "$REPO_DIR"
+    run bash -c "git-prune-worktrees < /dev/null"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted"* ]]
+    [ -d "$wt_path" ]
+}

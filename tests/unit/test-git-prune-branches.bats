@@ -315,3 +315,43 @@ create_squash_merged_branch() {
     # Should not error - default branch detection worked
     [ "$status" -eq 0 ]
 }
+
+# ============================================================================
+# WORKTREE INTERACTION (regression: git branch -vv "+" prefix parsing)
+# ============================================================================
+
+@test "git-prune-branches: parses cleanly with a worktree checkout present" {
+    create_gone_branch "feature/gone"
+    cd "$WORK_REPO"
+    git branch wt-branch >/dev/null 2>&1
+    git worktree add "$TEST_DIR/wt" wt-branch >/dev/null 2>&1
+
+    run_prune -n
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"feature/gone"* ]]
+    [[ "$output" != *"wt-branch"* ]]
+    # No mangled "+" entry from git branch -vv prefixes
+    [ "$(echo "$output" | grep -cE '^[[:space:]]*\+[[:space:]]*$')" -eq 0 ]
+}
+
+@test "git-prune-branches: gone branch checked out in a worktree is skipped" {
+    create_gone_branch "feature/wt-gone"
+    cd "$WORK_REPO"
+    git worktree add "$TEST_DIR/wt2" feature/wt-gone >/dev/null 2>&1
+
+    run_prune -n
+
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"feature/wt-gone"* ]]
+}
+
+@test "git-prune-branches: EOF at prompt aborts" {
+    create_merged_gone_branch "feature/eof"
+    cd "$WORK_REPO"
+    run bash -c "'$TEST_DIR/git-prune-branches' < /dev/null"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted"* ]]
+    git show-ref --verify --quiet refs/heads/feature/eof
+}
