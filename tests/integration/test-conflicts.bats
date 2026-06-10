@@ -159,10 +159,10 @@ teardown() {
     cd "$TEST_DOTFILES"
     bash src/symlink-manager.sh install
 
-    # Backup should dereference symlink (cp -RL)
+    # Backup preserves the symlink itself (cp -PR): it mirrors what was in $HOME
     backup_dir=$(find "$TEST_DOTFILES/.backups" -mindepth 1 -maxdepth 1 -type d | head -n1)
-    [ -f "$backup_dir/.testfile" ]
-    [ ! -L "$backup_dir/.testfile" ]  # Should be regular file, not symlink
+    [ -L "$backup_dir/.testfile" ]
+    [ "$(readlink "$backup_dir/.testfile")" = "$TEST_HOME/.target" ]
     [ "$(cat "$backup_dir/.testfile")" = "target content" ]
 }
 
@@ -197,6 +197,66 @@ teardown() {
 
     # Should handle gracefully
     [[ "$output" =~ "No backups" ]] || [[ "$output" =~ "backup" ]]
+}
+
+@test "restore: restores original files from chosen backup" {
+    cd "$TEST_DOTFILES"
+    echo "original data" > "$TEST_HOME/.testfile"
+    bash src/symlink-manager.sh install
+    [ -L "$TEST_HOME/.testfile" ]
+
+    run bash -c "echo 1 | bash src/symlink-manager.sh restore"
+    [ "$status" -eq 0 ]
+
+    # The original file is back in place of the symlink
+    [ ! -L "$TEST_HOME/.testfile" ]
+    [ "$(cat "$TEST_HOME/.testfile")" = "original data" ]
+}
+
+@test "restore: does not clobber repo sources through symlinks" {
+    cd "$TEST_DOTFILES"
+    echo "original data" > "$TEST_HOME/.testfile"
+    bash src/symlink-manager.sh install
+
+    run bash -c "echo 1 | bash src/symlink-manager.sh restore"
+    [ "$status" -eq 0 ]
+
+    # The repo's source file must be untouched by the restore
+    [ "$(cat "$TEST_DOTFILES/src/dotfiles/.testfile")" = "new content" ]
+}
+
+@test "restore: dry-run previews without changes" {
+    cd "$TEST_DOTFILES"
+    echo "original data" > "$TEST_HOME/.testfile"
+    bash src/symlink-manager.sh install
+
+    run bash -c "echo 1 | bash src/symlink-manager.sh --dry-run restore"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "DRY RUN" ]]
+
+    # Still linked; nothing restored
+    [ -L "$TEST_HOME/.testfile" ]
+}
+
+@test "restore: rejects non-numeric input" {
+    cd "$TEST_DOTFILES"
+    echo "original data" > "$TEST_HOME/.testfile"
+    bash src/symlink-manager.sh install
+
+    run bash -c "echo notanumber | bash src/symlink-manager.sh restore"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Invalid" ]]
+    [ -L "$TEST_HOME/.testfile" ]
+}
+
+@test "restore: rejects out-of-range backup number" {
+    cd "$TEST_DOTFILES"
+    echo "original data" > "$TEST_HOME/.testfile"
+    bash src/symlink-manager.sh install
+
+    run bash -c "echo 99 | bash src/symlink-manager.sh restore"
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Invalid" ]]
 }
 
 # ============================================================================

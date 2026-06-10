@@ -136,12 +136,35 @@ backup_path() {
     local relative_path="$2"
 
     mkdir -p "$BACKUPDIR/$(dirname "$relative_path")"
+    # -P preserves symlinks as symlinks: the backup mirrors what was actually
+    # in $HOME, and copying can't fail on dangling links the way -L did
+    cp -PR "$source_path" "$BACKUPDIR/$relative_path"
+}
 
-    if [ -L "$source_path" ] && [ ! -e "$source_path" ]; then
-        cp -P "$source_path" "$BACKUPDIR/$relative_path"
-    else
-        cp -RL "$source_path" "$BACKUPDIR/$relative_path"
-    fi
+# Make sure the parent of $1 is a directory, backing up and removing any
+# non-directory ancestor (e.g. ~/.config exists as a file but the config
+# wants ~/.config/foo/bar). Walks the whole chain, not just the immediate
+# parent.
+ensure_parent_dirs() {
+    local target_parent="$1"
+    local path="$target_parent"
+    local chain=()
+    local component
+
+    while [ -n "$path" ] && [ "$path" != "$DESTINATIONDIR" ] && [ "$path" != "/" ]; do
+        chain=("$path" "${chain[@]}")
+        path="$(dirname "$path")"
+    done
+
+    for component in "${chain[@]}"; do
+        if path_exists "$component" && [ ! -d "$component" ]; then
+            backup_path "$component" "${component#"$DESTINATIONDIR"/}"
+            rm -rf "$component"
+            break # nothing deeper can exist below a non-directory
+        fi
+    done
+
+    mkdir -p "$target_parent"
 }
 
 install_dotfiles() {
@@ -157,7 +180,8 @@ install_dotfiles() {
         printf "Linking dotfiles...\n\n"
     fi
 
-    while IFS= read -r filepath; do
+    local filepath oldfile newfile
+    while IFS= read -r filepath || [ -n "$filepath" ]; do
         is_skipped_config_line "$filepath" && continue
 
         filepath="$(normalize_config_path "$filepath")"
@@ -167,39 +191,28 @@ install_dotfiles() {
 
         # If the file is already correctly symlinked, skip.
         if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
-            printf "  ${DIM}✓${NC} ${filepath}\n"
+            printf "  ${DIM}✓${NC} %s\n" "$filepath"
             continue
         fi
 
         # If a file with this name already exists, it will be backed up
         if path_exists "$oldfile"; then
             if [ "$DRY_RUN" = true ]; then
-                printf "  ${YELLOW}→${NC} ${filepath} (would backup existing & link)\n"
+                printf "  ${YELLOW}→${NC} %s (would backup existing & link)\n" "$filepath"
             else
-                mkdir -p "$BACKUPDIR"
-                # Make a deep, recursive copy, removing symlinks, preserving full path structure
                 backup_path "$oldfile" "$filepath"
                 rm -rf "$oldfile"
             fi
         else
             if [ "$DRY_RUN" = true ]; then
-                printf "  ${BLUE}+${NC} ${filepath} (would create link)\n"
+                printf "  ${BLUE}+${NC} %s (would create link)\n" "$filepath"
             fi
         fi
 
         if [ "$DRY_RUN" = false ]; then
-            # Create parent directories, removing any conflicting files in the path
-            local parent_dir="$(dirname "$oldfile")"
-            if path_exists "$parent_dir" && [ ! -d "$parent_dir" ]; then
-                # Parent path is a file, need to back it up and remove it
-                mkdir -p "$BACKUPDIR"
-                local parent_path="${parent_dir#$DESTINATIONDIR/}"
-                backup_path "$parent_dir" "$parent_path"
-                rm -rf "$parent_dir"
-            fi
-            mkdir -p "$parent_dir"
+            ensure_parent_dirs "$(dirname "$oldfile")"
             ln -s "$newfile" "$oldfile"
-            printf "  ${GREEN}✓${NC} ${filepath}\n"
+            printf "  ${GREEN}✓${NC} %s\n" "$filepath"
         fi
     done < "$CONFIGFILE"
 
@@ -211,9 +224,15 @@ install_dotfiles() {
 }
 
 uninstall_dotfiles() {
-    printf "Unlinking dotfiles...\n\n"
+    if [ "$DRY_RUN" = true ]; then
+        printf "${BLUE}[DRY RUN]${NC} Preview of changes:\n\n"
+    else
+        printf "Unlinking dotfiles...\n\n"
+    fi
 
-    while IFS= read -r filepath; do
+    local filepath oldfile newfile
+    local removed=0 skipped=0
+    while IFS= read -r filepath || [ -n "$filepath" ]; do
         is_skipped_config_line "$filepath" && continue
 
         filepath="$(normalize_config_path "$filepath")"
@@ -222,27 +241,41 @@ uninstall_dotfiles() {
         newfile=$SOURCEDIR/$filepath
 
         # Check if it's currently symlinked to our dotfiles
-        if [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
-            rm -f "$oldfile"
-            printf "  ${GREEN}✓${NC} ${filepath}\n"
+        if [ "$oldfile" -ef "$newfile" ] 2>/dev/null && [ -L "$oldfile" ]; then
+            if [ "$DRY_RUN" = true ]; then
+                printf "  ${YELLOW}→${NC} %s (would unlink)\n" "$filepath"
+            else
+                rm -f "$oldfile"
+                printf "  ${GREEN}✓${NC} %s\n" "$filepath"
+            fi
+            removed=$((removed + 1))
         elif [ -L "$oldfile" ]; then
-            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
+            printf "  ${YELLOW}⚠${NC} %s (skipped: symlink points elsewhere)\n" "$filepath"
+            skipped=$((skipped + 1))
         elif [ -e "$oldfile" ]; then
-            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
+            printf "  ${YELLOW}⚠${NC} %s (skipped: not a symlink)\n" "$filepath"
+            skipped=$((skipped + 1))
         else
-            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
+            printf "  ${YELLOW}⚠${NC} %s (skipped: not found)\n" "$filepath"
+            skipped=$((skipped + 1))
         fi
     done < "$CONFIGFILE"
 
-    printf "\n${GREEN}All dotfiles unlinked${NC}\n"
+    printf "\n"
+    if [ "$DRY_RUN" = true ]; then
+        printf "${BLUE}[DRY RUN]${NC} No changes made. Run without -n to apply.\n"
+    else
+        printf "${GREEN}%d unlinked${NC}, %d skipped\n" "$removed" "$skipped"
+    fi
 }
 
 show_status() {
     printf "Dotfiles status:\n\n"
 
+    local filepath oldfile newfile
     local all_ok=true
 
-    while IFS= read -r filepath; do
+    while IFS= read -r filepath || [ -n "$filepath" ]; do
         is_skipped_config_line "$filepath" && continue
 
         filepath="$(normalize_config_path "$filepath")"
@@ -250,19 +283,19 @@ show_status() {
         oldfile=$DESTINATIONDIR/$filepath
         newfile=$SOURCEDIR/$filepath
 
-        if [ ! -e "$newfile" ]; then
-            printf "  ${RED}✗${NC} ${filepath}\n"
+        if ! path_exists "$newfile"; then
+            printf "  ${RED}✗${NC} %s (source missing)\n" "$filepath"
             all_ok=false
         elif [ "$oldfile" -ef "$newfile" ] 2>/dev/null; then
-            printf "  ${GREEN}✓${NC} ${filepath}\n"
+            printf "  ${GREEN}✓${NC} %s\n" "$filepath"
         elif [ -L "$oldfile" ]; then
-            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
+            printf "  ${YELLOW}⚠${NC} %s (symlink points elsewhere)\n" "$filepath"
             all_ok=false
         elif [ -e "$oldfile" ]; then
-            printf "  ${YELLOW}⚠${NC} ${filepath}\n"
+            printf "  ${YELLOW}⚠${NC} %s (exists but is not a symlink)\n" "$filepath"
             all_ok=false
         else
-            printf "  ${RED}✗${NC} ${filepath}\n"
+            printf "  ${RED}✗${NC} %s (not linked)\n" "$filepath"
             all_ok=false
         fi
     done < "$CONFIGFILE"
@@ -286,36 +319,80 @@ restore_from_backup() {
     printf "Available backups:\n\n"
 
     local -a backups
+    local backup
     while IFS= read -r backup; do
         backups+=("$backup")
         printf "  [%d] %s\n" "${#backups[@]}" "$(basename "$backup")"
     done < <(find "$BACKUPSDIR" -mindepth 1 -maxdepth 1 -type d | sort -r)
 
-    printf "\nEnter backup number to restore (or 0 to cancel): "
-    read -r choice
+    printf "\nRestored files replace whatever is at their path in \$HOME,\n"
+    printf "including symlinks created by 'make link'.\n"
 
-    if [ "$choice" -eq 0 ] 2>/dev/null; then
+    printf "\nEnter backup number to restore (or 0 to cancel): "
+    local choice
+    if ! read -r choice; then
         echo "Cancelled."
         exit 0
     fi
 
-    if [ "$choice" -lt 1 ] 2>/dev/null || [ "$choice" -gt "${#backups[@]}" ] 2>/dev/null; then
+    if ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+        echo "Invalid choice."
+        exit 1
+    fi
+
+    if [ "$choice" -eq 0 ]; then
+        echo "Cancelled."
+        exit 0
+    fi
+
+    if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#backups[@]}" ]; then
         echo "Invalid choice."
         exit 1
     fi
 
     local backup_dir="${backups[$((choice-1))]}"
 
-    printf "\nRestoring from %s...\n" "$(basename "$backup_dir")"
-
-    # Copy all files from backup back to home
-    if [ -d "$backup_dir" ]; then
-        cp -R "$backup_dir"/. "$DESTINATIONDIR/"
-        printf "${GREEN}Restore complete!${NC}\n"
-        printf "Note: You may want to run 'make teardown' first to remove symlinks.\n"
+    if [ "$DRY_RUN" = true ]; then
+        printf "\n${BLUE}[DRY RUN]${NC} Would restore from %s:\n\n" "$(basename "$backup_dir")"
     else
-        echo "Backup directory not found."
-        exit 1
+        printf "\nRestoring from %s...\n\n" "$(basename "$backup_dir")"
+    fi
+
+    # Recreate directory structure first
+    local entry rel dest
+    if [ "$DRY_RUN" = false ]; then
+        while IFS= read -r entry; do
+            rel="${entry#./}"
+            [ "$rel" = "." ] && continue
+            mkdir -p "$DESTINATIONDIR/$rel"
+        done < <(cd "$backup_dir" && find . -type d)
+    fi
+
+    # Copy entry-by-entry so our own symlinks can be removed first; a plain
+    # recursive cp would write *through* an existing symlink and overwrite
+    # the repo's source files instead of restoring the original.
+    local restored=0
+    while IFS= read -r entry; do
+        rel="${entry#./}"
+        if [ "$DRY_RUN" = true ]; then
+            printf "  ${YELLOW}→${NC} ~/%s (would restore)\n" "$rel"
+            restored=$((restored + 1))
+            continue
+        fi
+        dest="$DESTINATIONDIR/$rel"
+        if [ -L "$dest" ]; then
+            rm -f "$dest"
+        fi
+        cp -PR "$backup_dir/$rel" "$dest"
+        printf "  ${GREEN}✓${NC} ~/%s\n" "$rel"
+        restored=$((restored + 1))
+    done < <(cd "$backup_dir" && find . \( -type f -o -type l \))
+
+    printf "\n"
+    if [ "$DRY_RUN" = true ]; then
+        printf "${BLUE}[DRY RUN]${NC} No changes made. Run without -n to apply.\n"
+    else
+        printf "${GREEN}Restore complete!${NC} %d file(s) restored.\n" "$restored"
     fi
 }
 

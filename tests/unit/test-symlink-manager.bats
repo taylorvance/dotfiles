@@ -260,6 +260,56 @@ run_symlink_manager() {
     [ -L "$TEST_HOME/.my file" ]
 }
 
+@test "install: links last entry when config lacks trailing newline" {
+    # Setup
+    echo "content1" > "$TEST_SOURCE/.file1"
+    echo "content2" > "$TEST_SOURCE/.file2"
+    printf ".file1\n.file2" > "$TEST_CONFIG"
+
+    # Run
+    run_symlink_manager install
+
+    # Assert: both entries linked, including the one without a newline
+    [ "$status" -eq 0 ]
+    [ -L "$TEST_HOME/.file1" ]
+    [ -L "$TEST_HOME/.file2" ]
+}
+
+@test "install: backs up file blocking a deep parent directory" {
+    # Setup: ~/.config exists as a regular FILE, but config wants a path under it
+    mkdir -p "$TEST_SOURCE/.config/tool"
+    echo "content" > "$TEST_SOURCE/.config/tool/conf"
+    create_config ".config/tool/conf"
+    echo "blocking file" > "$TEST_HOME/.config"
+
+    # Run
+    run_symlink_manager install
+
+    # Assert: blocking file backed up, directories created, link in place
+    [ "$status" -eq 0 ]
+    [ -L "$TEST_HOME/.config/tool/conf" ]
+    backup_dir=$(find "$TEST_BACKUPS" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    [ "$(cat "$backup_dir/.config")" = "blocking file" ]
+}
+
+@test "install: backs up directory containing a dangling symlink" {
+    # Setup: conflicting directory contains a symlink to nowhere
+    mkdir -p "$TEST_SOURCE/.mydir"
+    echo "content" > "$TEST_SOURCE/.mydir/file"
+    create_config ".mydir"
+    mkdir -p "$TEST_HOME/.mydir"
+    ln -s "$TEST_HOME/.does-not-exist" "$TEST_HOME/.mydir/dead"
+
+    # Run
+    run_symlink_manager install
+
+    # Assert: install succeeds, dangling link preserved in backup
+    [ "$status" -eq 0 ]
+    [ -L "$TEST_HOME/.mydir" ]
+    backup_dir=$(find "$TEST_BACKUPS" -mindepth 1 -maxdepth 1 -type d | head -n1)
+    [ -L "$backup_dir/.mydir/dead" ]
+}
+
 # ============================================================================
 # UNINSTALL MODE TESTS
 # ============================================================================
@@ -313,6 +363,38 @@ run_symlink_manager() {
 
     # Assert (should not fail)
     [ ! -e "$TEST_HOME/.nonexistent" ]
+}
+
+@test "uninstall: explains why entries are skipped" {
+    # Setup: regular file at the configured path
+    echo "important" > "$TEST_HOME/.testfile"
+    echo "source" > "$TEST_SOURCE/.testfile"
+    create_config ".testfile"
+
+    # Run uninstall
+    run_symlink_manager uninstall
+
+    # Assert: skipped with a reason, file untouched
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "not a symlink" ]]
+    [ -f "$TEST_HOME/.testfile" ]
+}
+
+@test "uninstall: reports unlinked and skipped counts" {
+    # Setup: one of our links + one foreign regular file
+    echo "ours" > "$TEST_SOURCE/.linked"
+    echo "theirs" > "$TEST_HOME/.notours"
+    echo "src" > "$TEST_SOURCE/.notours"
+    printf ".linked\n.notours\n" > "$TEST_CONFIG"
+    ln -s "$TEST_SOURCE/.linked" "$TEST_HOME/.linked"
+
+    # Run uninstall
+    run_symlink_manager uninstall
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "1 unlinked" ]]
+    [[ "$output" =~ "1 skipped" ]]
 }
 
 # ============================================================================
@@ -530,6 +612,22 @@ run_symlink_manager() {
     # Assert
     [ "$status" -eq 0 ]
     [[ "$output" =~ ".testfile" ]]
+}
+
+@test "dry-run: uninstall previews without removing links" {
+    # Setup
+    echo "content" > "$TEST_SOURCE/.testfile"
+    create_config ".testfile"
+    run_symlink_manager install
+
+    # Run dry-run uninstall
+    run_symlink_manager -n uninstall
+
+    # Assert: preview shown, link still in place
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "DRY RUN" ]]
+    [[ "$output" =~ "would unlink" ]]
+    [ -L "$TEST_HOME/.testfile" ]
 }
 
 @test "dry-run: flag position can come after mode" {
