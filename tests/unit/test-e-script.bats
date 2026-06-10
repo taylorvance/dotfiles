@@ -1198,3 +1198,108 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"myfile.txt"* ]]
 }
+
+# ============================================================================
+# REGRESSION TESTS (porcelain parsing, stdin handling, filter edges)
+# ============================================================================
+
+@test "e -m: handles filenames containing ' D' or ' M'" {
+    # Unanchored porcelain grep used to exclude/include these wrongly
+    echo "content" > "bar D.txt"
+    echo "content" > "foo M.txt"
+    git add .
+    git commit -q -m "initial"
+    echo "modified" >> "bar D.txt"
+
+    run_e -m
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"bar D.txt"* ]]
+    [[ "$output" != *"foo M.txt"* ]]
+}
+
+@test "e -m: includes staged modifications" {
+    echo "content" > file1.txt
+    git add .
+    git commit -q -m "initial"
+    echo "modified" >> file1.txt
+    git add file1.txt
+
+    run_e -m
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+}
+
+@test "e -m: staged rename opens the new filename" {
+    echo "content" > oldname.txt
+    git add .
+    git commit -q -m "initial"
+    git mv oldname.txt newname.txt
+
+    run_e -m
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"newname.txt"* ]]
+    [[ "$output" != *"->"* ]]
+}
+
+@test "e -m: handles non-ASCII filenames without quoting" {
+    echo "content" > "naïve.txt"
+    git add .
+    git commit -q -m "initial"
+    echo "modified" >> "naïve.txt"
+
+    run_e -m
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"naïve.txt"* ]]
+}
+
+@test "e -r -u: recent includes untracked files" {
+    echo "tracked" > tracked.txt
+    git add .
+    git commit -q -m "initial"
+    echo "untracked" > untracked.txt
+
+    run_e -r -u
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tracked.txt"* ]]
+    [[ "$output" == *"untracked.txt"* ]]
+}
+
+@test "e -: rejects combining stdin content with file arguments" {
+    cd "$TEST_REPO"
+    run bash -c "echo content | '$TEST_DIR/e' - somefile.txt"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Cannot combine"* ]]
+}
+
+@test "e -g: pattern starting with a dash works" {
+    echo "uses the -foo flag" > file1.txt
+    echo "other" > file2.txt
+    git add .
+    git commit -q -m "initial"
+
+    run_e -g "-foo"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    [[ "$output" != *"file2.txt"* ]]
+}
+
+@test "e -g: works from a subdirectory" {
+    mkdir -p sub
+    echo "TODO inner" > sub/inner.txt
+    echo "TODO outer" > outer.txt
+    git add .
+    git commit -q -m "initial"
+
+    cd sub
+    run "$TEST_DIR/e" -g TODO
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"inner.txt"* ]]
+    [[ "$output" == *"outer.txt"* ]]
+}

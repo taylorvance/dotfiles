@@ -116,8 +116,9 @@ check_git_repo() {
 	fi
 }
 
-# Convert git-relative paths to paths relative to current directory
-make_paths_relative() {
+# git outputs repo-root-relative paths; prefix the repo root so they're
+# absolute and resolvable from any working directory
+prefix_git_root() {
 	local git_files="$1"
 	if [ -z "$git_root" ] || [ "$git_root" = "$PWD" ]; then
 		# Already at git root or not in git repo
@@ -292,6 +293,15 @@ for arg in "${positional_args[@]}"; do
 	fi
 done
 
+if [ "$stdin_as_content" = true ]; then
+	if [ -n "$file_set" ] || [ -n "$grep_pattern" ] || [ -n "$name_pattern" ]; then
+		die "Cannot combine '-' (stdin as content) with file set or filter flags"
+	fi
+	if [ "${#positional_args[@]}" -gt 0 ]; then
+		die "Cannot combine '-' (stdin as content) with file arguments"
+	fi
+fi
+
 if [ ! -t 0 ]; then
 	if [ "$stdin_as_content" = true ]; then
 		# Pass stdin directly to editor as content (not filenames)
@@ -325,35 +335,42 @@ fi
 case "$file_set" in
 	modified)
 		check_git_repo
+		# Plumbing instead of porcelain parsing: porcelain status codes are
+		# positional and quote special filenames. --diff-filter=d excludes
+		# deleted files; staged + unstaged are unioned and deduped.
 		if [ "$include_untracked" = true ]; then
-			# Get modified and untracked, but exclude deleted files
-			# Use cut -c4- to handle filenames with spaces (skip status codes)
-			file_list=$(git status --porcelain | grep -v '^D\| D' | cut -c4-)
+			file_list=$({
+				git -c core.quotePath=false diff --name-only --diff-filter=d
+				git -c core.quotePath=false diff --cached --name-only --diff-filter=d
+				git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard --full-name
+			} | awk '!seen[$0]++')
 		else
-			# Get only modified files (not deleted)
-			file_list=$(git status --porcelain | grep '^ M\| M\|^M' | grep -v '^D\| D' | cut -c4-)
+			file_list=$({
+				git -c core.quotePath=false diff --name-only --diff-filter=d
+				git -c core.quotePath=false diff --cached --name-only --diff-filter=d
+			} | awk '!seen[$0]++')
 		fi
-		file_list=$(make_paths_relative "$file_list")
+		file_list=$(prefix_git_root "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No modified files found"
 		fi
 		;;
 	untracked)
 		check_git_repo
-		file_list=$(git ls-files --others --exclude-standard --full-name)
-		file_list=$(make_paths_relative "$file_list")
+		file_list=$(git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard --full-name)
+		file_list=$(prefix_git_root "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No untracked files found"
 		fi
 		;;
 	all)
 		check_git_repo
-		file_list=$(git ls-files --full-name)
+		file_list=$(git -C "$git_root" -c core.quotePath=false ls-files --full-name)
 		if [ "$include_untracked" = true ]; then
-			untracked=$(git ls-files --others --exclude-standard --full-name)
+			untracked=$(git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard --full-name)
 			file_list="$file_list"$'\n'"$untracked"
 		fi
-		file_list=$(make_paths_relative "$file_list")
+		file_list=$(prefix_git_root "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No files found"
 		fi
@@ -368,15 +385,20 @@ case "$file_set" in
 		fi
 
 		if [ "$is_git_repo" = true ]; then
-			# In git repo, only consider tracked files
+			# In git repo, consider tracked files (plus untracked with -u)
 			# Use stat to get mtime, sort by it, take top N
 			# Need to run stat from git root since git ls-files returns paths relative to root
-			file_list=$(cd "$git_root" && git ls-files | while IFS= read -r f; do
+			file_list=$(cd "$git_root" && {
+				git -C "$git_root" -c core.quotePath=false ls-files
+				if [ "$include_untracked" = true ]; then
+					git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard
+				fi
+			} | while IFS= read -r f; do
 				if [ -f "$f" ]; then
 					mtime=$($stat_cmd "$f" 2>/dev/null) && echo "$mtime $f"
 				fi
 			done | sort -rn | head -n "$recent_count" | cut -d' ' -f2-)
-			file_list=$(make_paths_relative "$file_list")
+			file_list=$(prefix_git_root "$file_list")
 		else
 			# Outside git repo, find all files and sort by mtime
 			if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -399,8 +421,8 @@ case "$file_set" in
 			diff_ref=$(get_default_branch)
 		fi
 		# Pass through to git diff directly
-		file_list=$(git diff --name-only $diff_ref 2>/dev/null || true)
-		file_list=$(make_paths_relative "$file_list")
+		file_list=$(git -c core.quotePath=false diff --name-only $diff_ref 2>/dev/null || true)
+		file_list=$(prefix_git_root "$file_list")
 		if [ -z "$file_list" ]; then
 			die "No files changed for: git diff --name-only $diff_ref"
 		fi
@@ -413,8 +435,8 @@ case "$file_set" in
 		elif [ -n "$grep_pattern" ] || [ -n "$name_pattern" ] || [ "$use_fzf" = true ]; then
 			# Have filters or interactive mode - default to all tracked files (or all files if not in git repo)
 			if [ "$is_git_repo" = true ]; then
-				file_list=$(git ls-files --full-name)
-				file_list=$(make_paths_relative "$file_list")
+				file_list=$(git -C "$git_root" -c core.quotePath=false ls-files --full-name)
+				file_list=$(prefix_git_root "$file_list")
 			else
 				# Outside git repo, find all files
 				file_list=$(find . -type f 2>/dev/null | sed 's|^\./||' || true)
@@ -430,9 +452,9 @@ esac
 # Step 2: Apply all filename filters (cheap - do this before expensive grep)
 # Both -n and positional arg are just filename pattern matching
 if [ -n "$file_list" ]; then
-	# Apply -n pattern if provided
+	# Apply -n pattern if provided (-e so patterns starting with "-" work)
 	if [ -n "$name_pattern" ]; then
-		file_list=$(echo "$file_list" | grep "$name_pattern" || true)
+		file_list=$(echo "$file_list" | grep -e "$name_pattern" || true)
 		if [ -z "$file_list" ]; then
 			die "No files matching name pattern '$name_pattern'"
 		fi
@@ -440,7 +462,7 @@ if [ -n "$file_list" ]; then
 
 	# Apply positional filter if provided (only when using flags, not for direct file opening)
 	if [ -n "$positional_filter" ] && { [ -n "$file_set" ] || [ -n "$grep_pattern" ] || [ -n "$name_pattern" ] || [ "$use_fzf" = true ]; }; then
-		file_list=$(echo "$file_list" | grep "$positional_filter" || true)
+		file_list=$(echo "$file_list" | grep -e "$positional_filter" || true)
 		if [ -z "$file_list" ]; then
 			die "No files matching filter '$positional_filter'"
 		fi
@@ -449,26 +471,21 @@ fi
 
 # Step 3: Apply content filter (expensive - do this last on the reduced file set)
 if [ -n "$grep_pattern" ] && [ -n "$file_list" ]; then
+	# One grep -l pass over the whole list instead of one process per file
 	if [ "$is_git_repo" = true ]; then
-		# Use git grep on the file list
-		filtered=""
+		# Run from the repo root with root-relative paths; pathspecs outside
+		# the working directory aren't handled the same by all git versions
+		rel_list=""
 		while IFS= read -r file; do
 			[ -z "$file" ] && continue
-			if git grep -q "$grep_pattern" -- "$file" 2>/dev/null; then
-				filtered="$filtered$file"$'\n'
-			fi
+			rel_list="$rel_list${file#"$git_root"/}"$'\n'
 		done <<< "$file_list"
-		file_list="$filtered"
+		file_list=$(printf '%s' "$rel_list" | tr '\n' '\0' \
+			| xargs -0 git -C "$git_root" -c core.quotePath=false grep -l -e "$grep_pattern" -- 2>/dev/null || true)
+		file_list=$(prefix_git_root "$file_list")
 	else
-		# Use regular grep
-		filtered=""
-		while IFS= read -r file; do
-			[ -z "$file" ] && continue
-			if [ -f "$file" ] && grep -q "$grep_pattern" "$file" 2>/dev/null; then
-				filtered="$filtered$file"$'\n'
-			fi
-		done <<< "$file_list"
-		file_list="$filtered"
+		file_list=$(printf '%s\n' "$file_list" | tr '\n' '\0' \
+			| xargs -0 grep -l -e "$grep_pattern" -- 2>/dev/null || true)
 	fi
 
 	if [ -z "$file_list" ]; then
@@ -532,9 +549,24 @@ build_editor_args() {
 	printf '%s\0' "${args[@]}"
 }
 
+# Launch the editor directly (not via xargs, which would hand it an exhausted
+# pipe as stdin). When our own stdin was consumed by piped input, reattach the
+# terminal so interactive editors still work.
+launch_editor() {
+	if [ ! -t 0 ] && [ -t 1 ]; then
+		# $editor intentionally unquoted: $EDITOR may contain flags
+		exec $editor "$@" < /dev/tty
+	fi
+	exec $editor "$@"
+}
+
 if [ -n "$file_list" ]; then
-	# Build args with +line handling, then pass to editor
-	echo "$file_list" | build_editor_args | xargs -0 $editor
+	# Build args with +line handling, then collect them into an array
+	editor_args=()
+	while IFS= read -r -d '' arg; do
+		editor_args+=("$arg")
+	done < <(printf '%s\n' "$file_list" | build_editor_args)
+	launch_editor "${editor_args[@]}"
 else
-	exec $editor
+	launch_editor
 fi
