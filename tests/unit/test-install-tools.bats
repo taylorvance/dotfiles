@@ -1,219 +1,185 @@
 #!/usr/bin/env bats
 
 # Unit tests for install-tools.sh
-# Note: These tests focus on logic and flow, not actual package installation
+# Runs the real script against mock package managers on an isolated PATH/HOME.
 
 setup() {
-    # Create temporary test directory
     export TEST_DIR=$(mktemp -d)
     export TEST_SCRIPT="$TEST_DIR/install-tools.sh"
-
-    # Copy the actual install-tools.sh
     cp "$BATS_TEST_DIRNAME/../../src/install-tools.sh" "$TEST_SCRIPT"
 
-    # Create mock package manager scripts
+    # Mocks take precedence over real binaries
     export MOCK_BIN="$TEST_DIR/bin"
     mkdir -p "$MOCK_BIN"
-
-    # Prepend mock bin to PATH
     export PATH="$MOCK_BIN:$PATH"
+
+    # Isolate HOME so antigen/bat-theme detection doesn't see real files
+    export HOME="$TEST_DIR/home"
+    mkdir -p "$HOME"
+
+    # Keep tests offline: downloads fail fast and deterministically
+    create_mock failure curl
+    create_mock failure wget
 }
 
 teardown() {
     rm -rf "$TEST_DIR"
 }
 
-# Helper: Create mock command that always succeeds
-create_mock_success() {
-    local cmd=$1
-    cat > "$MOCK_BIN/$cmd" << 'EOF'
-#!/bin/bash
-exit 0
-EOF
+# create_mock {success|failure} NAME
+create_mock() {
+    local result=$1
+    local cmd=$2
+    if [ "$result" = "success" ]; then
+        printf '#!/bin/bash\nexit 0\n' > "$MOCK_BIN/$cmd"
+    else
+        printf '#!/bin/bash\nexit 1\n' > "$MOCK_BIN/$cmd"
+    fi
     chmod +x "$MOCK_BIN/$cmd"
 }
 
-# Helper: Create mock command that always fails
-create_mock_failure() {
-    local cmd=$1
-    cat > "$MOCK_BIN/$cmd" << 'EOF'
-#!/bin/bash
-exit 1
-EOF
-    chmod +x "$MOCK_BIN/$cmd"
-}
-
-# Helper: Create mock command that checks if it's called with specific args
-create_mock_check_args() {
-    local cmd=$1
-    local log_file="$TEST_DIR/${cmd}_calls.log"
-    cat > "$MOCK_BIN/$cmd" << EOF
-#!/bin/bash
-echo "\$@" >> "$log_file"
-exit 0
-EOF
-    chmod +x "$MOCK_BIN/$cmd"
+# Mock brew that fails only for the given package names
+create_brew_failing_for() {
+    {
+        printf '#!/bin/bash\n'
+        printf 'case "$2" in\n'
+        local pkg
+        for pkg in "$@"; do
+            printf '    %s) exit 1 ;;\n' "$pkg"
+        done
+        printf '    *) exit 0 ;;\nesac\n'
+    } > "$MOCK_BIN/brew"
+    chmod +x "$MOCK_BIN/brew"
 }
 
 # ============================================================================
-# OS DETECTION TESTS
+# PACKAGE MANAGER DETECTION
 # ============================================================================
 
-@test "install-tools: detects macOS via OSTYPE" {
-    skip "Requires modifying script to expose OS detection function"
-    # Would need to refactor script to make this testable
+@test "install-tools: prefers brew when available" {
+    create_mock success brew
+    run bash "$TEST_SCRIPT" -y
+    [[ "$output" =~ "Package manager: brew" ]]
 }
 
-@test "install-tools: detects Linux via /etc/os-release" {
-    skip "Requires modifying script to expose OS detection function"
-    # Would need to refactor script to make this testable
-}
-
-# ============================================================================
-# PACKAGE MANAGER DETECTION TESTS
-# ============================================================================
-
-@test "install-tools: prefers brew on macOS" {
-    # Setup
-    create_mock_success brew
-    export OSTYPE="darwin20"
-
-    # This is hard to test without refactoring the script
-    skip "Requires script refactoring for better testability"
+@test "install-tools: errors helpfully with no package manager" {
+    if command -v brew >/dev/null 2>&1 || command -v apt-get >/dev/null 2>&1 \
+        || command -v dnf >/dev/null 2>&1 || command -v pacman >/dev/null 2>&1; then
+        skip "host has a real package manager (run inside the test container)"
+    fi
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "No package manager found" ]]
 }
 
 # ============================================================================
-# TOOL INSTALLATION LOGIC TESTS
+# FAILURE HANDLING (set -e must not eat the summary)
 # ============================================================================
 
-@test "install-tools: handles already installed tools" {
-    # Setup: Create mock for tool check
-    create_mock_success nvim
-
-    # Check if nvim is detected as installed
-    run command -v nvim
+@test "install-tools: successful run prints summary and exits 0" {
+    create_mock success brew
+    run bash "$TEST_SCRIPT" -y
     [ "$status" -eq 0 ]
+    [[ "$output" =~ "Installation Summary" ]]
+    [[ "$output" =~ "Installation complete" ]]
 }
 
-@test "install-tools: detects missing tools" {
-    # Remove tool from PATH
-    run command -v nonexistent_tool_12345
-    [ "$status" -ne 0 ]
+@test "install-tools: core tool failure still reaches summary and exits 1" {
+    # unzip is not preinstalled in the test container, so it must go
+    # through the (failing) mock package manager
+    create_mock failure brew
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Critical tools failed" ]]
+    [[ "$output" =~ "unzip" ]]
+    [[ "$output" =~ "Installation Summary" ]]
+}
+
+@test "install-tools: optional tool failure is not critical" {
+    create_brew_failing_for fzf
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "fzf (not available in repos)" ]]
+    [[ "$output" =~ "aren't critical" ]]
+}
+
+@test "install-tools: failed optional language tools do not abort setup" {
+    create_brew_failing_for ollama dotnet php
+    run bash -c "printf 'y\ny\ny\n' | bash '$TEST_SCRIPT'"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Optional tools not available" ]]
+    [[ ! "$output" =~ "Critical tools failed" ]]
+    [[ "$output" =~ "Installation complete" ]]
 }
 
 # ============================================================================
-# INTERACTIVE PROMPT TESTS
+# INTERACTIVE PROMPTS
 # ============================================================================
 
-@test "install-tools: handles non-interactive mode" {
-    skip "Would need to test with redirected stdin"
+@test "install-tools: declining a prompt skips the tool" {
+    create_mock success brew
+    run bash -c "printf 'n\nn\nn\n' | bash '$TEST_SCRIPT'"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "ollama (skipped)" ]]
+}
+
+@test "install-tools: EOF at a prompt declines instead of crashing" {
+    create_mock success brew
+    run bash -c "bash '$TEST_SCRIPT' < /dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Installation complete" ]]
+}
+
+@test "install-tools: -y skips language tool prompts entirely" {
+    create_mock success brew
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Skipping optional language tools" ]]
 }
 
 # ============================================================================
-# EXIT CODE TESTS
+# TOOL DETECTION
 # ============================================================================
 
-@test "install-tools: exits 0 when all tools present or installed" {
-    skip "Integration test - needs real package manager"
+@test "install-tools: reports preinstalled tools as already present" {
+    create_mock success brew
+    create_mock success git
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "git (already installed)" ]]
 }
 
-@test "install-tools: exits 1 when required tool installation fails" {
-    skip "Integration test - needs real package manager"
+@test "install-tools: antigen detected via antigen.zsh file, not a command" {
+    create_mock success brew
+    mkdir -p "$HOME/.zsh"
+    echo "# antigen" > "$HOME/.zsh/antigen.zsh"
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "antigen (already installed)" ]]
+}
+
+@test "install-tools: antigen download failure is non-critical" {
+    create_brew_failing_for antigen
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "antigen (download failed)" ]]
 }
 
 # ============================================================================
-# HELPER FUNCTION TESTS
+# BASICS
 # ============================================================================
 
-@test "color codes: are defined" {
-    # Just verify the script sources without errors
+@test "install-tools: has valid bash syntax" {
     run bash -n "$TEST_SCRIPT"
     [ "$status" -eq 0 ]
 }
 
-@test "script: has valid bash syntax" {
-    run bash -n "$TEST_SCRIPT"
-    [ "$status" -eq 0 ]
-}
-
-@test "script: is executable" {
+@test "install-tools: is executable" {
     [ -x "$BATS_TEST_DIRNAME/../../src/install-tools.sh" ]
 }
 
-# ============================================================================
-# MOCK PACKAGE MANAGER TESTS
-# ============================================================================
-
-@test "mock apt: can install packages" {
-    # Create mock apt
-    create_mock_check_args apt-get
-
-    # Run mock apt
-    run apt-get install -y nvim
-    [ "$status" -eq 0 ]
-
-    # Check it was called correctly
-    log_file="$TEST_DIR/apt-get_calls.log"
-    [ -f "$log_file" ]
-    grep -q "install -y nvim" "$log_file"
-}
-
-@test "mock brew: can install packages" {
-    # Create mock brew
-    create_mock_check_args brew
-
-    # Run mock brew
-    run brew install nvim
-    [ "$status" -eq 0 ]
-
-    # Check it was called correctly
-    log_file="$TEST_DIR/brew_calls.log"
-    [ -f "$log_file" ]
-    grep -q "install nvim" "$log_file"
-}
-
-# ============================================================================
-# TOOL ARRAY TRACKING TESTS
-# ============================================================================
-
-@test "arrays: can track installed tools" {
-    # Test bash array functionality
-    run bash -c 'installed=(); installed+=("nvim"); installed+=("git"); echo ${#installed[@]}'
-    [ "$status" -eq 0 ]
-    [ "$output" = "2" ]
-}
-
-@test "arrays: can track failed tools" {
-    # Test bash array functionality
-    run bash -c 'failed=(); failed+=("tool1"); [ ${#failed[@]} -gt 0 ] && exit 1 || exit 0'
+@test "install-tools: rejects unknown options" {
+    run bash "$TEST_SCRIPT" --bogus
     [ "$status" -eq 1 ]
-}
-
-# ============================================================================
-# SUMMARY OUTPUT TESTS
-# ============================================================================
-
-@test "summary: can format tool lists" {
-    # Test the kind of string manipulation used in summary
-    run bash -c 'tools=("nvim" "git" "tmux"); printf "%s, " "${tools[@]}" | sed "s/, $//"'
-    [ "$status" -eq 0 ]
-    [ "$output" = "nvim, git, tmux" ]
-}
-
-# ============================================================================
-# SPECIAL CASE TESTS
-# ============================================================================
-
-@test "special case: curl or wget check logic" {
-    # Test the logic for "at least one of curl/wget"
-    run bash -c 'command -v curl >/dev/null || command -v wget >/dev/null'
-    # Should succeed if either curl or wget exists (both usually present)
-    [ "$status" -eq 0 ]
-}
-
-@test "special case: gcc or make on macOS" {
-    # Test skip logic for gcc/make on macOS
-    run bash -c '[[ "$OSTYPE" == darwin* ]] && echo "skip" || echo "check"'
-    # Output depends on actual OS
-    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Usage" ]]
 }

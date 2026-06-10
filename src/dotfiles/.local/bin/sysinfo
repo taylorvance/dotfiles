@@ -50,17 +50,17 @@ get_cpu() {
 	esac
 }
 
-# Get RAM in GB
+# Get RAM in GB (awk instead of bc: bc isn't installed everywhere)
 get_ram() {
 	local platform="$1"
 	case "$platform" in
 		macos)
 			local bytes=$(sysctl -n hw.memsize 2>/dev/null || echo "0")
-			echo "$(echo "scale=0; $bytes / 1024 / 1024 / 1024" | bc) GB"
+			awk -v b="$bytes" 'BEGIN { printf "%d GB\n", b / 1073741824 }'
 			;;
 		linux|wsl)
 			local kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
-			echo "$(echo "scale=0; $kb / 1024 / 1024" | bc) GB"
+			awk -v kb="$kb" 'BEGIN { printf "%d GB\n", kb / 1048576 }'
 			;;
 		*)
 			echo "Unknown"

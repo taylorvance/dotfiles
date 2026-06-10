@@ -54,6 +54,137 @@ command_exists() {
 	command -v "$1" >/dev/null 2>&1
 }
 
+# Download a URL to a file with curl or wget; fails if the result is empty
+download_file() {
+	local url=$1
+	local dest=$2
+	if command_exists curl; then
+		curl -fsSL --max-time 10 -o "$dest" "$url" >/dev/null 2>&1 || return 1
+	elif command_exists wget; then
+		wget -q -T 10 -O "$dest" "$url" >/dev/null 2>&1 || return 1
+	else
+		return 1
+	fi
+	[ -s "$dest" ]
+}
+
+# Run the package manager to install one package; returns its success
+pkg_install() {
+	local pkg_name=$1
+	case $PKG_MGR in
+		brew)
+			brew install "$pkg_name" >/dev/null 2>&1
+			;;
+		apt)
+			sudo apt-get install -y "$pkg_name" >/dev/null 2>&1
+			;;
+		dnf)
+			sudo dnf install -y "$pkg_name" >/dev/null 2>&1
+			;;
+		pacman)
+			sudo pacman -S --noconfirm "$pkg_name" >/dev/null 2>&1
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+# Install a tool and record the outcome: install_tool TOOL [PKG] [critical|optional]
+# Always returns 0 (set -e safe); failures are tallied and reported in the summary.
+install_tool() {
+	local tool=$1
+	local pkg_name=${2:-$tool}
+	local criticality=${3:-critical}
+
+	if command_exists "$tool"; then
+		print_status "$YELLOW" "$PRESENT" "$tool (already installed)"
+		present_tools+=("$tool")
+		return 0
+	fi
+
+	print_status "$BLUE" "..." "Installing $tool..."
+
+	if pkg_install "$pkg_name"; then
+		print_status "$GREEN" "$INSTALLED" "$tool"
+		installed_tools+=("$tool")
+	elif [ "$criticality" = "critical" ]; then
+		print_status "$RED" "$FAILED" "$tool (installation failed)"
+		failed_tools+=("$tool")
+	else
+		print_status "$YELLOW" "$SKIPPED" "$tool (not available in repos)"
+		failed_optional_tools+=("$tool")
+	fi
+	return 0
+}
+
+# Install optional tool (non-critical, won't fail the run)
+install_optional_tool() {
+	install_tool "$1" "${2:-$1}" optional
+}
+
+# Install optional tool, prompting first (unless -y)
+install_optional() {
+	local tool=$1
+	local pkg_name=${2:-$tool}
+
+	if command_exists "$tool"; then
+		print_status "$YELLOW" "$PRESENT" "$tool (already installed)"
+		present_tools+=("$tool")
+		return 0
+	fi
+
+	if [ "$AUTO_YES" != true ]; then
+		echo -ne "${YELLOW}Install ${tool}? (y/N): ${NC}"
+		local response=""
+		read -r response || true
+		if [[ ! "$response" =~ ^[Yy]$ ]]; then
+			print_status "$YELLOW" "$SKIPPED" "$tool (skipped)"
+			skipped_tools+=("$tool")
+			return 0
+		fi
+	fi
+
+	install_tool "$tool" "$pkg_name" optional
+}
+
+# antigen is a zsh script sourced by .zshrc, not a command; detect it by the
+# paths .zshrc actually checks, and fall back to downloading it there.
+install_antigen() {
+	local brew_prefix=""
+	if command_exists brew; then
+		brew_prefix=$(brew --prefix 2>/dev/null) || brew_prefix=""
+	fi
+
+	if { [ -n "$brew_prefix" ] && [ -f "$brew_prefix/share/antigen/antigen.zsh" ]; } \
+		|| [ -f "$HOME/.zsh/antigen.zsh" ]; then
+		print_status "$YELLOW" "$PRESENT" "antigen (already installed)"
+		present_tools+=("antigen")
+		return 0
+	fi
+
+	print_status "$BLUE" "..." "Installing antigen..."
+
+	if [ "$PKG_MGR" = "brew" ] && pkg_install antigen; then
+		print_status "$GREEN" "$INSTALLED" "antigen"
+		installed_tools+=("antigen")
+		return 0
+	fi
+
+	# No brew package: download antigen.zsh where .zshrc looks for it
+	local antigen_file="$HOME/.zsh/antigen.zsh"
+	local antigen_url="https://raw.githubusercontent.com/zsh-users/antigen/master/bin/antigen.zsh"
+	if mkdir -p "$HOME/.zsh" 2>/dev/null && download_file "$antigen_url" "$antigen_file"; then
+		print_status "$GREEN" "$INSTALLED" "antigen (~/.zsh/antigen.zsh)"
+		installed_tools+=("antigen")
+	else
+		rm -f "$antigen_file"
+		print_status "$YELLOW" "$SKIPPED" "antigen (download failed)"
+		failed_optional_tools+=("antigen")
+	fi
+	return 0
+}
+
 # Install bat theme used by ~/.config/bat/config.
 install_bat_theme() {
 	if ! command_exists bat; then
@@ -74,22 +205,27 @@ install_bat_theme() {
 		return 0
 	fi
 
-	if command_exists curl; then
-		if curl -fsSL --max-time 10 -o "$theme_file" "$theme_url" >/dev/null 2>&1; then
-			bat cache --build >/dev/null 2>&1 || true
-			print_status "$GREEN" "$INSTALLED" "bat theme: tokyonight_moon"
-			return 0
-		fi
-	elif command_exists wget; then
-		if wget -q -T 10 -O "$theme_file" "$theme_url" >/dev/null 2>&1; then
-			bat cache --build >/dev/null 2>&1 || true
-			print_status "$GREEN" "$INSTALLED" "bat theme: tokyonight_moon"
-			return 0
-		fi
+	if download_file "$theme_url" "$theme_file"; then
+		bat cache --build >/dev/null 2>&1 || true
+		print_status "$GREEN" "$INSTALLED" "bat theme: tokyonight_moon"
+	else
+		rm -f "$theme_file"
+		print_status "$YELLOW" "$SKIPPED" "bat theme: tokyonight_moon (download failed)"
 	fi
+	return 0
+}
 
-	rm -f "$theme_file"
-	print_status "$YELLOW" "$SKIPPED" "bat theme: tokyonight_moon (download failed)"
+# The nvim config uses 0.11+ APIs (vim.lsp.config, treesitter main branch)
+warn_old_nvim() {
+	command_exists nvim || return 0
+	local version major minor
+	version=$(nvim --version 2>/dev/null | head -1 | sed 's/^NVIM v//')
+	major="${version%%.*}"
+	minor="${version#*.}"
+	minor="${minor%%.*}"
+	if [ "$major" -eq 0 ] 2>/dev/null && [ "$minor" -lt 11 ] 2>/dev/null; then
+		print_status "$YELLOW" "$SKIPPED" "nvim $version is older than 0.11; the nvim config needs 0.11+ (upgrade via your package manager or https://github.com/neovim/neovim/releases)"
+	fi
 	return 0
 }
 
@@ -109,7 +245,7 @@ detect_os() {
 detect_package_manager() {
 	if command_exists brew; then
 		echo "brew"
-	elif command_exists apt; then
+	elif command_exists apt-get; then
 		echo "apt"
 	elif command_exists dnf; then
 		echo "dnf"
@@ -118,168 +254,6 @@ detect_package_manager() {
 	else
 		echo "none"
 	fi
-}
-
-# Install tool with appropriate package manager
-install_tool() {
-	local tool=$1
-	local pkg_name=${2:-$tool}  # Use tool name if package name not specified
-
-	if command_exists "$tool"; then
-		print_status "$YELLOW" "$PRESENT" "$tool (already installed)"
-		present_tools+=("$tool")
-		return 0
-	fi
-
-	print_status "$BLUE" "..." "Installing $tool..."
-
-	case $PKG_MGR in
-		brew)
-			if brew install "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		apt)
-			if sudo apt install -y "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		dnf)
-			if sudo dnf install -y "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		pacman)
-			if sudo pacman -S --noconfirm "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-	esac
-
-	print_status "$RED" "$FAILED" "$tool (installation failed)"
-	failed_tools+=("$tool")
-	return 1
-}
-
-# Install optional tool (non-critical, won't fail build)
-install_optional_tool() {
-	local tool=$1
-	local pkg_name=${2:-$tool}  # Use tool name if package name not specified
-
-	if command_exists "$tool"; then
-		print_status "$YELLOW" "$PRESENT" "$tool (already installed)"
-		present_tools+=("$tool")
-		return 0
-	fi
-
-	print_status "$BLUE" "..." "Installing $tool..."
-
-	case $PKG_MGR in
-		brew)
-			if brew install "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		apt)
-			if sudo apt install -y "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		dnf)
-			if sudo dnf install -y "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		pacman)
-			if sudo pacman -S --noconfirm "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-	esac
-
-	print_status "$YELLOW" "$SKIPPED" "$tool (not available in repos)"
-	failed_optional_tools+=("$tool")
-	return 0
-}
-
-# Install optional tool (prompt before installing)
-install_optional() {
-	local tool=$1
-	local pkg_name=${2:-$tool}
-
-	if command_exists "$tool"; then
-		print_status "$YELLOW" "$PRESENT" "$tool (already installed)"
-		present_tools+=("$tool")
-		return 0
-	fi
-
-	# Auto-yes if flag is set
-	if [ "$AUTO_YES" = true ]; then
-		# Just continue to installation
-		:
-	else
-		# Prompt user
-		echo -ne "${YELLOW}Install ${tool}? (y/N): ${NC}"
-		read -r response
-		if [[ ! "$response" =~ ^[Yy]$ ]]; then
-			print_status "$YELLOW" "$SKIPPED" "$tool (skipped)"
-			skipped_tools+=("$tool")
-			return 0
-		fi
-	fi
-
-	print_status "$BLUE" "..." "Installing $tool..."
-
-	case $PKG_MGR in
-		brew)
-			if brew install "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		apt)
-			if sudo apt install -y "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		dnf)
-			if sudo dnf install -y "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-		pacman)
-			if sudo pacman -S --noconfirm "$pkg_name" >/dev/null 2>&1; then
-				print_status "$GREEN" "$INSTALLED" "$tool"
-				installed_tools+=("$tool")
-				return 0
-			fi
-			;;
-	esac
-
-	print_status "$RED" "$FAILED" "$tool (installation failed)"
-	failed_tools+=("$tool")
-	return 0
 }
 
 # Main installation
@@ -311,6 +285,12 @@ main() {
 		exit 1
 	fi
 
+	# Fresh systems often have stale/empty package lists
+	if [[ "$PKG_MGR" == "apt" ]]; then
+		print_status "$BLUE" "..." "Updating apt package lists..."
+		sudo apt-get update >/dev/null 2>&1 || true
+	fi
+
 	echo -e "${BLUE}Installing core tools...${NC}"
 
 	# Core tools
@@ -338,7 +318,7 @@ main() {
 
 	install_tool unzip
 
-	# Download tools
+	# Download tools (either curl or wget is fine)
 	if ! command_exists curl && ! command_exists wget; then
 		install_tool curl
 	else
@@ -352,13 +332,15 @@ main() {
 		fi
 	fi
 
+	warn_old_nvim
+
 	echo ""
 	echo -e "${BLUE}Installing modern CLI tools...${NC}"
 	echo "(These enhance the shell experience but aren't critical)"
 	echo ""
 
 	# Shell plugin manager
-	install_optional_tool antigen
+	install_antigen
 
 	# Modern CLI replacements (all have fallbacks in .zshrc)
 	install_optional_tool fzf
@@ -377,13 +359,7 @@ main() {
 
 	# Development dependencies
 	if [[ "$OS" == "macos" ]]; then
-		# Node via brew
-		if ! command_exists node; then
-			install_tool node
-		else
-			print_status "$YELLOW" "$PRESENT" "node (already installed)"
-			present_tools+=("node")
-		fi
+		install_tool node
 	else
 		# On Linux, recommend nvm for node
 		if ! command_exists node; then
@@ -396,12 +372,7 @@ main() {
 	fi
 
 	# Python (usually pre-installed on Linux)
-	if ! command_exists python3; then
-		install_tool python3 python3
-	else
-		print_status "$YELLOW" "$PRESENT" "python3 (already installed)"
-		present_tools+=("python3")
-	fi
+	install_tool python3
 
 	# Only prompt for language-specific tools in interactive mode
 	if [ "$AUTO_YES" = false ]; then

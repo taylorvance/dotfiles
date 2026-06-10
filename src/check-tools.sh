@@ -19,12 +19,12 @@ check_tool() {
 	local category=$2
 
 	if command_exists "$tool"; then
-		printf "  ${GREEN}✓${NC} ${tool}\n"
+		printf "  ${GREEN}✓${NC} %s\n" "$tool"
 	else
 		if [ "$category" = "required" ]; then
-			printf "  ${RED}✗${NC} ${tool}\n"
+			printf "  ${RED}✗${NC} %s\n" "$tool"
 		else
-			printf "  ${YELLOW}⚠${NC} ${tool}\n"
+			printf "  ${YELLOW}⚠${NC} %s\n" "$tool"
 		fi
 	fi
 }
@@ -37,8 +37,14 @@ check_tool nvim "required"
 check_tool git "required"
 check_tool tmux "required"
 check_tool zsh "required"
-check_tool curl "required"
 check_tool unzip "required"
+
+# Either curl or wget satisfies the download-tool requirement
+if command_exists curl || command_exists wget; then
+	printf "  ${GREEN}✓${NC} %s\n" "curl/wget"
+else
+	printf "  ${RED}✗${NC} %s\n" "curl/wget"
+fi
 
 if [[ "$OSTYPE" != "darwin"* ]]; then
 	check_tool gcc "required"
