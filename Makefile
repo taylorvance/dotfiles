@@ -35,6 +35,11 @@ status: ## Show installation status of tools and dotfiles
 doctor: ## Validate repo config, scripts, and dotfile wiring without touching HOME
 	@src/doctor.sh
 
+.PHONY: shellcheck
+shellcheck: ## Lint all shell scripts with shellcheck
+	@shellcheck src/*.sh tests/test-runner.sh .githooks/* src/dotfiles/.local/bin/*
+	@echo "✓ shellcheck passed"
+
 .PHONY: install
 install: ## Install required CLI tools (via pkg mgr)
 	@src/install-tools.sh
@@ -48,7 +53,7 @@ unlink: ## Remove all dotfile symlinks
 .PHONY: adopt
 adopt: ## Adopt an existing HOME path into src/dotfiles (use F=.path)
 	@test -n "$(F)" || (echo "Usage: make adopt F=.config/tool/config.toml"; exit 1)
-	@src/adopt.sh $(F)
+	@src/adopt.sh "$(F)"
 
 .PHONY: restore
 restore: ## Restore files from a backup directory

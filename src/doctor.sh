@@ -183,44 +183,49 @@ check_executable_bits() {
 	for file in "$BASEDIR"/src/*.sh "$SOURCEDIR"/.local/bin/* "$BASEDIR"/tests/test-runner.sh "$BASEDIR"/.githooks/*; do
 		[ -f "$file" ] || continue
 		if [ -x "$file" ]; then
-			ok "${file#$BASEDIR/}"
+			ok "${file#"$BASEDIR"/}"
 		else
-			error "script is not executable: ${file#$BASEDIR/}"
+			error "script is not executable: ${file#"$BASEDIR"/}"
 		fi
 	done
+}
+
+check_one_syntax() {
+	local checker="$1" file="$2"
+	if "$checker" -n "$file" 2>/dev/null; then
+		ok "$checker -n ${file#"$BASEDIR"/}"
+	else
+		error "$checker syntax check failed: ${file#"$BASEDIR"/}"
+	fi
 }
 
 check_shell_syntax() {
 	printf "\n${BLUE}Shell syntax${NC}\n"
 
-	local file
+	local file shebang
 
-	for file in "$BASEDIR"/src/*.sh "$SOURCEDIR"/.local/bin/clean "$SOURCEDIR"/.local/bin/e "$SOURCEDIR"/.local/bin/git-prune-branches "$SOURCEDIR"/.local/bin/git-prune-worktrees "$SOURCEDIR"/.local/bin/proj "$SOURCEDIR"/.local/bin/tmp "$BASEDIR"/tests/test-runner.sh "$BASEDIR"/.githooks/*; do
+	for file in "$BASEDIR"/src/*.sh "$BASEDIR"/tests/test-runner.sh "$BASEDIR"/.githooks/*; do
 		[ -f "$file" ] || continue
-		if bash -n "$file" 2>/dev/null; then
-			ok "bash -n ${file#$BASEDIR/}"
-		else
-			error "bash syntax check failed: ${file#$BASEDIR/}"
-		fi
+		check_one_syntax bash "$file"
 	done
 
-	file="$SOURCEDIR/.local/bin/sysinfo"
-	if [ -f "$file" ]; then
-		if sh -n "$file" 2>/dev/null; then
-			ok "sh -n ${file#$BASEDIR/}"
-		else
-			error "sh syntax check failed: ${file#$BASEDIR/}"
-		fi
-	fi
+	# Extensionless bin scripts: pick the checker from the shebang so new
+	# scripts are covered automatically
+	for file in "$SOURCEDIR"/.local/bin/*; do
+		[ -f "$file" ] || continue
+		shebang=$(head -n1 "$file")
+		case "$shebang" in
+			'#!'*bash*)           check_one_syntax bash "$file" ;;
+			'#!'*zsh*)            : ;; # handled with the zsh section below
+			'#!'*/sh*|'#!'*' sh'*) check_one_syntax sh "$file" ;;
+			*)          warn "no recognizable shebang, syntax not checked: ${file#"$BASEDIR"/}" ;;
+		esac
+	done
 
 	if command -v zsh >/dev/null 2>&1; then
 		for file in "$SOURCEDIR"/.zshrc "$SOURCEDIR"/.zsh/functions.zsh; do
 			[ -f "$file" ] || continue
-			if zsh -n "$file" 2>/dev/null; then
-				ok "zsh -n ${file#$BASEDIR/}"
-			else
-				error "zsh syntax check failed: ${file#$BASEDIR/}"
-			fi
+			check_one_syntax zsh "$file"
 		done
 	else
 		info "zsh not installed; skipped zsh syntax checks"

@@ -1,8 +1,8 @@
 # Fast, minimal Alpine Linux base for testing
-# Final image size: ~200MB with all tools
-FROM alpine:3.19
+FROM alpine:3.22
 
-# Install base system tools needed for testing
+# Base tools for the test harness, plus the tools whose configs the
+# integration tests exercise (zsh, tmux, neovim >= 0.11)
 RUN apk add --no-cache \
     bash \
     coreutils \
@@ -15,7 +15,18 @@ RUN apk add --no-cache \
     sed \
     tar \
     gzip \
+    zsh \
+    tmux \
+    neovim \
     && rm -rf /var/cache/apk/*
+
+# Bake BATS into the image so test runs don't download it every time
+# (version should match BATS_VERSION in tests/test-runner.sh)
+ARG BATS_VERSION=1.11.0
+RUN curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" \
+        | tar -xz -C /tmp \
+    && "/tmp/bats-core-${BATS_VERSION}/install.sh" /usr/local \
+    && rm -rf "/tmp/bats-core-${BATS_VERSION}"
 
 # Create test user (non-root to match real usage)
 RUN adduser -D -s /bin/bash testuser

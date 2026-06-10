@@ -50,8 +50,9 @@ install_bats() {
 
     echo -e "${BLUE}→${NC} Installing BATS ${BATS_VERSION}..."
 
-    local tmpdir=$(mktemp -d)
-    local tarball="$tmpdir/bats.tar.gz"
+    local tmpdir tarball
+    tmpdir=$(mktemp -d)
+    tarball="$tmpdir/bats.tar.gz"
 
     # Download tarball with retries
     local max_attempts=3
@@ -100,7 +101,6 @@ install_bats() {
 
 run_docker_tests() {
     local mode=$1
-    local dockerfile=${2:-Dockerfile.alpine}
 
     echo -e "${CYAN}═══════════════════════════════════════${NC}"
     echo -e "${CYAN}  Dotfiles Test Suite (Docker)${NC}"
@@ -109,7 +109,7 @@ run_docker_tests() {
 
     # Build Docker image
     echo -e "${BLUE}→${NC} Building test container..."
-    docker build -f "$PROJECT_ROOT/tests/docker/$dockerfile" -t dotfiles-test:latest "$PROJECT_ROOT" -q
+    docker build -f "$PROJECT_ROOT/tests/docker/Dockerfile.alpine" -t dotfiles-test:latest "$PROJECT_ROOT" -q
 
     if [ "$mode" = "shell" ]; then
         echo -e "${BLUE}→${NC} Starting interactive shell..."
@@ -155,11 +155,13 @@ run_tests() {
 
     cd "$PROJECT_ROOT"
 
+    # `|| exit_code=$?` so set -e doesn't abort before the result banner
+    local exit_code=0
     case $mode in
         all)
             echo -e "${YELLOW}Running all tests...${NC}"
             echo ""
-            bats tests/unit/*.bats tests/integration/*.bats
+            bats tests/unit/*.bats tests/integration/*.bats || exit_code=$?
             ;;
         *.bats)
             if [ ! -f "$mode" ]; then
@@ -168,15 +170,13 @@ run_tests() {
             fi
             echo -e "${YELLOW}Running: $mode${NC}"
             echo ""
-            bats "$mode"
+            bats "$mode" || exit_code=$?
             ;;
         *)
             echo -e "${RED}✗${NC} Unknown mode: $mode"
             usage
             ;;
     esac
-
-    local exit_code=$?
 
     echo ""
     if [ $exit_code -eq 0 ]; then

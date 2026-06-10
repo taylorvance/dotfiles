@@ -134,15 +134,22 @@ teardown() {
 @test "tmux: .tmux.conf has valid syntax" {
     skip_if_not_installed tmux
 
+    # Pre-create the TPM dir so the auto-install doesn't clone from the network
+    mkdir -p "$TEST_HOME/.tmux/plugins/tpm"
+
     # Tmux can validate config
     run tmux -f "$TEST_HOME/.tmux.conf" source-file "$TEST_HOME/.tmux.conf"
 
-    # Exit code 0 means valid (may have warnings about missing plugins)
-    [ "$status" -eq 0 ] || [[ "$output" =~ "unknown" ]]
+    # Missing-plugin errors are fine; genuine config errors say "unknown command"
+    [[ ! "$output" =~ "unknown command" ]]
+    [[ ! "$output" =~ "syntax error" ]]
 }
 
 @test "tmux: can start with config" {
     skip_if_not_installed tmux
+
+    # Pre-create the TPM dir so the auto-install doesn't clone from the network
+    mkdir -p "$TEST_HOME/.tmux/plugins/tpm"
 
     # Try to start tmux with config (immediately exit)
     run tmux -f "$TEST_HOME/.tmux.conf" new-session -d "echo test"
@@ -428,8 +435,8 @@ teardown() {
     run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f tmp"
     [ "$status" -eq 0 ]
 
-    # Check if proj function exists
-    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f proj"
+    # proj is a script, not a function; confirm it's reachable via PATH
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; command -v proj"
     [ "$status" -eq 0 ]
 }
 

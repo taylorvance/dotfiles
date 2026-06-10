@@ -137,9 +137,9 @@ run_proj() {
 }
 
 @test "proj: errors when tmux not installed" {
-    export PATH="/usr/bin:/bin"
-
-    run run_proj someproject
+    # Empty PATH so the guard trips even on systems with tmux installed
+    mkdir -p "$TEST_DIR/empty-bin"
+    run env PATH="$TEST_DIR/empty-bin" "$TEST_DIR/proj" someproject
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"tmux is not installed"* ]]

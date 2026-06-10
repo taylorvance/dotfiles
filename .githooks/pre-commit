@@ -1,20 +1,43 @@
 #!/usr/bin/env bash
 # Syntax-check modified shell files before committing.
+# Extensionless scripts (e.g. .local/bin/*) are matched by shebang.
 
 failed=0
 
+checker_for() {
+    local file="$1"
+    case "$file" in
+        *.zsh|*.zshrc) echo zsh; return ;;
+        *.sh|*.bash)   echo bash; return ;;
+    esac
+    local shebang
+    shebang=$(head -n1 "$file" 2>/dev/null)
+    case "$shebang" in
+        '#!'*bash*)            echo bash ;;
+        '#!'*zsh*)             echo zsh ;;
+        '#!'*/sh*|'#!'*' sh'*) echo sh ;;
+        *)                     echo none ;;
+    esac
+}
+
 while IFS= read -r file; do
     [[ -f "$file" ]] || continue
-    case "$file" in
-        *.zsh|*.zshrc)
-            if ! zsh -n "$file" 2>&1; then
+    case "$(checker_for "$file")" in
+        zsh)
+            if command -v zsh >/dev/null 2>&1 && ! zsh -n "$file" 2>&1; then
                 echo "zsh syntax error: $file"
                 failed=1
             fi
             ;;
-        *.sh|*.bash)
+        bash)
             if ! bash -n "$file" 2>&1; then
                 echo "bash syntax error: $file"
+                failed=1
+            fi
+            ;;
+        sh)
+            if ! sh -n "$file" 2>&1; then
+                echo "sh syntax error: $file"
                 failed=1
             fi
             ;;

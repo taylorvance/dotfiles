@@ -3,8 +3,21 @@ name: Tests
 on:
   push:
     branches: [master]
+  pull_request:
 
 jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make doctor
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make shellcheck
+
   test:
     runs-on: ubuntu-latest
     steps:
