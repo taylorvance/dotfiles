@@ -234,6 +234,7 @@ detect_os() {
 	if [[ "$OSTYPE" == "darwin"* ]]; then
 		echo "macos"
 	elif [[ -f /etc/os-release ]]; then
+		# shellcheck disable=SC1091
 		. /etc/os-release
 		echo "$ID"
 	else

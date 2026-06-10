@@ -137,9 +137,11 @@ append_keys() {
     local keys=("$@")
     [[ ${#keys[@]} -eq 0 ]] && return
     [[ ! -f "$actual_file" ]] && touch "$actual_file"
-    local key
+    # Decide on the separator blank line before opening the file for append
+    local key needs_blank=false
+    [[ -s "$actual_file" ]] && needs_blank=true
     {
-        [[ -s "$actual_file" ]] && printf '\n'
+        [[ "$needs_blank" == true ]] && printf '\n'
         printf '# envsync added (%s)\n' "$(date +%Y-%m-%d)"
         for key in "${keys[@]}"; do
             sample_block "$key" "$sample_file"
@@ -183,7 +185,7 @@ group_tokens() {
         found=false
         for g in "${!group_idxs[@]}"; do
             if [[ "${group_idxs[$g]}" == "$pidx" ]]; then
-                group_keys[$g]+=" $key"
+                group_keys[g]+=" $key"
                 found=true
                 break
             fi

@@ -78,7 +78,7 @@ if [ "$DELETE" = true ]; then
   # Handle "all"
   if [[ "$choice" =~ ^(a|all)$ ]]; then
     echo "Deleting all workspaces..." >&2
-    rm -rf "$TMP_BASE"/*
+    rm -rf "${TMP_BASE:?}"/*
     echo "All workspaces deleted" >&2
     exit 0
   fi
@@ -88,7 +88,7 @@ if [ "$DELETE" = true ]; then
   for num in $choice; do
     if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "${#dirs[@]}" ]; then
       dir_to_delete="${dirs[$((num-1))]}"
-      rm -rf "$TMP_BASE/$dir_to_delete"
+      rm -rf "${TMP_BASE:?}/$dir_to_delete"
       echo "Deleted: $dir_to_delete" >&2
       ((deleted_count++))
     else
@@ -107,6 +107,7 @@ fi
 # cd to most recent temp directory
 if [ "$RECENT" = true ]; then
   if [ -d "$TMP_BASE" ]; then
+    # shellcheck disable=SC2012  # workspace names are self-generated timestamps
     LATEST_DIR=$(ls -t "$TMP_BASE" | head -n 1)
     if [ -n "$LATEST_DIR" ]; then
       echo "cd \"$TMP_BASE/$LATEST_DIR\""

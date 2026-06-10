@@ -109,9 +109,9 @@ add_branch() {
     local name="$1" tag="$2" flag="$3"
     local idx
     if idx=$(find_branch "$name"); then
-        TAGS[$idx]="${TAGS[$idx]}, $tag"
+        TAGS[idx]="${TAGS[$idx]}, $tag"
         # Escalate to -D if needed
-        [[ "$flag" == "D" ]] && FLAGS[$idx]="D"
+        [[ "$flag" == "D" ]] && FLAGS[idx]="D"
     else
         BRANCHES+=("$name")
         TAGS+=("$tag")

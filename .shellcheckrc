@@ -1,0 +1,4 @@
+# Color escape variables (\033 sequences) are intentionally interpolated into
+# printf format strings so printf interprets them; data arguments always go
+# through %s. Disabling the "variables in printf format" warning repo-wide.
+disable=SC2059

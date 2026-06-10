@@ -1,5 +1,6 @@
 #!/bin/sh
 # System information utility - quick hardware specs at a glance
+# shellcheck disable=SC3043  # `local` is supported by every sh we target (dash/ash/bash)
 
 set -e
 
@@ -35,13 +36,16 @@ get_cpu() {
 	local platform="$1"
 	case "$platform" in
 		macos)
-			local brand=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Unknown")
-			local cores=$(sysctl -n hw.ncpu 2>/dev/null || echo "?")
+			# local and assignment split: `local x=$(...)` word-splits in dash/ash
+			local brand cores
+			brand=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Unknown")
+			cores=$(sysctl -n hw.ncpu 2>/dev/null || echo "?")
 			echo "$brand ($cores cores)"
 			;;
 		linux|wsl)
-			local model=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[[:space:]]*//' || echo "Unknown")
-			local cores=$(grep -c "^processor" /proc/cpuinfo 2>/dev/null || echo "?")
+			local model cores
+			model=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^[[:space:]]*//' || echo "Unknown")
+			cores=$(grep -c "^processor" /proc/cpuinfo 2>/dev/null || echo "?")
 			echo "$model ($cores cores)"
 			;;
 		*)
@@ -55,11 +59,13 @@ get_ram() {
 	local platform="$1"
 	case "$platform" in
 		macos)
-			local bytes=$(sysctl -n hw.memsize 2>/dev/null || echo "0")
+			local bytes
+			bytes=$(sysctl -n hw.memsize 2>/dev/null || echo "0")
 			awk -v b="$bytes" 'BEGIN { printf "%d GB\n", b / 1073741824 }'
 			;;
 		linux|wsl)
-			local kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
+			local kb
+			kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
 			awk -v kb="$kb" 'BEGIN { printf "%d GB\n", kb / 1048576 }'
 			;;
 		*)
@@ -73,9 +79,10 @@ get_gpu() {
 	local platform="$1"
 	case "$platform" in
 		macos)
-			local chip=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "Chipset Model:" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//')
-			local vram=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "VRAM" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//')
-			local metal=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -o "Metal.*" | head -1)
+			local chip vram metal
+			chip=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "Chipset Model:" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//')
+			vram=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "VRAM" | head -1 | cut -d: -f2 | sed 's/^[[:space:]]*//')
+			metal=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -o "Metal.*" | head -1)
 			if [ -n "$chip" ]; then
 				local result="$chip"
 				[ -n "$vram" ] && result="$result ($vram)"
@@ -104,9 +111,10 @@ get_storage() {
 	local path="/"
 	# macOS APFS: user data lives on /System/Volumes/Data
 	[ "$platform" = "macos" ] && [ -d "/System/Volumes/Data" ] && path="/System/Volumes/Data"
-	local used=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $3}')
-	local total=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $2}')
-	local pct=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $5}')
+	local used total pct
+	used=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $3}')
+	total=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $2}')
+	pct=$(df -h "$path" 2>/dev/null | tail -1 | awk '{print $5}')
 	if [ -n "$used" ] && [ -n "$total" ]; then
 		echo "${used}B / ${total}B ($pct)"
 	else
@@ -142,12 +150,14 @@ get_os() {
 	local platform="$1"
 	case "$platform" in
 		macos)
-			local ver=$(sw_vers -productVersion 2>/dev/null || echo "Unknown")
-			local build=$(sw_vers -buildVersion 2>/dev/null)
+			local ver build
+			ver=$(sw_vers -productVersion 2>/dev/null || echo "Unknown")
+			build=$(sw_vers -buildVersion 2>/dev/null)
 			[ -n "$build" ] && echo "macOS $ver ($build)" || echo "macOS $ver"
 			;;
 		linux)
 			if [ -f /etc/os-release ]; then
+				# shellcheck disable=SC1091
 				. /etc/os-release
 				echo "${PRETTY_NAME:-Linux}"
 			else
@@ -156,6 +166,7 @@ get_os() {
 			;;
 		wsl)
 			if [ -f /etc/os-release ]; then
+				# shellcheck disable=SC1091
 				. /etc/os-release
 				echo "${PRETTY_NAME:-Linux} (WSL)"
 			else
@@ -188,11 +199,13 @@ get_local_ip() {
 	local platform="$1"
 	case "$platform" in
 		macos)
-			local ip=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+			local ip
+			ip=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
 			echo "${ip:-No active connection}"
 			;;
 		linux|wsl)
-			local ip=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
+			local ip
+			ip=$(ip route get 1 2>/dev/null | awk '{print $7; exit}')
 			if [ -z "$ip" ]; then
 				ip=$(hostname -I 2>/dev/null | awk '{print $1}')
 			fi
@@ -226,7 +239,8 @@ main() {
 		esac
 	done
 
-	local platform=$(detect_platform)
+	local platform
+	platform=$(detect_platform)
 
 	echo ""
 	printf "%-12s %s\n" "CPU:" "$(get_cpu "$platform")"
