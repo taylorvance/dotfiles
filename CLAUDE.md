@@ -9,6 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make test` - Full suite in Docker
 - `make test F=tests/unit/test-foo.bats` - Single file in Docker
 
+**Don't duplicate documentation.** Each script in `src/dotfiles/.local/bin/`
+documents itself via `-h`; keep that help text (and the README) current
+instead of restating flags here.
+
 ## Repository Overview
 
 This is a personal dotfiles repository using a custom symlink-based management system. Files in `src/dotfiles/` are symlinked to `~/` via a Makefile that calls the `src/symlink-manager.sh` helper script, based on paths listed in `config`.
@@ -17,31 +21,26 @@ The repository includes a comprehensive Docker-based test suite to safely verify
 
 ## Key Commands
 
-### Fresh Machine Setup
-
 ```bash
-make setup
-```
-
-- **Complete bootstrap**: Installs all required tools + creates symlinks
-- Detects OS (macOS/Linux) and package manager (brew/apt/dnf/pacman)
-- Installs required tools and attempts recommended optional tools: nvim, git, tmux, zsh, curl/wget, unzip, fzf, bat, zoxide, eza, fd, ripgrep, delta, atuin, starship, node, python3
-- Creates symlinks from `src/dotfiles/` to `~/` for files listed in `config`
-- Idempotent: safe to run multiple times
-- Backs up conflicting files to `.backups/YYYY-MM-DD_HH-MM-SS_PID/`
-
-### Individual Operations
-
-```bash
+make setup         # Complete bootstrap: install tools + symlinks + git hooks
 make install       # Only install CLI tools (no symlinks)
 make link          # Only create symlinks (no tool installation)
 make unlink        # Remove all symlinks
-make status        # Check installation status of all dotfiles
+make status        # Check installation status of tools and dotfiles
 make doctor        # Validate repo/config/script wiring without touching HOME
+make shellcheck    # Lint all shell scripts
 make adopt F=.path # Adopt an existing HOME path into src/dotfiles
 make restore       # Interactively restore from backups
 make help          # Show all available targets with descriptions
 ```
+
+`make setup` detects the OS/package manager (brew/apt/dnf/pacman), installs
+required and recommended tools, creates symlinks, and installs git hooks.
+It is idempotent; conflicting files are backed up to
+`.backups/YYYY-MM-DD_HH-MM-SS_PID/`.
+
+`symlink-manager.sh` accepts `-n`/`--dry-run` for install, uninstall, and
+restore previews.
 
 ### Testing (All Tests Run in Docker)
 
@@ -50,6 +49,7 @@ make test                                        # Run all tests in Docker
 make test F=tests/unit/test-clean-script.bats    # Run single test file in Docker
 make test-shell                                  # Drop into test container for debugging
 make test-clean                                  # Remove test Docker images and containers
+make dev-shell                                   # Ubuntu box with dotfiles pre-installed
 ```
 
 ### Adding New Dotfiles
@@ -59,59 +59,105 @@ make test-clean                                  # Remove test Docker images and
 3. Run `make link` to create the symlink
 4. Run `make doctor` and `make test` to verify it works correctly
 
+Or adopt an existing file: `make adopt F=.config/tool/config.toml` then `make link`.
+
 ## Architecture
 
 ### Core Structure
 
-- **`Makefile`**: Standard API with targets: `setup`, `link`, `unlink`, `status`, `restore`, `test`, `help`
-- **`src/install-tools.sh`**: Tool installation script supporting macOS (Homebrew) and Linux (apt/dnf/pacman)
-- **`src/check-tools.sh`**: Verification script that checks installation status of all tools
-- **`src/doctor.sh`**: Static repo/config validator that does not touch `$HOME`
+- **`Makefile`**: Command interface (`setup`, `link`, `status`, `doctor`, `test`, ...)
+- **`src/install-tools.sh`**: Tool installation (macOS/Linux); failures are
+  collected and summarized — optional-tool failures must never abort setup
+- **`src/check-tools.sh`**: Tool status report (`make status`)
+- **`src/doctor.sh`**: Static repo/config validator; discovers scripts by
+  glob + shebang, so new scripts are covered automatically
 - **`src/adopt.sh`**: Copies existing `$HOME` files into `src/dotfiles/` and appends `config`
-- **`src/symlink-manager.sh`**: Helper script that handles symlink operations (install, uninstall, status, restore)
-- **`src/dotfiles/`**: Source directory containing all dotfiles, organized exactly as they should appear under `~/`
-- **`config`**: Text file listing paths to symlink (relative to `src/dotfiles/` and `~/`)
-- **`.backups/`**: Auto-generated backup directory for conflicting files
-- **`tests/`**: Comprehensive test suite with Docker infrastructure
+- **`src/symlink-manager.sh`**: Symlink operations (install/uninstall/status/restore)
+- **`src/dotfiles/`**: The actual dotfiles, organized exactly as they appear under `~/`
+- **`config`**: Paths to symlink (relative to both `src/dotfiles/` and `~/`)
+- **`archive/`**: Retired configs kept for reference; not linked, not validated
+- **`.githooks/`**: pre-commit (syntax-checks changed shell files, shebang-aware)
+  and pre-push (runs `make test`)
+- **`.github/workflows/test.yml`**: CI — doctor + shellcheck + Docker suite,
+  on master pushes and PRs
+- **`tests/`**: BATS test suite + Docker infrastructure (see `tests/README.md`)
 
 ### Tool Dependencies
 
-- **Core**: nvim, git, tmux, zsh, curl/wget, gcc/make, unzip
+- **Core**: nvim (>= 0.11 for the nvim config), git, tmux, zsh, curl/wget, gcc/make, unzip
 - **Recommended/optional CLI**: fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship
-- **Development**: node/npm, python3
-- **Optional**: ollama (AI completions), dotnet (C#), php (PHP)
+- **Development**: node/npm, python3; **Optional**: ollama, dotnet, php
 - **Note**: All tools have graceful fallbacks in `.zshrc` if not installed
 
-### Test Suite Architecture
+### Custom Scripts (`src/dotfiles/.local/bin/`)
 
-**`tests/docker/`** - Docker infrastructure for isolated testing
+Run any of these with `-h` for full usage — the help text is the source of truth.
 
-- **`Dockerfile.alpine`**: Fast, minimal Alpine Linux base
-- **`Dockerfile.ubuntu`**: Ubuntu base for broader compatibility testing
+- **`e`** — git-aware editor wrapper; composable file sets (`-m/-u/-a/-d/-r`)
+  AND content (`-g`)/name (`-n`) filters, `file:line` support, piped input,
+  `-` for stdin-as-content, fzf via `-i`
+- **`envsync`** — find sample env files, report/copy missing variables
+  (`-d` also diffs values)
+- **`clean`** — remove dependency/cache dirs with a size report
+- **`tmp`** — timestamped scratch workspaces (cd handled by the `tmp()`
+  wrapper in `.zsh/functions.zsh`)
+- **`proj`** — tmux session manager (picker/attach/create/kill)
+- **`git-prune-branches`** — delete merged/gone/squash-merged branches;
+  auto-discovered as `git prune-branches`; skips branches checked out in worktrees
+- **`git-prune-worktrees`** — remove worktrees synced with upstream; flags
+  `+N ignored` files that forced removal would delete
+- **`sysinfo`** — hardware/OS summary (POSIX sh; everything else is bash)
 
-**`tests/unit/`** - Unit tests for individual components
+Conventions shared by the interactive scripts: `-n` dry-run; `y/N/i` prompts
+(apply all / abort / fzf multi-select); EOF at a prompt aborts safely;
+bash 3.2 compatible (parallel arrays, no associative arrays).
 
-- **`test-symlink-manager.bats`**: Tests symlink creation, conflict handling, backups, status checking
-- **`test-install-tools.bats`**: Tests tool installation logic and error handling
-- **`test-git-prune-worktrees.bats`**: Tests worktree state detection and removal
+### Configuration Files
 
-**`tests/integration/`** - End-to-end integration tests
+- **`.zshrc`** — antigen + oh-my-zsh when present, with explicit fallbacks
+  (history settings, arrow-key search widgets) so a bare zsh still behaves;
+  vi mode with `jk`/`kj` escape; starship prompt (`.config/starship.toml`);
+  lazy-loaded nvm; modern CLI tools guarded by `command -v`. Local overrides:
+  `~/.zshrc.local`
+- **`.zsh/functions.zsh`** — `tmp` wrapper, `mkcd`, `extract`, `backup`,
+  `fcd`, `lt`, `lsrepos`, `gw`, `raw`
+- **nvim** (`.config/nvim/`) — lazy.nvim, requires nvim 0.11+; plugin
+  versions pinned via tracked `lazy-lock.json`; see `.config/nvim/README.md`
+- **`.gitconfig`** — aliases (see the file; `db` resolves the remote default
+  branch and powers `smp`/`fmom`/`from`); delta pager; `user.useConfigOnly`
+  with email set per-repo or in `~/.gitconfig.local`
+- **`.tmux.conf`** — `C-Space` prefix, vi copy mode, TPM plugins
+  (resurrect/continuum/yank); full cheat sheet in the file header
 
-- **`test-fresh-setup.bats`**: Fresh system installation scenarios
-- **`test-idempotency.bats`**: Verify safe re-running of operations
-- **`test-conflicts.bats`**: Conflict detection, backup creation, and restore functionality
-- **`test-configs.bats`**: Verification that nvim, tmux, zsh, git configs work correctly
+## Development Notes
 
-**`tests/test-runner.sh`** - Test orchestration script
+### When Modifying Scripts
 
-- Builds Docker container with dotfiles
-- Installs BATS testing framework automatically
-- Runs selected test suites
-- Provides interactive shell for debugging
+- Source scripts are in `src/`; custom scripts in `src/dotfiles/.local/bin/`
+  are symlinked into `~/.local/bin/`, so changes affect the live environment
+  immediately
+- Update the script's `-h` help text (and README/CLAUDE.md if behavior
+  categories change) in the same commit
+- **IMPORTANT**: Always run `make doctor` and `make shellcheck` after
+  modifying scripts/config. Run `make test` for the full Docker suite when
+  Docker is available.
 
-### Unit Test Conventions
+### Working with Config
 
-Tests run in Docker, but each test still isolates itself with temp directories for clean setup/teardown:
+- The `config` file can specify individual files or entire directories
+- Directory entries create a single symlink to the directory (not recursive individual symlinks)
+- Individual file symlinks allow keeping untracked files in the same directory
+
+### Testing Workflow
+
+1. **Make changes**: Edit files in `src/` or `src/dotfiles/`
+2. **Test**: `make doctor` + `make shellcheck` locally, then `make test`
+   (all) or `make test F=tests/unit/test-foo.bats` (single file) when Docker
+   is available
+3. **Debug issues**: Use `make test-shell` to explore the test environment
+   interactively
+
+Unit tests isolate themselves with temp directories:
 
 ```bash
 setup() {
@@ -126,209 +172,3 @@ teardown() {
 ```
 
 Follow this pattern when adding new tests. See existing tests in `tests/unit/` for examples.
-
-### Custom Scripts (`src/dotfiles/.local/bin/`)
-
-**`clean`** - Remove build dependencies and cache directories
-
-Reclaim disk space by removing common dependency folders across projects:
-
-- **Basic usage**: `clean` - scan current directory's immediate subdirs
-- **Recursive**: `clean -r` - search all nested directories
-- **Dry run**: `clean -n` - show what would be deleted, no prompt
-- **Custom path**: `clean ~/projects` - specify directory to scan
-- **Prompt options**: `y` (delete all), `N` (abort), `i` (interactive fzf selection)
-- **Targets**: `node_modules`, `__pycache__`, `.venv`, `venv`, `.pytest_cache`, `*.egg-info`
-- **Features**:
-  - Shows size of each directory, sorted largest first
-  - Displays total reclaimable space
-  - Interactive mode uses fzf for multi-select (TAB to select)
-
-**`envsync`** - Compare env files against sample/example counterparts
-
-Recursively find sample env files and report missing or differing variables:
-
-- **Basic usage**: `envsync` - scan current directory for missing vars
-- **Custom path**: `envsync ~/project` - specify directory to scan
-- **Dry run**: `envsync -n` - show findings without prompting
-- **Diff mode**: `envsync -d` - also show variables where values differ (noisy; most will be intentional)
-- **Prompt options**: `y` (apply all), `N` (skip, default), `i` (interactive fzf selection)
-- **Sample patterns recognized**: `.env.sample`, `.env.example`, `.env.template`, `.env.dist`, `*.env.sample`, `*.env.example`, `example.env`, `sample.env`
-- **Skips**: `.git`, `node_modules`, `.venv`, `venv`, `vendor`, `.next`
-- **Copy missing**: appends new vars to actual file with `# envsync added (DATE)` marker; includes preceding comment block from sample for context
-- **Overwrite different** (`-d` mode): backs up actual file to `.envsync-bak` before overwriting values; preserves symlinks
-
-**`tmp`** - Quick temporary workspace creator
-
-Create timestamped temporary directories for scratch work:
-
-- **Basic usage**: `tmp` - create new temp dir and cd to it
-- **Edit mode**: `tmp -e` - create temp dir, cd, and open `scratch.txt` in editor
-- **Custom file**: `tmp -e test.py` - specify filename for syntax highlighting
-- **List/select**: `tmp -l` - interactive picker of existing temp dirs
-- **Recent**: `tmp -r` - cd to most recent temp directory
-- **Delete**: `tmp -d` - interactively delete temp workspaces
-- **Features**:
-  - Timestamped directories: `/tmp/tmp-workspaces/YYYYMMDD-HHMMSS/`
-  - Shell wrapper function handles cd and editor invocation
-  - Perfect for quick experiments, scratch files, or temporary work
-
-**`git-prune-branches`** - Remove local git branches that are no longer needed
-
-Auto-discovered by git as `git prune-branches` (no alias needed):
-
-- **Basic usage**: `git prune-branches` - find and delete stale branches
-- **Dry run**: `git prune-branches -n` - show branches without prompting
-- **Squash detection**: `git prune-branches -a` - also detect squash-merged branches (slower)
-- **Prompt options**: `y` (delete all), `N` (abort, default), `i` (interactive fzf selection)
-- **Branch states detected**:
-  - `[merged]` — merged into default branch (safe `-d` delete)
-  - `[gone]` — remote tracking branch was deleted (force `-D` delete)
-  - `[merged, gone]` — both merged and remote deleted (most common after PR workflow)
-  - `[squash-merged]` — changes integrated via squash/rebase, detected by `git cherry` (with `-a`)
-- **Features**:
-  - Auto-detects default branch (origin/HEAD, main, master)
-  - Groups branches by state
-  - Skips current and default branches
-  - Bash 3.2 compatible (no associative arrays)
-
-**`git-prune-worktrees`** - Remove worktrees that are fully synced with upstream
-
-Auto-discovered by git as `git prune-worktrees` (no alias needed):
-
-- **Basic usage**: `git prune-worktrees` - find and remove synced worktrees
-- **Dry run**: `git prune-worktrees -n` - show worktrees without prompting
-- **Prompt options**: `y` (remove all safe), `N` (abort, default), `i` (interactive fzf selection)
-- **Safety model**: A worktree is safe to remove only if:
-  - Branch has an upstream tracking branch
-  - Branch is in sync with upstream (0 ahead, 0 behind)
-  - Working tree is clean (no uncommitted changes)
-- **Worktree states**:
-  - `[synced]` — clean and in sync with upstream (safe to remove)
-  - `[dirty]` — uncommitted changes (skipped)
-  - `[ahead]` — unpushed commits (skipped)
-  - `[behind]` — behind upstream (skipped)
-  - `[diverged]` — ahead and behind upstream (skipped)
-  - `[unpublished]` — no upstream tracking branch (skipped)
-- **Features**:
-  - Only removes worktrees, not branches (use `git prune-branches` for branch cleanup)
-  - Skips main worktree automatically
-  - Separate "Safe to remove" and "Skipped (unsafe)" sections
-  - Bash 3.2 compatible (no associative arrays)
-
-**`proj`** - tmux session manager
-
-Manage tmux sessions with create/attach/kill operations:
-
-- **Interactive picker**: `proj` - fzf picker of existing sessions → attach
-- **Attach**: `proj NAME` - attach by name; fzf on multiple matches; prompt to create if none found
-- **Create**: `proj -c [NAME]` - create session from cwd (name defaults to `basename $PWD`)
-- **Kill**: `proj -k [NAME]` - kill named session, current session if in tmux, or fzf picker if not
-- Works inside or outside tmux (switch-client or attach intelligently)
-
-**`e`** - Git-aware editor wrapper with composable filters
-
-Uses a **composable filter model** where all filters AND together:
-
-- **File sets**: `-m` (modified), `-u` (untracked), `-a` (all tracked), `-d [ARG]` (diff), `-r [N]` (recent)
-- **Content filter**: `-g PATTERN` (files containing pattern)
-- **Name filter**: `-n PATTERN` (filename matches regex)
-- **Positional filters**: Additional filename substring filters
-- **Interactive**: `-i` (fzf selection)
-
-**Composition examples:**
-
-- `e -m -g TODO`: Modified files containing "TODO"
-- `e -u -n test`: Untracked files with "test" in name
-- `e -g TODO test`: Files containing "TODO" with "test" in filename
-- `e -m -g TODO -n .py`: Modified Python files containing "TODO"
-- `e -a component`: All tracked files with "component" in filename
-- `e -mui`: Modified+untracked files, interactive selection
-
-**Basic usage:**
-
-- `e file.txt`: Open or create file
-- `e file.txt:42`: Open at line 42 (works with vim/nvim/emacs/nano/gedit/micro)
-- `e docs/*.md`: Open multiple files via shell glob
-- `e -m`, `e -u`, `e -mu`: Modified/untracked files
-- `e -d`, `e -d dev`, `e -d branch1..branch2`: Diff (mirrors git diff)
-- `e -r`, `e -r 20`: Recent files (default 10)
-- `e -ai`: Browse all tracked files
-- Detects default branch automatically (main/master)
-- Falls back to regular `grep`/`find` outside git repos
-
-**Piped input & grep integration:**
-
-- `find . -name "*.py" | e`: Open found files
-- `git ls-files | e`: Open tracked files
-- `grep -rn "TODO" | fzf | e`: Select grep match, open at line number
-- `grep -rn "pattern" src/ | e`: Open all matches at their line numbers
-
-**Stdin as content (using `-`):**
-
-- `echo "hello" | e -`: Open stdin content in new buffer
-- `cat log.txt | e -`: View file content in editor
-- `curl url | e -`: Edit fetched content
-- `pbpaste | e -`: Edit clipboard content
-
-### Configuration Files
-
-**Shell (`.zshrc`)**
-
-- Uses Antigen plugin manager with oh-my-zsh
-- Vi mode enabled with `jk`/`kj` escape to normal mode
-- Starship prompt (config in `.config/starship.toml`) with a custom vi-mode character
-- Key bindings: ↑/↓ for history search, `^r` for atuin/history search
-- Modern CLI tools: `zoxide` (z), `eza` (ls/ll/la/lt), `fd` (f), `ripgrep` (rg), `atuin` (history)
-- Aliases: `r` (bat/less), `python` (python3), `f` (fd)
-- Functions: `mkcd`, `extract`, `backup`, `fcd` (fzf directory jump), `lt` (tree view), `gw` (git worktree cd)
-- Integrations: fzf (multi-select by default), nvm
-- Default editor: `nvim`
-- Graceful fallbacks if modern tools not installed
-
-**Neovim (`.config/nvim/`)**
-
-- Uses lazy.nvim plugin manager (bootstrapped via `lua/config/lazy.lua`)
-- Structure: `init.vim` → `lazy.lua` → `plugins/init.lua`
-- Plugins can be extended in separate `.lua` files in `plugins/`
-
-**Git (`.gitconfig`)**
-
-- Aliases: `st`, `di`, `ci`, `br`, `co`, `g` (enhanced grep), `lg` (graph log)
-- Default editor: `nvim`
-- Diff/merge tool: `nvimdiff`
-- Delta integration: syntax-highlighted diffs, side-by-side view, line numbers
-- Extended regex and line numbers enabled for `git grep`
-- Global `.gitignore` for common patterns (macOS, IDEs, temp files, etc.)
-
-**Tmux (`.tmux.conf`)**
-
-- Prefix: `C-Space` (instead of default `C-b`)
-- Vim-like navigation: `h/j/k/l` for panes, `H/J/K/L` for resizing
-- Smart splits: `|` and `-` open in current directory
-- Vi copy mode with system clipboard integration (macOS: pbcopy)
-- Status bar showing session, date/time
-- Mouse support enabled
-- Reload config: `prefix + r`
-
-## Development Notes
-
-### When Modifying Scripts
-
-- Source scripts are in `src/` directory
-- Custom scripts in `src/dotfiles/.local/bin/` are symlinked to `~/.local/bin/` (in PATH)
-- Changes to these scripts affect the live environment immediately
-- The `e` script is referenced in `.zshrc` comments as the sophisticated "edit" command
-- **IMPORTANT**: Always run `make doctor` after modifying scripts/config. Run `make test` for the full Docker suite when Docker is available.
-
-### Working with Config
-
-- The `config` file can specify individual files or entire directories
-- Directory entries create a single symlink to the directory (not recursive individual symlinks)
-- Individual file symlinks allow keeping untracked files in the same directory
-
-### Testing Workflow
-
-1. **Make changes**: Edit files in `src/` or `src/dotfiles/`
-2. **Test**: `make doctor` locally, then `make test` (all) or `make test F=tests/unit/test-foo.bats` (single file) when Docker is available
-3. **Debug issues**: Use `make test-shell` to explore the test environment interactively

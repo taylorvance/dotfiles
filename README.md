@@ -50,11 +50,12 @@ Run `make help` to see all available commands:
 **Setup & Management:**
 
 - `make setup` - Complete bootstrap: install tools + create symlinks
-- `make install` - Install required CLI tools (prompts to also install optional tools)
+- `make install` - Install required + recommended CLI tools (prompts before optional language tools)
 - `make link` - Create symlinks only (no tool installation)
 - `make unlink` - Remove all dotfile symlinks
 - `make status` - Show installation status of tools and dotfiles
 - `make doctor` - Validate repo wiring and script syntax without touching `$HOME`
+- `make shellcheck` - Lint all shell scripts (requires shellcheck)
 - `make adopt F=.path` - Copy an existing `$HOME` path into `src/dotfiles/`, add it to `config`, and preview linking
 - `make restore` - Restore files from a backup directory
 
@@ -110,9 +111,12 @@ Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where nee
 - **`proj`** - tmux session manager
 - **`tmp`** - Quick temporary workspace creator
 - **`clean`** - Remove common dependency/cache directories
+- **`envsync`** - Compare `.env` files against their sample counterparts
 - **`git-prune-branches`** - Remove stale local git branches
 - **`git-prune-worktrees`** - Remove synced git worktrees
 - **`sysinfo`** - Quick system information summary
+
+Each script documents itself — run it with `-h` for full usage.
 
 ### Configurations
 
@@ -138,14 +142,15 @@ dotfiles/
 │       ├── .tmux.conf
 │       └── .gitconfig
 ├── tests/                  # Comprehensive test suite
-│   ├── docker/             # Docker infrastructure (Alpine/Ubuntu)
+│   ├── docker/             # Docker infrastructure (Alpine test image, Ubuntu dev image)
 │   ├── unit/               # Unit tests
 │   ├── integration/        # Integration tests
 │   ├── test-runner.sh      # Test orchestration
 │   └── README.md           # Testing documentation
+├── archive/                # Retired configs kept for reference (not linked)
 ├── .backups/               # Auto-generated backups
 │   └── 2025-01-20_10-30-45_12345/
-│       └── .vimrc          # Your original files
+│       └── .zshrc          # Your original files
 ├── config                  # Paths to symlink
 ├── Makefile                # Command interface
 ├── CLAUDE.md               # AI assistant instructions
