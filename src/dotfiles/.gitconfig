@@ -24,11 +24,37 @@
 	fmom = "!b=$(git db) && git fetch && git merge \"origin/$b\""
 	from = "!b=$(git db) && git fetch && git rebase \"origin/$b\""
 
+[branch]
+	sort = -committerdate
+
+[commit]
+	verbose = true
+
+[push]
+	autoSetupRemote = true
+
+[fetch]
+	prune = true
+
+[pull]
+	ff = only
+
+[rebase]
+	autostash = true
+	autosquash = true
+
+[rerere]
+	# remember conflict resolutions; replay them when the same conflict reappears
+	enabled = true
+
 [diff]
 	tool = nvimdiff
 	colorMoved = default
+	algorithm = histogram
 [merge]
 	tool = nvimdiff
+	# include the common-ancestor version in conflict markers
+	conflictStyle = zdiff3
 [mergetool]
 	keepBackup = false
 
