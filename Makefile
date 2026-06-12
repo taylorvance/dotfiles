@@ -59,6 +59,10 @@ adopt: ## Adopt an existing HOME path into src/dotfiles (use F=.path)
 restore: ## Restore files from a backup directory
 	@src/symlink-manager.sh restore
 
+.PHONY: macos
+macos: ## Apply macOS system preferences (no-op on other platforms)
+	@src/macos.sh
+
 .PHONY: test test-shell test-clean
 test: ## Run tests in Docker (all, or F=path/to/test.bats for single file)
 	@tests/test-runner.sh $(if $(F),$(F),all)

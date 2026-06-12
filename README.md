@@ -58,6 +58,7 @@ Run `make help` to see all available commands:
 - `make shellcheck` - Lint all shell scripts (requires shellcheck)
 - `make adopt F=.path` - Copy an existing `$HOME` path into `src/dotfiles/`, add it to `config`, and preview linking
 - `make restore` - Restore files from a backup directory
+- `make macos` - Apply macOS system preferences (`defaults` deviations from stock; no-op elsewhere)
 
 **Testing (safe - runs in Docker, never touches your system):**
 

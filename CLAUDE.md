@@ -31,6 +31,7 @@ make doctor        # Validate repo/config/script wiring without touching HOME
 make shellcheck    # Lint all shell scripts
 make adopt F=.path # Adopt an existing HOME path into src/dotfiles
 make restore       # Interactively restore from backups
+make macos         # Apply macOS system preferences (no-op elsewhere)
 make help          # Show all available targets with descriptions
 ```
 
@@ -72,6 +73,7 @@ Or adopt an existing file: `make adopt F=.config/tool/config.toml` then `make li
 - **`src/doctor.sh`**: Static repo/config validator; discovers scripts by
   glob + shebang, so new scripts are covered automatically
 - **`src/adopt.sh`**: Copies existing `$HOME` files into `src/dotfiles/` and appends `config`
+- **`src/macos.sh`**: macOS `defaults` deviations from stock (`make macos`); exits as a no-op on other platforms
 - **`src/symlink-manager.sh`**: Symlink operations (install/uninstall/status/restore)
 - **`src/dotfiles/`**: The actual dotfiles, organized exactly as they appear under `~/`
 - **`config`**: Paths to symlink (relative to both `src/dotfiles/` and `~/`)
