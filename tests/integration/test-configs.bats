@@ -420,6 +420,37 @@ teardown() {
     [[ "$output" == *"no errors"* ]] || [ "$status" -eq 0 ]
 }
 
+@test "zsh: mise is activated when present" {
+    skip_if_not_installed zsh
+
+    # Mock mise: .zshrc should eval the output of `mise activate zsh`
+    mkdir -p "$TEST_DIR/mockbin"
+    cat > "$TEST_DIR/mockbin/mise" <<'EOF'
+#!/bin/sh
+if [ "$1" = "activate" ]; then
+    echo 'export MISE_TEST_ACTIVATED=yes'
+fi
+exit 0
+EOF
+    chmod +x "$TEST_DIR/mockbin/mise"
+
+    run zsh -c "export PATH=$TEST_DIR/mockbin:\$PATH; source $TEST_HOME/.zshrc 2>/dev/null; echo activated=\$MISE_TEST_ACTIVATED"
+    [[ "$output" =~ "activated=yes" ]]
+}
+
+@test "zsh: nvm fallback is sourced when mise is absent" {
+    skip_if_not_installed zsh
+    if command -v mise >/dev/null 2>&1; then
+        skip "mise installed on host (run inside the test container)"
+    fi
+
+    mkdir -p "$TEST_HOME/.nvm"
+    echo 'export NVM_TEST_SOURCED=yes' > "$TEST_HOME/.nvm/nvm.sh"
+
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; echo sourced=\$NVM_TEST_SOURCED"
+    [[ "$output" =~ "sourced=yes" ]]
+}
+
 @test "zsh: custom functions are defined" {
     skip_if_not_installed zsh
 

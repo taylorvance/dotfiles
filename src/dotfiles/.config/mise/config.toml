@@ -1,0 +1,5 @@
+# Global runtime versions managed by mise (https://mise.jdx.dev)
+# Per-project versions come from .nvmrc/.node-version/mise.toml in the project.
+# `mise use -g <tool>@<version>` edits this file (through the symlink).
+[tools]
+node = "24"

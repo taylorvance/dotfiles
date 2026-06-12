@@ -123,52 +123,19 @@ export VISUAL=nvim
 export FZF_DEFAULT_OPTS='--multi'
 
 
-# NVM - lazy load for fast startup
-# node/npm/npx work immediately via PATH; `nvm` command loads the full NVM on first use
-export NVM_DIR="$HOME/.nvm"
-
-# Add the default node version to PATH without loading NVM
-() {
-	local default_alias="$NVM_DIR/alias/default"
-	local version
-	local hops=0
-	# Resolve alias chain (e.g. "lts/*" -> "lts/iron" -> "v20.x.x");
-	# bounded so a cyclic alias can't hang shell startup
-	while [[ -f "$default_alias" && $hops -lt 5 ]]; do
-		version=$(cat "$default_alias")
-		default_alias="$NVM_DIR/alias/$version"
-		hops=$((hops + 1))
-	done
-	version="${default_alias##*/}"
-	if [[ -d "$NVM_DIR/versions/node/$version/bin" ]]; then
-		export PATH="$NVM_DIR/versions/node/$version/bin:$PATH"
-	elif [[ -d "$NVM_DIR/versions/node" ]]; then
-		# Fall back to the most recently installed version
-		version=$(ls -t "$NVM_DIR/versions/node" 2>/dev/null | head -1)
-		[[ -n "$version" ]] && export PATH="$NVM_DIR/versions/node/$version/bin:$PATH"
-	elif [[ -n $HOMEBREW_PREFIX && -f "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ]]; then
-		# Homebrew-managed NVM: load it since we can't find the version dir
-		source "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" 2>/dev/null
-	fi
-}
-
-# Load full NVM lazily on first `nvm` invocation
-nvm() {
-	unset -f nvm
-	[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
-	[[ -n $HOMEBREW_PREFIX && -s "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ]] && source "$HOMEBREW_PREFIX/opt/nvm/nvm.sh"
-	nvm "$@"
-}
-
-# Auto-switch node version when entering a directory with .nvmrc
-# Only switches if NVM is already loaded (avoids triggering full NVM load on every cd)
-autoload -U add-zsh-hook
-_nvm_auto_use() {
-	if [[ -f .nvmrc ]] && typeset -f nvm &>/dev/null && [[ $(type nvm 2>/dev/null) != *"unset -f nvm"* ]]; then
-		nvm use
-	fi
-}
-add-zsh-hook chpwd _nvm_auto_use
+# Runtime versions (node, ...) via mise — global defaults in
+# ~/.config/mise/config.toml; auto-switches per project from
+# .nvmrc/.node-version/mise.toml on cd
+if command -v mise >/dev/null 2>&1; then
+	eval "$(mise activate zsh)"
+elif [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+	# Fallback: plain nvm (slow to load; install mise for fast startup)
+	export NVM_DIR="$HOME/.nvm"
+	source "$NVM_DIR/nvm.sh"
+elif [[ -n $HOMEBREW_PREFIX && -s "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ]]; then
+	export NVM_DIR="$HOME/.nvm"
+	source "$HOMEBREW_PREFIX/opt/nvm/nvm.sh"
+fi
 
 # Initialize completion system (must be after all fpath modifications)
 autoload -Uz compinit && compinit -i

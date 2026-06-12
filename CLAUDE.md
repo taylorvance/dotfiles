@@ -85,8 +85,8 @@ Or adopt an existing file: `make adopt F=.config/tool/config.toml` then `make li
 ### Tool Dependencies
 
 - **Core**: nvim (>= 0.11 for the nvim config), git, tmux, zsh, curl/wget, gcc/make, unzip
-- **Recommended/optional CLI**: fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship
-- **Development**: node/npm, python3; **Optional**: ollama, dotnet, php
+- **Recommended/optional CLI**: fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship, mise
+- **Development**: node/npm (via mise; global versions in `.config/mise/config.toml`), python3; **Optional**: ollama, dotnet, php
 - **Note**: All tools have graceful fallbacks in `.zshrc` if not installed
 
 ### Custom Scripts (`src/dotfiles/.local/bin/`)
@@ -117,8 +117,8 @@ bash 3.2 compatible (parallel arrays, no associative arrays).
 - **`.zshrc`** — antigen + oh-my-zsh when present, with explicit fallbacks
   (history settings, arrow-key search widgets) so a bare zsh still behaves;
   vi mode with `jk`/`kj` escape; starship prompt (`.config/starship.toml`);
-  lazy-loaded nvm; modern CLI tools guarded by `command -v`. Local overrides:
-  `~/.zshrc.local`
+  runtimes via mise (nvm as fallback); modern CLI tools guarded by
+  `command -v`. Local overrides: `~/.zshrc.local`
 - **`.zsh/functions.zsh`** — `tmp` wrapper, `mkcd`, `extract`, `backup`,
   `fcd`, `lt`, `lsrepos`, `gw`, `raw`
 - **nvim** (`.config/nvim/`) — lazy.nvim, requires nvim 0.11+; plugin

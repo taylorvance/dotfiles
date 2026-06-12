@@ -166,6 +166,39 @@ create_brew_failing_for() {
 }
 
 # ============================================================================
+# MISE / NODE
+# ============================================================================
+
+@test "install-tools: mise install failure is non-critical" {
+    create_brew_failing_for mise
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "mise (install failed" ]]
+    [[ ! "$output" =~ "Critical tools failed" ]]
+}
+
+@test "install-tools: mise detected at ~/.local/bin/mise" {
+    create_mock success brew
+    mkdir -p "$HOME/.local/bin"
+    printf '#!/bin/bash\nexit 0\n' > "$HOME/.local/bin/mise"
+    chmod +x "$HOME/.local/bin/mise"
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "mise (already installed)" ]]
+}
+
+@test "install-tools: node defers to mise when mise is present" {
+    if command -v node >/dev/null 2>&1; then
+        skip "host has node installed (run inside the test container)"
+    fi
+    create_mock success brew
+    create_mock success mise
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "node (run 'mise install' after 'make link')" ]]
+}
+
+# ============================================================================
 # BASICS
 # ============================================================================
 

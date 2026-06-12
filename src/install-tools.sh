@@ -185,6 +185,38 @@ install_antigen() {
 	return 0
 }
 
+# mise manages runtime versions (node, ...); .zshrc activates it when present
+# and falls back to nvm without it. Not in every distro's repos, so fall back
+# to the official installer, which drops a single binary in ~/.local/bin.
+install_mise() {
+	if command_exists mise || [ -x "$HOME/.local/bin/mise" ]; then
+		print_status "$YELLOW" "$PRESENT" "mise (already installed)"
+		present_tools+=("mise")
+		return 0
+	fi
+
+	print_status "$BLUE" "..." "Installing mise..."
+
+	if pkg_install mise; then
+		print_status "$GREEN" "$INSTALLED" "mise"
+		installed_tools+=("mise")
+		return 0
+	fi
+
+	local installer
+	installer=$(mktemp)
+	if download_file "https://mise.run" "$installer" \
+		&& MISE_INSTALL_PATH="$HOME/.local/bin/mise" sh "$installer" >/dev/null 2>&1; then
+		print_status "$GREEN" "$INSTALLED" "mise (~/.local/bin/mise)"
+		installed_tools+=("mise")
+	else
+		print_status "$YELLOW" "$SKIPPED" "mise (install failed; node falls back to nvm if present)"
+		failed_optional_tools+=("mise")
+	fi
+	rm -f "$installer"
+	return 0
+}
+
 # Install bat theme used by ~/.config/bat/config.
 install_bat_theme() {
 	if ! command_exists bat; then
@@ -358,18 +390,21 @@ main() {
 	echo ""
 	echo -e "${BLUE}Installing development tools...${NC}"
 
-	# Development dependencies
-	if [[ "$OS" == "macos" ]]; then
+	# Runtime version manager (node lives here; see ~/.config/mise/config.toml)
+	install_mise
+
+	# Node comes from mise; a pre-existing install (nvm, brew, ...) also works
+	if command_exists node; then
+		print_status "$YELLOW" "$PRESENT" "node (already installed)"
+		present_tools+=("node")
+	elif command_exists mise || [ -x "$HOME/.local/bin/mise" ]; then
+		print_status "$YELLOW" "$SKIPPED" "node (run 'mise install' after 'make link')"
+		skipped_tools+=("node")
+	elif [[ "$OS" == "macos" ]]; then
 		install_tool node
 	else
-		# On Linux, recommend nvm for node
-		if ! command_exists node; then
-			print_status "$YELLOW" "$SKIPPED" "node (install via nvm: https://github.com/nvm-sh/nvm)"
-			skipped_tools+=("node")
-		else
-			print_status "$YELLOW" "$PRESENT" "node (already installed)"
-			present_tools+=("node")
-		fi
+		print_status "$YELLOW" "$SKIPPED" "node (install mise or use your package manager)"
+		skipped_tools+=("node")
 	fi
 
 	# Python (usually pre-installed on Linux)
@@ -436,7 +471,7 @@ main() {
 	echo "Next steps:"
 	echo "  1. Run 'make link' to create dotfile symlinks"
 	echo "  2. Restart your shell or run 'source ~/.zshrc'"
-	echo "  3. For node packages via nvm: install nvm and run 'nvm install --lts'"
+	echo "  3. Install runtimes from the global mise config: 'mise install'"
 	if ! command_exists docker; then
 		echo "  4. To run 'make test', install Docker: https://docs.docker.com/get-docker/"
 	fi

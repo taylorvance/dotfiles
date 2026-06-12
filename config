@@ -1,4 +1,5 @@
 .config/bat/config
+.config/mise/config.toml
 .config/nvim/README.md
 .config/nvim/init.vim
 .config/nvim/lazy-lock.json
