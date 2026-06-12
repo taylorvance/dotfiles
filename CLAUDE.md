@@ -85,7 +85,7 @@ Or adopt an existing file: `make adopt F=.config/tool/config.toml` then `make li
 ### Tool Dependencies
 
 - **Core**: nvim (>= 0.11 for the nvim config), git, tmux, zsh, curl/wget, gcc/make, unzip
-- **Recommended/optional CLI**: fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship, mise
+- **Recommended/optional CLI**: fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship, mise, lazygit
 - **Development**: node/npm (via mise; global versions in `.config/mise/config.toml`), python3; **Optional**: ollama, dotnet, php
 - **Note**: All tools have graceful fallbacks in `.zshrc` if not installed
 

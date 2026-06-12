@@ -385,6 +385,7 @@ main() {
 	install_optional_tool delta git-delta
 	install_optional_tool atuin
 	install_optional_tool starship
+	install_optional_tool lazygit  # tmux prefix+g popup (falls back to git status)
 	install_bat_theme
 
 	echo ""

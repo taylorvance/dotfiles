@@ -103,7 +103,7 @@ make link
 
 ### Tools Installed
 
-Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where needed. The installer also attempts to install recommended CLI tools (fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship) and development tools (mise for node — global versions live in `~/.config/mise/config.toml` — plus python3), but the shell config is designed to degrade gracefully when optional tools are missing.
+Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where needed. The installer also attempts to install recommended CLI tools (fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship, lazygit) and development tools (mise for node — global versions live in `~/.config/mise/config.toml` — plus python3), but the shell config is designed to degrade gracefully when optional tools are missing.
 
 ### Custom Scripts (`~/.local/bin/`)
 
