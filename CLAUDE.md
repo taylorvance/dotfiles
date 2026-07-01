@@ -125,8 +125,8 @@ bash 3.2 compatible (parallel arrays, no associative arrays).
   `fcd`, `lt`, `lsrepos`, `gw`, `raw`
 - **nvim** (`.config/nvim/`) — lazy.nvim, requires nvim 0.11+; plugin
   versions pinned via tracked `lazy-lock.json`; see `.config/nvim/README.md`
-- **`.gitconfig`** — aliases (see the file; `db` resolves the remote default
-  branch and powers `smp`/`fmom`/`from`); delta pager; `user.useConfigOnly`
+- **`.gitconfig`** — aliases (see the file; `default` resolves the remote
+  default branch and powers `smp`/`fmom`/`from`); delta pager; `user.useConfigOnly`
   with email set per-repo or in `~/.gitconfig.local`
 - **`.tmux.conf`** — `C-Space` prefix, vi copy mode, TPM plugins
   (resurrect/continuum/yank); full cheat sheet in the file header

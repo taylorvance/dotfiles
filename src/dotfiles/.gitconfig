@@ -5,24 +5,31 @@
 	useConfigOnly = true
 
 [alias]
+	# inspect
 	st = status
 	di = diff
+	dih = diff HEAD~1
+	dis = diff --staged
+	l = log --graph --oneline --decorate
+	ll = log --graph --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset' --abbrev-commit
+	g = grep --break --heading --line-number
+	cfg = config --list
+
+	# stage / commit
 	a = add .
 	c = commit
 	cm = commit -m
+	amend = commit --amend --no-edit
+
+	# branch / sync
 	s = switch
 	f = fetch
 	p = pull
-	g = grep --break --heading --line-number
-	l = log --graph --oneline --decorate
-	ll = log --graph --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset' --abbrev-commit
-	cfg = config --list
-	amend = commit --amend --no-edit
-	# db = the remote's default branch (main/master/...); requires origin/HEAD
-	db = "!ref=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || { echo 'origin/HEAD not set; run: git remote set-head origin -a' >&2; exit 1; }; echo \"${ref#origin/}\""
-	smp = "!b=$(git db) && git switch \"$b\" && git pull --ff-only"
-	fmom = "!b=$(git db) && git fetch && git merge \"origin/$b\""
-	from = "!b=$(git db) && git fetch && git rebase \"origin/$b\""
+	# the remote's default branch (main/master/...)
+	default = "!ref=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || { echo 'origin/HEAD not set; run: git remote set-head origin -a' >&2; exit 1; }; echo \"${ref#origin/}\""
+	smp = "!b=$(git default) && git switch \"$b\" && git pull --ff-only"  # switch to default branch, ff-only pull
+	fmom = "!b=$(git default) && git fetch && git merge \"origin/$b\""    # fetch, merge origin/<default>
+	from = "!b=$(git default) && git fetch && git rebase \"origin/$b\""   # fetch, rebase onto origin/<default>
 
 [branch]
 	sort = -committerdate
