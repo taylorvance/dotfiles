@@ -1,4 +1,9 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
+# Ceiling for module commands (e.g. `node --version`). Warm node startup is ~12ms;
+# the default 500ms only gets clipped on the first cold run after boot (signature
+# verification + cold cache). Raising this is free in steady state.
+command_timeout = 2000
+
 [character]
 vimcmd_symbol = "[❮](blue)"
