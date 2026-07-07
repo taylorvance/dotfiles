@@ -8,7 +8,7 @@
 	# inspect
 	st = status
 	di = diff
-	dih = diff HEAD~1
+	dip = diff HEAD~1
 	dis = diff --staged
 	l = log --graph --oneline --decorate
 	ll = log --graph --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset' --abbrev-commit
@@ -28,6 +28,7 @@
 	pfwl = push --force-with-lease --force-if-includes  # safe force-push (won't clobber unseen commits)
 	# the remote's default branch (main/master/...)
 	default = "!ref=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || { echo 'origin/HEAD not set; run: git remote set-head origin -a' >&2; exit 1; }; echo \"${ref#origin/}\""
+	pm = "!b=$(git default) && git fetch origin \"$b:$b\""                # pull default without switching
 	smp = "!b=$(git default) && git switch \"$b\" && git pull --ff-only"  # switch to default branch, ff-only pull
 	fmom = "!b=$(git default) && git fetch && git merge \"origin/$b\""    # fetch, merge origin/<default>
 	from = "!b=$(git default) && git fetch && git rebase \"origin/$b\""   # fetch, rebase onto origin/<default>
