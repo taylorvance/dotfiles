@@ -129,7 +129,10 @@ bash 3.2 compatible (parallel arrays, no associative arrays).
   default branch and powers `smp`/`fmom`/`from`); delta pager; `user.useConfigOnly`
   with email set per-repo or in `~/.gitconfig.local`
 - **`.tmux.conf`** — `C-Space` prefix, vi copy mode, TPM plugins
-  (resurrect/continuum/yank); full cheat sheet in the file header
+  (resurrect/continuum/yank); full cheat sheet in the file header.
+  Continuum auto-restore is deliberately off — post-reboot restore is run
+  synchronously by `proj` (see `maybe_restore` there) to avoid the async
+  restore race
 
 ## Development Notes
 

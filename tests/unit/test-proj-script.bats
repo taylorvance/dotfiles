@@ -74,6 +74,15 @@ case "$subcommand" in
     display-message)
         echo "${MOCK_CURRENT_SESSION:-test_current}"
         ;;
+    show-option)
+        # proj probes resurrect's registered options in maybe_restore;
+        # -gqv semantics: unset option prints nothing and exits 0
+        case "$*" in
+            *@resurrect-restore-script-path*) echo "${MOCK_RESURRECT_RESTORE_SCRIPT:-}" ;;
+            *@resurrect-dir*) echo "${MOCK_RESURRECT_DIR:-}" ;;
+            *) echo "" ;;
+        esac
+        ;;
     *)
         exit 1
         ;;
@@ -388,9 +397,105 @@ run_proj() {
 
 # ============================================================================
 # TMUX RESURRECTION TESTS
-# These tests verify that proj handles the race condition where tmux-resurrect
-# (or tmux-continuum) restores sessions asynchronously after the server starts.
+# proj drives tmux-resurrect itself: when the server is down/empty it runs
+# the restore script synchronously before any lookup (maybe_restore). The
+# older race-condition fallbacks are kept as a safety net and tested below.
 # ============================================================================
+
+# Simulate an installed tmux-resurrect with a saved session file. The mock
+# restore script appends $MOCK_RESTORE_ADDS to the visible session list.
+enable_mock_restore() {
+    export MOCK_RESURRECT_DIR="$TEST_DIR/resurrect"
+    mkdir -p "$MOCK_RESURRECT_DIR"
+    touch "$MOCK_RESURRECT_DIR/last"
+    export MOCK_RESTORE_CALLS="$TEST_DIR/mock_restore_calls"
+    touch "$MOCK_RESTORE_CALLS"
+    export MOCK_RESURRECT_RESTORE_SCRIPT="$TEST_DIR/mock_restore.sh"
+    cat > "$MOCK_RESURRECT_RESTORE_SCRIPT" <<'EOF'
+#!/bin/bash
+echo "restore" >> "$MOCK_RESTORE_CALLS"
+if [ -n "${MOCK_RESTORE_ADDS:-}" ]; then
+    for s in $MOCK_RESTORE_ADDS; do
+        echo "$s" >> "$MOCK_TMUX_SESSIONS"
+    done
+fi
+EOF
+    chmod +x "$MOCK_RESURRECT_RESTORE_SCRIPT"
+}
+
+@test "proj NAME: dead server - restores saved sessions synchronously, then attaches" {
+    unset TMUX
+    enable_mock_restore
+    export MOCK_RESTORE_ADDS="dotfiles workstuff"
+
+    run run_proj dotfiles
+
+    [ "$status" -eq 0 ]
+    grep -q "restore" "$MOCK_RESTORE_CALLS"
+    grep -q "attach-session.*dotfiles" "$MOCK_TMUX_CALLS"
+    # Restore happened BEFORE lookup: no create prompt was shown
+    [[ "$output" != *"Create one here"* ]]
+    [[ "$output" == *"Restoring saved tmux sessions"* ]]
+}
+
+@test "proj NAME: live sessions exist - restore is NOT re-run over them" {
+    unset TMUX
+    enable_mock_restore
+    echo "existing" >> "$MOCK_TMUX_SESSIONS"
+
+    run run_proj existing
+
+    [ "$status" -eq 0 ]
+    ! grep -q "restore" "$MOCK_RESTORE_CALLS"
+    grep -q "attach-session.*existing" "$MOCK_TMUX_CALLS"
+}
+
+@test "proj NAME: restore cleans up its throwaway session" {
+    unset TMUX
+    enable_mock_restore
+    export MOCK_RESTORE_ADDS="alpha"
+
+    run run_proj alpha
+
+    [ "$status" -eq 0 ]
+    ! grep -qxF "__proj_restore__" "$MOCK_TMUX_SESSIONS"
+    grep -q "kill-session.*__proj_restore__" "$MOCK_TMUX_CALLS"
+}
+
+@test "proj -k NAME: dead server - restores first, then kills the named session" {
+    unset TMUX
+    enable_mock_restore
+    export MOCK_RESTORE_ADDS="doomed survivor"
+
+    run run_proj -k doomed
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Killed session: doomed"* ]]
+    grep -qxF "survivor" "$MOCK_TMUX_SESSIONS"
+    ! grep -qxF "doomed" "$MOCK_TMUX_SESSIONS"
+}
+
+@test "proj -c NAME: dead server - restore first; name collision errors instead of merging" {
+    unset TMUX
+    enable_mock_restore
+    export MOCK_RESTORE_ADDS="myproj"
+
+    run run_proj -c myproj
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"already exists"* ]]
+}
+
+@test "proj NAME: resurrect not installed - dead server prompts to create as before" {
+    unset TMUX
+    # No MOCK_RESURRECT_* set: show-option returns empty, default script path
+    # doesn't exist under the test HOME
+
+    run bash -c 'echo "N" | '"$TEST_DIR"'/proj brandnew'
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Create one here"* ]]
+}
 
 @test "proj NAME: resurrection race - session restored before Y is processed, attaches" {
     unset TMUX
@@ -401,8 +506,9 @@ run_proj() {
 
     [ "$status" -eq 0 ]
     # Should attach to the resurrected session, not try to create a new one
+    # (the throwaway __proj_restore__ session is the only new-session allowed)
     grep -q "attach-session.*dotfiles" "$MOCK_TMUX_CALLS"
-    ! grep -q "new-session" "$MOCK_TMUX_CALLS"
+    ! grep -q "new-session.*dotfiles" "$MOCK_TMUX_CALLS"
 }
 
 @test "proj NAME: resurrection race - in tmux, new-session fails but session restored, switches" {
