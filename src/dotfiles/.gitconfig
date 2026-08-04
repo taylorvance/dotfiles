@@ -10,6 +10,9 @@
 	di = diff
 	dip = diff HEAD~1
 	dis = diff --staged
+	dio = diff @{u}  # vs upstream: unpushed + uncommitted changes
+	# vs merge-base with origin/<default>: only this branch's changes (PR-style)
+	dim = "!b=$(git default) && git diff \"$(git merge-base \"origin/$b\" HEAD)\""
 	l = log --graph --oneline --decorate
 	ll = log --graph --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset' --abbrev-commit
 	g = grep --break --heading --line-number
@@ -53,7 +56,7 @@
 	autosquash = true
 
 [rerere]
-	# remember conflict resolutions; replay them when the same conflict reappears
+	# remember conflict resolutions and replay them when the same conflict reappears
 	enabled = true
 
 [diff]
