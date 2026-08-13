@@ -495,6 +495,23 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Create one here"* ]]
+    # No saves on disk: nothing to warn about
+    [[ "$output" != *"Warning"* ]]
+}
+
+@test "proj NAME: saves exist but restore script missing - warns instead of silently skipping" {
+    unset TMUX
+    # Saved sessions on disk, but no restore script anywhere (plugin deleted)
+    export MOCK_RESURRECT_DIR="$TEST_DIR/resurrect"
+    mkdir -p "$MOCK_RESURRECT_DIR"
+    touch "$MOCK_RESURRECT_DIR/last"
+
+    run bash -c 'echo "N" | '"$TEST_DIR"'/proj brandnew'
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Warning: tmux-resurrect saves exist but restore script is missing"* ]]
+    # Still proceeds normally after warning
+    [[ "$output" == *"Create one here"* ]]
 }
 
 @test "proj NAME: resurrection race - session restored before Y is processed, attaches" {

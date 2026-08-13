@@ -91,14 +91,20 @@ maybe_restore() {
 	save_dir="${save_dir/#\~/$HOME}"
 	[ -e "$save_dir/last" ] || save_dir="$HOME/.tmux/resurrect"
 
-	if [ -x "$script" ] && [ -e "$save_dir/last" ]; then
-		echo "Restoring saved tmux sessions..." >&2
-		# restore.sh derives the server socket from $TMUX (format
-		# "socket,pid,session"), which is empty when proj runs outside tmux
-		# (the post-reboot case) - so provide it ourselves
-		local socket
-		socket=$(tmux display-message -p '#{socket_path}' 2>/dev/null) || true
-		TMUX="${socket},proj,0" "$script" >/dev/null 2>&1 || true
+	if [ -e "$save_dir/last" ]; then
+		if [ -x "$script" ]; then
+			echo "Restoring saved tmux sessions..." >&2
+			# restore.sh derives the server socket from $TMUX (format
+			# "socket,pid,session"), which is empty when proj runs outside tmux
+			# (the post-reboot case) - so provide it ourselves
+			local socket
+			socket=$(tmux display-message -p '#{socket_path}' 2>/dev/null) || true
+			TMUX="${socket},proj,0" "$script" >/dev/null 2>&1 || true
+		else
+			# saves exist but the plugin is gone (e.g. deleted by a tpm
+			# mishap) - stay loud, or the sessions are silently unrecoverable
+			echo "Warning: tmux-resurrect saves exist but restore script is missing ($script); skipping restore" >&2
+		fi
 	fi
 
 	# killing the throwaway lets a server with nothing restored exit cleanly
