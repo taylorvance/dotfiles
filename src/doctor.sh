@@ -148,11 +148,21 @@ check_config() {
 		CONFIG_PATHS+=("$filepath")
 
 		source="$SOURCEDIR/$filepath"
-		if path_exists "$source"; then
-			ok "$filepath"
-		else
+		if ! path_exists "$source"; then
 			error "configured source is missing: $filepath"
+			continue
 		fi
+
+		# A gitignored, untracked source links fine locally but never
+		# reaches other machines (e.g. the global gitignore's `.claude/`
+		# rule also applies inside src/dotfiles/)
+		if git check-ignore -q "$source" 2>/dev/null \
+			&& ! git ls-files --error-unmatch "$source" >/dev/null 2>&1; then
+			error "configured source is gitignored and untracked: $filepath (fix: git add -f)"
+			continue
+		fi
+
+		ok "$filepath"
 	done < "$CONFIGFILE"
 
 	if [ "$had_entries" = false ]; then
