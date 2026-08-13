@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Sync vendored plugin submodules after a pull, so the symlinked plugin
+# directories never drift from the pinned commits.
+
+git submodule update --init

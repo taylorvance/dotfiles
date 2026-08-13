@@ -134,9 +134,6 @@ teardown() {
 @test "tmux: .tmux.conf has valid syntax" {
     skip_if_not_installed tmux
 
-    # Pre-create the TPM dir so the auto-install doesn't clone from the network
-    mkdir -p "$TEST_HOME/.tmux/plugins/tpm"
-
     # Tmux can validate config
     run tmux -f "$TEST_HOME/.tmux.conf" source-file "$TEST_HOME/.tmux.conf"
 
@@ -147,9 +144,6 @@ teardown() {
 
 @test "tmux: can start with config" {
     skip_if_not_installed tmux
-
-    # Pre-create the TPM dir so the auto-install doesn't clone from the network
-    mkdir -p "$TEST_HOME/.tmux/plugins/tpm"
 
     # Try to start tmux with config (immediately exit)
     run tmux -f "$TEST_HOME/.tmux.conf" new-session -d "echo test"
@@ -305,22 +299,20 @@ teardown() {
 # TMUX ADVANCED TESTS
 # ============================================================================
 
-@test "tmux: resurrect plugin directory exists or installs" {
+@test "tmux: vendored plugins are linked and loadable" {
     skip_if_not_installed tmux
+    if [ ! -f "$TEST_HOME/.tmux/plugins/tmux-resurrect/resurrect.tmux" ]; then
+        skip "plugin submodules not synced (run: git submodule update --init)"
+    fi
 
-    # Start tmux briefly to trigger TPM auto-install
-    tmux -f "$TEST_HOME/.tmux.conf" new-session -d "sleep 1" || true
-    sleep 2
+    # All three vendored plugins arrive via the .tmux/plugins symlink
+    [ -x "$TEST_HOME/.tmux/plugins/tmux-resurrect/resurrect.tmux" ]
+    [ -x "$TEST_HOME/.tmux/plugins/tmux-continuum/continuum.tmux" ]
+    [ -x "$TEST_HOME/.tmux/plugins/tmux-yank/yank.tmux" ]
 
-    # Check if TPM was installed
-    [ -d "$TEST_HOME/.tmux/plugins/tpm" ] || skip "TPM auto-install didn't complete"
-
-    # Check if resurrect plugin exists or is referenced
-    run grep -q "tmux-resurrect" "$TEST_HOME/.tmux.conf"
-    [ "$status" -eq 0 ]
-
-    # Clean up
-    tmux kill-server 2>/dev/null || true
+    # And .tmux.conf loads each of them
+    run grep -c "^run-shell ~/.tmux/plugins/" "$TEST_HOME/.tmux.conf"
+    [ "$output" -eq 3 ]
 }
 
 @test "tmux: clipboard integration is configured" {
@@ -411,13 +403,21 @@ teardown() {
     [ "$status" -eq 0 ] || [[ "$output" == *"zshrc loaded successfully"* ]]
 }
 
-@test "zsh: antigen loads without fatal errors" {
+@test "zsh: vendored plugins are sourced" {
     skip_if_not_installed zsh
+    if [ ! -f "$TEST_HOME/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ]; then
+        skip "plugin submodules not synced (run: git submodule update --init)"
+    fi
 
-    # Check if antigen is loaded
-    run zsh -c "source $TEST_HOME/.zshrc 2>&1 | grep -i 'error' || echo 'no errors'"
+    # wd and autosuggestions define functions; syntax-highlighting sets a version
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null
+        typeset -f wd >/dev/null && echo wd-ok
+        typeset -f _zsh_autosuggest_start >/dev/null && echo autosuggest-ok
+        [ -n \"\$ZSH_HIGHLIGHT_VERSION\" ] && echo highlight-ok"
 
-    [[ "$output" == *"no errors"* ]] || [ "$status" -eq 0 ]
+    [[ "$output" == *"wd-ok"* ]]
+    [[ "$output" == *"autosuggest-ok"* ]]
+    [[ "$output" == *"highlight-ok"* ]]
 }
 
 @test "zsh: mise is activated when present" {

@@ -24,7 +24,9 @@ Simply clone the repo and run `make setup`.
 git clone https://github.com/taylorvance/dotfiles.git && cd dotfiles && make setup
 ```
 
-This will install required CLI tools (nvim, git, tmux, zsh, etc.) and create symlinks in your home directory for everything located in `src/dotfiles/` and configured in `config`. If there are any conflicts\*, your original files will be backed up in `.backups/` with full path preservation.
+This will install required CLI tools (nvim, git, tmux, zsh, etc.), sync the vendored plugin submodules, and create symlinks in your home directory for everything located in `src/dotfiles/` and configured in `config`. If there are any conflicts\*, your original files will be backed up in `.backups/` with full path preservation.
+
+Zsh and tmux plugins are vendored as commit-pinned git submodules (under `src/dotfiles/.zsh/plugins/` and `src/dotfiles/.tmux/plugins/`), so nothing on your machine executes unreviewed upstream HEAD. `make bump-plugins` upgrades them interactively: it fetches upstream commits, lists them for audit, and only checks them out after you confirm.
 
 Installation is [idempotent](https://en.wikipedia.org/wiki/Idempotence), which is a [word](https://github.com/anishathalye/dotfiles) [that](https://medium.com/@webprolific/getting-started-with-dotfiles-43c3602fd789) [dotfile](https://umanovskis.se/blog/post/dotfiles/) [authors](https://www.geekytidbits.com/dotfiles/) [love](https://unhexium.net/dotfiles/the-dotfile-drama/) [to](https://bananamafia.dev/post/dotfile-deployment/) [flaunt](https://www.evanjones.ca/dotfiles-personal-software-configuration.html).
 
@@ -49,9 +51,10 @@ Run `make help` to see all available commands:
 
 **Setup & Management:**
 
-- `make setup` - Complete bootstrap: install tools + create symlinks
+- `make setup` - Complete bootstrap: install tools + sync submodules + create symlinks + git hooks
 - `make install` - Install required + recommended CLI tools (prompts before optional language tools)
-- `make link` - Create symlinks only (no tool installation)
+- `make link` - Sync plugin submodules + create symlinks (no tool installation)
+- `make bump-plugins` - Update vendored plugins interactively (fetch, audit, confirm, checkout)
 - `make unlink` - Remove all dotfile symlinks
 - `make status` - Show installation status of tools and dotfiles
 - `make doctor` - Validate repo wiring and script syntax without touching `$HOME`
@@ -139,6 +142,8 @@ dotfiles/
 │   └── dotfiles/           # Your actual dotfiles
 │       ├── .config/
 │       ├── .local/bin/
+│       ├── .tmux/plugins/  # Vendored tmux plugins (pinned submodules)
+│       ├── .zsh/plugins/   # Vendored zsh plugins (pinned submodules)
 │       ├── .zshrc
 │       ├── .tmux.conf
 │       └── .gitconfig

@@ -1,0 +1,18 @@
+[submodule "src/dotfiles/.zsh/plugins/zsh-syntax-highlighting"]
+	path = src/dotfiles/.zsh/plugins/zsh-syntax-highlighting
+	url = https://github.com/zsh-users/zsh-syntax-highlighting
+[submodule "src/dotfiles/.zsh/plugins/zsh-autosuggestions"]
+	path = src/dotfiles/.zsh/plugins/zsh-autosuggestions
+	url = https://github.com/zsh-users/zsh-autosuggestions
+[submodule "src/dotfiles/.zsh/plugins/wd"]
+	path = src/dotfiles/.zsh/plugins/wd
+	url = https://github.com/mfaerevaag/wd
+[submodule "src/dotfiles/.tmux/plugins/tmux-resurrect"]
+	path = src/dotfiles/.tmux/plugins/tmux-resurrect
+	url = https://github.com/tmux-plugins/tmux-resurrect
+[submodule "src/dotfiles/.tmux/plugins/tmux-continuum"]
+	path = src/dotfiles/.tmux/plugins/tmux-continuum
+	url = https://github.com/tmux-plugins/tmux-continuum
+[submodule "src/dotfiles/.tmux/plugins/tmux-yank"]
+	path = src/dotfiles/.tmux/plugins/tmux-yank
+	url = https://github.com/tmux-plugins/tmux-yank

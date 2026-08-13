@@ -148,43 +148,6 @@ install_optional() {
 	install_tool "$tool" "$pkg_name" optional
 }
 
-# antigen is a zsh script sourced by .zshrc, not a command; detect it by the
-# paths .zshrc actually checks, and fall back to downloading it there.
-install_antigen() {
-	local brew_prefix=""
-	if command_exists brew; then
-		brew_prefix=$(brew --prefix 2>/dev/null) || brew_prefix=""
-	fi
-
-	if { [ -n "$brew_prefix" ] && [ -f "$brew_prefix/share/antigen/antigen.zsh" ]; } \
-		|| [ -f "$HOME/.zsh/antigen.zsh" ]; then
-		print_status "$YELLOW" "$PRESENT" "antigen (already installed)"
-		present_tools+=("antigen")
-		return 0
-	fi
-
-	print_status "$BLUE" "..." "Installing antigen..."
-
-	if [ "$PKG_MGR" = "brew" ] && pkg_install antigen; then
-		print_status "$GREEN" "$INSTALLED" "antigen"
-		installed_tools+=("antigen")
-		return 0
-	fi
-
-	# No brew package: download antigen.zsh where .zshrc looks for it
-	local antigen_file="$HOME/.zsh/antigen.zsh"
-	local antigen_url="https://raw.githubusercontent.com/zsh-users/antigen/master/bin/antigen.zsh"
-	if mkdir -p "$HOME/.zsh" 2>/dev/null && download_file "$antigen_url" "$antigen_file"; then
-		print_status "$GREEN" "$INSTALLED" "antigen (~/.zsh/antigen.zsh)"
-		installed_tools+=("antigen")
-	else
-		rm -f "$antigen_file"
-		print_status "$YELLOW" "$SKIPPED" "antigen (download failed)"
-		failed_optional_tools+=("antigen")
-	fi
-	return 0
-}
-
 # mise manages runtime versions (node, ...); .zshrc activates it when present
 # and falls back to nvm without it. Not in every distro's repos, so fall back
 # to the official installer, which drops a single binary in ~/.local/bin.
@@ -225,7 +188,8 @@ install_bat_theme() {
 
 	local theme_dir="$HOME/.config/bat/themes"
 	local theme_file="$theme_dir/tokyonight_moon.tmTheme"
-	local theme_url="https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_moon.tmTheme"
+	# Pinned to a commit so upstream changes can't alter what gets installed
+	local theme_url="https://raw.githubusercontent.com/folke/tokyonight.nvim/054790b8676d0c561b22320d4b5ab3ef175f7445/extras/sublime/tokyonight_moon.tmTheme"
 
 	if [ -f "$theme_file" ]; then
 		print_status "$YELLOW" "$PRESENT" "bat theme: tokyonight_moon"
@@ -371,9 +335,6 @@ main() {
 	echo -e "${BLUE}Installing modern CLI tools...${NC}"
 	echo "(These enhance the shell experience but aren't critical)"
 	echo ""
-
-	# Shell plugin manager
-	install_antigen
 
 	# Modern CLI replacements (all have fallbacks in .zshrc)
 	install_optional_tool fzf

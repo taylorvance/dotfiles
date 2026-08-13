@@ -24,7 +24,8 @@ The repository includes a comprehensive Docker-based test suite to safely verify
 ```bash
 make setup         # Complete bootstrap: install tools + symlinks + git hooks
 make install       # Only install CLI tools (no symlinks)
-make link          # Only create symlinks (no tool installation)
+make link          # Sync plugin submodules + create symlinks (no tool installation)
+make bump-plugins  # Update vendored plugins: fetch, audit, confirm, checkout
 make unlink        # Remove all symlinks
 make status        # Check installation status of tools and dotfiles
 make doctor        # Validate repo/config/script wiring without touching HOME
@@ -36,9 +37,18 @@ make help          # Show all available targets with descriptions
 ```
 
 `make setup` detects the OS/package manager (brew/apt/dnf/pacman), installs
-required and recommended tools, creates symlinks, and installs git hooks.
-It is idempotent; conflicting files are backed up to
+required and recommended tools, syncs plugin submodules, creates symlinks,
+and installs git hooks. It is idempotent; conflicting files are backed up to
 `.backups/YYYY-MM-DD_HH-MM-SS_PID/`.
+
+Zsh and tmux plugins are vendored as commit-pinned git submodules under
+`src/dotfiles/.zsh/plugins/` and `src/dotfiles/.tmux/plugins/` (no plugin
+managers). `make link`, `make setup`, and the post-merge hook keep them
+synced. `make bump-plugins` upgrades them interactively: fetch (confirmed),
+audit the incoming commits, then confirm again before checkout — the
+symlinked plugin dirs go live the moment code is checked out, so nothing is
+applied sight-unseen. nvim plugins are pinned separately via
+`lazy-lock.json`.
 
 `symlink-manager.sh` accepts `-n`/`--dry-run` for install, uninstall, and
 restore previews.
@@ -116,8 +126,8 @@ bash 3.2 compatible (parallel arrays, no associative arrays).
 
 ### Configuration Files
 
-- **`.zshrc`** — antigen + oh-my-zsh when present, with explicit fallbacks
-  (history settings, arrow-key search widgets) so a bare zsh still behaves;
+- **`.zshrc`** — plugins (syntax-highlighting, autosuggestions, wd) sourced
+  from `~/.zsh/plugins/` with `[[ -f ]]` guards so a bare zsh still behaves;
   vi mode with `jk`/`kj` escape; starship prompt (`.config/starship.toml`);
   runtimes via mise (nvm as fallback); modern CLI tools guarded by
   `command -v`. Local overrides: `~/.zshrc.local`
@@ -128,11 +138,11 @@ bash 3.2 compatible (parallel arrays, no associative arrays).
 - **`.gitconfig`** — aliases (see the file; `default` resolves the remote
   default branch and powers `smp`/`fmom`/`from`); delta pager; `user.useConfigOnly`
   with email set per-repo or in `~/.gitconfig.local`
-- **`.tmux.conf`** — `C-Space` prefix, vi copy mode, TPM plugins
-  (resurrect/continuum/yank); full cheat sheet in the file header.
-  Continuum auto-restore is deliberately off — post-reboot restore is run
-  synchronously by `proj` (see `maybe_restore` there) to avoid the async
-  restore race
+- **`.tmux.conf`** — `C-Space` prefix, vi copy mode, vendored plugins
+  (resurrect/continuum/yank) loaded via `run-shell`; full cheat sheet in the
+  file header. Continuum auto-restore is deliberately off — post-reboot
+  restore is run synchronously by `proj` (see `maybe_restore` there) to
+  avoid the async restore race
 
 ## Development Notes
 

@@ -14,7 +14,7 @@ setup: ## Complete setup: install tools + create symlinks + install git hooks (f
 	@echo ""
 	@echo "Tools installed! Now creating symlinks..."
 	@echo ""
-	@src/symlink-manager.sh install
+	@$(MAKE) --no-print-directory link
 	@echo ""
 	@$(MAKE) --no-print-directory hooks
 teardown: unlink ## (alias for `unlink`)
@@ -45,10 +45,16 @@ install: ## Install required CLI tools (via pkg mgr)
 	@src/install-tools.sh
 
 .PHONY: link unlink
-link: ## Create symlinks for dotfiles
+link: submodules ## Create symlinks for dotfiles (syncs plugin submodules first)
 	@src/symlink-manager.sh install
 unlink: ## Remove all dotfile symlinks
 	@src/symlink-manager.sh uninstall
+
+.PHONY: submodules bump-plugins
+submodules: ## Sync vendored plugin submodules to their pinned commits
+	@git submodule update --init
+bump-plugins: ## Update vendored plugins: fetch, audit, confirm before checkout
+	@src/bump-plugins.sh
 
 .PHONY: adopt
 adopt: ## Adopt an existing HOME path into src/dotfiles (use F=.path)

@@ -13,7 +13,7 @@ setup() {
     mkdir -p "$MOCK_BIN"
     export PATH="$MOCK_BIN:$PATH"
 
-    # Isolate HOME so antigen/bat-theme detection doesn't see real files
+    # Isolate HOME so bat-theme detection doesn't see real files
     export HOME="$TEST_DIR/home"
     mkdir -p "$HOME"
 
@@ -147,22 +147,6 @@ create_brew_failing_for() {
     run bash "$TEST_SCRIPT" -y
     [ "$status" -eq 0 ]
     [[ "$output" =~ "git (already installed)" ]]
-}
-
-@test "install-tools: antigen detected via antigen.zsh file, not a command" {
-    create_mock success brew
-    mkdir -p "$HOME/.zsh"
-    echo "# antigen" > "$HOME/.zsh/antigen.zsh"
-    run bash "$TEST_SCRIPT" -y
-    [ "$status" -eq 0 ]
-    [[ "$output" =~ "antigen (already installed)" ]]
-}
-
-@test "install-tools: antigen download failure is non-critical" {
-    create_brew_failing_for antigen
-    run bash "$TEST_SCRIPT" -y
-    [ "$status" -eq 0 ]
-    [[ "$output" =~ "antigen (download failed)" ]]
 }
 
 # ============================================================================

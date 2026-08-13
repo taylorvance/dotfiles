@@ -19,34 +19,17 @@ export LESSUTFCHARDEF=E000-F8FF:p,F0000-FFFFD:p,100000-10FFFD:p
 # Custom scripts
 export PATH=$HOME/.local/bin:$PATH
 
-# Load antigen (installed via `brew install antigen`)
-# Falls back to ~/.zsh/antigen.zsh for non-Homebrew setups
-ADOTDIR=$HOME/.zsh/antigen
-ANTIGEN_MUTEX=false  # Disable file locking (prevents hangs if a prior session left a lock)
-if [[ -n $HOMEBREW_PREFIX && -f $HOMEBREW_PREFIX/share/antigen/antigen.zsh ]]; then
-	source $HOMEBREW_PREFIX/share/antigen/antigen.zsh
-elif [[ -f $HOME/.zsh/antigen.zsh ]]; then
-	source $HOME/.zsh/antigen.zsh
+# Plugins are vendored as commit-pinned git submodules in the dotfiles repo
+# (symlinked to ~/.zsh/plugins). Upgrade via `make bump-plugins` there.
+# wd - named directory bookmarks (`wd add foo`, `wd foo`)
+if [[ -f $HOME/.zsh/plugins/wd/wd.plugin.zsh ]]; then
+	source $HOME/.zsh/plugins/wd/wd.plugin.zsh
 fi
-
-# Only configure plugins if antigen loaded successfully
-if typeset -f antigen >/dev/null 2>&1; then
-	# Set oh-my-zsh as the default library
-	antigen use oh-my-zsh
-
-	# Load oh-my-zsh plugins
-	#antigen bundle vi-mode
-
-	# Load other plugins
-	antigen bundle zsh-users/zsh-syntax-highlighting
-	antigen bundle zsh-users/zsh-autosuggestions
-	antigen bundle mfaerevaag/wd
-
-	antigen apply
-fi
+# zsh-autosuggestions and zsh-syntax-highlighting are sourced at the END of
+# this file - syntax-highlighting must load after all custom widgets exist.
 
 
-# History (oh-my-zsh sets similar values; explicit so they hold without antigen)
+# History
 HISTFILE=$HOME/.zsh_history
 HISTSIZE=50000
 SAVEHIST=50000
@@ -58,8 +41,7 @@ bindkey -v
 export KEYTIMEOUT=10
 
 # Filter command history
-# These widgets ship with zsh but aren't registered by default (oh-my-zsh does
-# it; do it ourselves so arrow keys still work without antigen)
+# These widgets ship with zsh but aren't registered by default
 autoload -U up-line-or-beginning-search down-line-or-beginning-search
 zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
@@ -140,6 +122,11 @@ fi
 # Initialize completion system (must be after all fpath modifications)
 autoload -Uz compinit && compinit -i
 
+zstyle ':completion:*' menu select                        # arrow-key completion menu
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' # case-insensitive matching
+setopt interactive_comments                               # allow # comments at the prompt
+setopt auto_cd                                            # a bare dir path cd's to it
+
 
 # MODERN CLI TOOLS
 
@@ -182,6 +169,15 @@ fi
 # Command not found handler (suggest packages)
 if [[ -n $HOMEBREW_PREFIX && -f $HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh ]]; then
 	source $HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh
+fi
+
+# Vendored plugins that must load late: syntax-highlighting only decorates
+# widgets that already exist when it is sourced, so it stays at the bottom
+if [[ -f $HOME/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+	source $HOME/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+fi
+if [[ -f $HOME/.zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+	source $HOME/.zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
 
 # Load local customizations if they exist
