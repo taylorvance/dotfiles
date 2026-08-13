@@ -21,3 +21,4 @@
 .zsh/functions.zsh
 .zsh/plugins
 .zshrc
+.claude/statusline-command.sh
