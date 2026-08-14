@@ -42,14 +42,49 @@ return {
 		end,
 	},
 	{
-		'supermaven-inc/supermaven-nvim',
+		'zbirenbaum/copilot.lua',
+		cmd = 'Copilot', -- run :Copilot auth once per machine
+		event = 'InsertEnter',
 		opts = {
-			keymaps = {
-				accept_suggestion = '<tab>',
-				accept_word = '<right>',
-				clear_suggestion = '<c-]>',
+			panel = { enabled = false },
+			suggestion = {
+				-- Manual trigger only: the free tier counts every *generated*
+				-- suggestion (2000/mo), so auto-trigger burns it in days.
+				auto_trigger = false,
+				keymap = {
+					next = '<c-a>', -- request a suggestion / cycle (mnemonic: AI, like <c-d>/<c-t>)
+					prev = false,
+					accept = '<tab>', -- binds only while ghost text is visible; indents normally otherwise
+					-- Granular accepts, if they ever prove useful (bind only while ghost text is visible):
+					-- accept_word = '<right>',
+					-- accept_line = '<down>',
+					dismiss = false, -- ghost text clears on <esc> (InsertLeave) or by typing past it
+				},
 			},
-			disable_inline_completion = false,
+		},
+	},
+	{
+		'folke/sidekick.nvim',
+		opts = {
+			-- NES needs Copilot and auto-fires on typing pauses, which would
+			-- drain the same free-tier quota as completions. Off for now.
+			nes = { enabled = false },
+		},
+		keys = {
+			{
+				'<leader>aa',
+				function()
+					-- Work machine has claude, personal machines have codex.
+					local tool = vim.fn.executable('claude') == 1 and 'claude' or 'codex'
+					require('sidekick.cli').toggle({ name = tool, focus = true })
+				end,
+				desc = 'Sidekick: toggle AI CLI (claude/codex)',
+			},
+			{ '<leader>as', function() require('sidekick.cli').select() end, desc = 'Sidekick: select CLI tool' },
+			{ '<leader>ap', function() require('sidekick.cli').prompt() end, mode = { 'n', 'x' }, desc = 'Sidekick: pick prompt' },
+			{ '<leader>at', function() require('sidekick.cli').send({ msg = '{this}' }) end, mode = { 'n', 'x' }, desc = 'Sidekick: send cursor/selection context' },
+			{ '<leader>af', function() require('sidekick.cli').send({ msg = '{file}' }) end, desc = 'Sidekick: send file' },
+			{ '<leader>av', function() require('sidekick.cli').send({ msg = '{selection}' }) end, mode = 'x', desc = 'Sidekick: send selection' },
 		},
 	},
 	'tpope/vim-fugitive',
