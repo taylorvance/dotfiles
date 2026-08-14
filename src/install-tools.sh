@@ -347,6 +347,7 @@ main() {
 	install_optional_tool atuin
 	install_optional_tool starship
 	install_optional_tool lazygit  # tmux prefix+g popup (falls back to git status)
+	install_optional_tool tree-sitter tree-sitter-cli  # nvim-treesitter (main branch) builds parsers with it
 	install_bat_theme
 
 	echo ""
