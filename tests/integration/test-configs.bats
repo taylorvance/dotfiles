@@ -106,25 +106,23 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
-@test "git: global gitignore is referenced" {
+@test "git: global excludes file is referenced" {
     skip_if_not_installed git
 
     run git config --file "$TEST_HOME/.gitconfig" core.excludesfile
     [ "$status" -eq 0 ]
-    [[ "$output" =~ ".gitignore" ]]
+    # Must NOT be a file named .gitignore: the tracked copy would then act
+    # as a per-directory ignore file inside the dotfiles repo itself
+    [[ "$output" == *"/git/ignore"* ]]
 }
 
-@test "git: .gitignore file exists if referenced" {
+@test "git: global excludes file exists at the referenced path" {
     skip_if_not_installed git
 
-    # Check if global gitignore is set
-    gitignore_path=$(git config --file "$TEST_HOME/.gitconfig" core.excludesfile 2>/dev/null | sed "s|~|$TEST_HOME|")
+    excludes_path=$(git config --file "$TEST_HOME/.gitconfig" core.excludesfile 2>/dev/null | sed "s|~|$TEST_HOME|")
 
-    if [ -n "$gitignore_path" ]; then
-        [ -f "$gitignore_path" ] || [ -L "$gitignore_path" ]
-    else
-        skip "No global gitignore configured"
-    fi
+    [ -n "$excludes_path" ]
+    [ -f "$excludes_path" ] || [ -L "$excludes_path" ]
 }
 
 # ============================================================================

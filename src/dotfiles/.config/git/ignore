@@ -1,5 +1,7 @@
-# Global .gitignore
-# Use: git config --global core.excludesFile ~/.gitignore
+# Global git excludes file (core.excludesFile in .gitconfig points here).
+# Lives at git's default global-ignore path; the name "ignore" (not
+# ".gitignore") keeps it from acting as a per-directory ignore file inside
+# the dotfiles repo itself.
 
 # macOS
 .DS_Store

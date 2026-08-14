@@ -1,4 +1,5 @@
 .config/bat/config
+.config/git/ignore
 .config/mise/config.toml
 .config/nvim/README.md
 .config/nvim/init.vim
@@ -7,7 +8,6 @@
 .config/nvim/lua/plugins/init.lua
 .config/starship.toml
 .gitconfig
-.gitignore
 .local/bin/clean
 .local/bin/e
 .local/bin/envsync
