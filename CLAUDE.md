@@ -42,7 +42,8 @@ and installs git hooks. It is idempotent; conflicting files are backed up to
 `.backups/YYYY-MM-DD_HH-MM-SS_PID/`.
 
 Zsh and tmux plugins are vendored as commit-pinned git submodules under
-`src/dotfiles/.zsh/plugins/` and `src/dotfiles/.tmux/plugins/` (no plugin
+`vendor/zsh/` and `vendor/tmux/`, reached via tracked symlinks at
+`src/dotfiles/.zsh/plugins` and `src/dotfiles/.tmux/plugins` (no plugin
 managers). `make link`, `make setup`, and the post-merge hook keep them
 synced. `make bump-plugins` upgrades them interactively: fetch (confirmed),
 audit the incoming commits, then confirm again before checkout — the

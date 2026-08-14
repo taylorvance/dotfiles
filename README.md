@@ -26,7 +26,7 @@ git clone https://github.com/taylorvance/dotfiles.git && cd dotfiles && make set
 
 This will install required CLI tools (nvim, git, tmux, zsh, etc.), sync the vendored plugin submodules, and create symlinks in your home directory for everything located in `src/dotfiles/` and configured in `config`. If there are any conflicts\*, your original files will be backed up in `.backups/` with full path preservation.
 
-Zsh and tmux plugins are vendored as commit-pinned git submodules (under `src/dotfiles/.zsh/plugins/` and `src/dotfiles/.tmux/plugins/`), so nothing on your machine executes unreviewed upstream HEAD. `make bump-plugins` upgrades them interactively: it fetches upstream commits, lists them for audit, and only checks them out after you confirm.
+Zsh and tmux plugins are vendored as commit-pinned git submodules under `vendor/` (reached via tracked symlinks at `src/dotfiles/.zsh/plugins` and `src/dotfiles/.tmux/plugins`), so nothing on your machine executes unreviewed upstream HEAD. `make bump-plugins` upgrades them interactively: it fetches upstream commits, lists them for audit, and only checks them out after you confirm.
 
 Installation is [idempotent](https://en.wikipedia.org/wiki/Idempotence), which is a [word](https://github.com/anishathalye/dotfiles) [that](https://medium.com/@webprolific/getting-started-with-dotfiles-43c3602fd789) [dotfile](https://umanovskis.se/blog/post/dotfiles/) [authors](https://www.geekytidbits.com/dotfiles/) [love](https://unhexium.net/dotfiles/the-dotfile-drama/) [to](https://bananamafia.dev/post/dotfile-deployment/) [flaunt](https://www.evanjones.ca/dotfiles-personal-software-configuration.html).
 
@@ -142,8 +142,8 @@ dotfiles/
 │   └── dotfiles/           # Your actual dotfiles
 │       ├── .config/
 │       ├── .local/bin/
-│       ├── .tmux/plugins/  # Vendored tmux plugins (pinned submodules)
-│       ├── .zsh/plugins/   # Vendored zsh plugins (pinned submodules)
+│       ├── .tmux/plugins   # -> vendor/tmux
+│       ├── .zsh/plugins    # -> vendor/zsh
 │       ├── .zshrc
 │       ├── .tmux.conf
 │       └── .gitconfig
@@ -153,6 +153,7 @@ dotfiles/
 │   ├── integration/        # Integration tests
 │   ├── test-runner.sh      # Test orchestration
 │   └── README.md           # Testing documentation
+├── vendor/                 # Vendored plugin submodules (zsh/, tmux/), commit-pinned
 ├── archive/                # Retired configs kept for reference (not linked)
 ├── .backups/               # Auto-generated backups
 │   └── 2025-01-20_10-30-45_12345/

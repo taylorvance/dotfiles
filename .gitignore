@@ -1,1 +1,6 @@
 .backups/
+
+# Vendored plugin submodules: git tracks these as pinned gitlinks regardless
+# (ignore patterns never affect tracked paths); listed here only so
+# ignore-aware tools (rg, fd) skip the source trees
+/vendor/
