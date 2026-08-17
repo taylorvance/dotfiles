@@ -22,3 +22,4 @@
 .zsh/plugins
 .zshrc
 .claude/statusline-command.sh
+.config/gh-dash/config.yml
