@@ -183,6 +183,48 @@ create_brew_failing_for() {
 }
 
 # ============================================================================
+# GH / GH-DASH
+# ============================================================================
+
+@test "install-tools: gh-dash skipped when gh is missing" {
+    if command -v gh >/dev/null 2>&1; then
+        skip "host has gh installed (run inside the test container)"
+    fi
+    create_mock success brew
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "gh-dash (requires gh)" ]]
+}
+
+@test "install-tools: gh-dash already installed is detected" {
+    create_mock success brew
+    printf '#!/bin/bash\ncase "$1 $2" in\n    "extension list") echo "gh dash dlvhdr/gh-dash v4"; exit 0 ;;\nesac\nexit 0\n' > "$MOCK_BIN/gh"
+    chmod +x "$MOCK_BIN/gh"
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "gh-dash (already installed)" ]]
+}
+
+@test "install-tools: gh-dash skipped when gh is unauthenticated" {
+    create_mock success brew
+    printf '#!/bin/bash\ncase "$1 $2" in\n    "extension list") exit 1 ;;\n    "auth status") exit 1 ;;\nesac\nexit 0\n' > "$MOCK_BIN/gh"
+    chmod +x "$MOCK_BIN/gh"
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "gh auth login" ]]
+}
+
+@test "install-tools: gh-dash extension install failure is non-critical" {
+    create_mock success brew
+    printf '#!/bin/bash\ncase "$1 $2" in\n    "extension list") exit 1 ;;\n    "auth status") exit 0 ;;\n    "extension install") exit 1 ;;\nesac\nexit 0\n' > "$MOCK_BIN/gh"
+    chmod +x "$MOCK_BIN/gh"
+    run bash "$TEST_SCRIPT" -y
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "gh extension install failed" ]]
+    [[ ! "$output" =~ "Critical tools failed" ]]
+}
+
+# ============================================================================
 # BASICS
 # ============================================================================
 

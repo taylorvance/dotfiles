@@ -61,7 +61,18 @@ check_tool rg "optional"
 check_tool delta "optional"
 check_tool atuin "optional"
 check_tool starship "optional"
+check_tool lazygit "optional"
 check_tool tree-sitter "optional"
+check_tool gh "optional"
+
+# gh-dash is a gh extension, not a binary on PATH
+if command_exists gh && gh extension list 2>/dev/null | grep -q "dlvhdr/gh-dash"; then
+	printf "  ${GREEN}✓${NC} %s\n" "gh-dash"
+else
+	printf "  ${YELLOW}⚠${NC} %s\n" "gh-dash"
+fi
+
+check_tool mise "optional"
 check_tool node "optional"
 check_tool npm "optional"
 check_tool python3 "optional"

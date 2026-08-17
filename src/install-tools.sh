@@ -180,6 +180,39 @@ install_mise() {
 	return 0
 }
 
+# Install the gh-dash extension (PR/notifications dashboard; config lives at
+# ~/.config/gh-dash/config.yml). gh extensions aren't in package repos, so
+# this shells out to gh itself, which must be authenticated first.
+install_gh_dash() {
+	if ! command_exists gh; then
+		print_status "$YELLOW" "$SKIPPED" "gh-dash (requires gh)"
+		skipped_tools+=("gh-dash")
+		return 0
+	fi
+
+	if gh extension list 2>/dev/null | grep -q "dlvhdr/gh-dash"; then
+		print_status "$YELLOW" "$PRESENT" "gh-dash (already installed)"
+		present_tools+=("gh-dash")
+		return 0
+	fi
+
+	if ! gh auth status >/dev/null 2>&1; then
+		print_status "$YELLOW" "$SKIPPED" "gh-dash (run 'gh auth login', then 'gh extension install dlvhdr/gh-dash')"
+		skipped_tools+=("gh-dash")
+		return 0
+	fi
+
+	print_status "$BLUE" "..." "Installing gh-dash..."
+	if gh extension install dlvhdr/gh-dash >/dev/null 2>&1; then
+		print_status "$GREEN" "$INSTALLED" "gh-dash"
+		installed_tools+=("gh-dash")
+	else
+		print_status "$YELLOW" "$SKIPPED" "gh-dash (gh extension install failed)"
+		failed_optional_tools+=("gh-dash")
+	fi
+	return 0
+}
+
 # Install bat theme used by ~/.config/bat/config.
 install_bat_theme() {
 	if ! command_exists bat; then
@@ -348,6 +381,12 @@ main() {
 	install_optional_tool starship
 	install_optional_tool lazygit  # tmux prefix+g popup (falls back to git status)
 	install_optional_tool tree-sitter tree-sitter-cli  # nvim-treesitter (main branch) builds parsers with it
+	# gh + the gh-dash extension power the PR dashboard (~/.config/gh-dash)
+	case $PKG_MGR in
+		pacman) install_optional_tool gh github-cli ;;
+		*) install_optional_tool gh ;;
+	esac
+	install_gh_dash
 	install_bat_theme
 
 	echo ""
