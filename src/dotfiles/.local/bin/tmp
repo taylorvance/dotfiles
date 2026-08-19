@@ -1,49 +1,83 @@
 #!/bin/bash
 # tmp - Quick temporary workspace creator
 
-USAGE="Usage: tmp [-l|-r|-e [FILENAME]|-d]
+USAGE="Usage: tmp [-l|-r|-d] [FILE...]
 Create and cd to a timestamped temporary directory
 
 Options:
-  -l           List and select from existing temp directories (or create new if none selected)
+  -l           List existing temp directories (with a contents preview) and
+               select one, or create new if none selected
   -r           cd to most recent temp directory
-  -e [FILE]    Create temp dir, cd to it, and open editor (default: scratch.txt)
   -d           Delete temp directories (interactive: enter numbers, 'a' for all, or Enter to cancel)
 
+FILE arguments are opened in \$EDITOR inside the new workspace.
+
 Examples:
-  tmp          Create new temp dir and cd to it
-  tmp -l       List existing dirs and prompt for selection (default: create new)
-  tmp -r       cd to most recent temp directory
-  tmp -e       Create temp dir, cd, and open editor with scratch.txt
-  tmp -e test.py    Open test.py for Python syntax highlighting
-  tmp -d       Delete temp directories interactively"
+  tmp               Create new temp dir and cd to it
+  tmp test.py       Create temp dir, cd to it, and open test.py in \$EDITOR
+  tmp a.md b.py     Same, with both files opened together
+  tmp -l            List existing dirs and prompt for selection (default: create new)
+  tmp -r            cd to most recent temp directory
+  tmp -d            Delete temp directories interactively"
 
 TMP_BASE="${TMPDIR:-/tmp}/tmp-workspaces"
 RECENT=false
 SELECT=false
 DELETE=false
-EDIT=false
-FILENAME="scratch.txt"
 
 # Parse options
-while getopts "rldeh" opt; do
+while getopts "rldh" opt; do
   case $opt in
     r) RECENT=true ;;
     l) SELECT=true ;;
     d) DELETE=true ;;
-    e) EDIT=true ;;
     h) echo "$USAGE"; exit 0 ;;
     *) echo "$USAGE" >&2; exit 1 ;;
   esac
 done
 
-# Shift past options to get positional arguments
+# Shift past options; remaining arguments are filenames to open
 shift $((OPTIND - 1))
 
-# If -e flag was used and there's an argument, use it as filename
-if [ "$EDIT" = true ] && [ -n "$1" ]; then
-  FILENAME="$1"
-fi
+# Short comma-separated preview of a workspace's contents, e.g.
+# "test.py, data.csv, +3 more" or "(empty)"
+contents_preview() {
+  local dir="$1" limit=3 preview="" name i
+  local names=()
+  while IFS= read -r name; do
+    [ -n "$name" ] && names+=("$name")
+  done < <(ls -A "$dir" 2>/dev/null)
+
+  if [ "${#names[@]}" -eq 0 ]; then
+    echo "(empty)"
+    return
+  fi
+
+  for i in "${!names[@]}"; do
+    [ "$i" -ge "$limit" ] && break
+    [ -n "$preview" ] && preview+=", "
+    preview+="${names[$i]}"
+  done
+  if [ "${#names[@]}" -gt "$limit" ]; then
+    preview+=", +$((${#names[@]} - limit)) more"
+  fi
+  echo "$preview"
+}
+
+# Numbered listing of workspaces (newest first) with contents previews;
+# fills the global dirs array
+list_workspaces() {
+  local dir i
+  dirs=()
+  while IFS= read -r dir; do
+    dirs+=("$dir")
+  done < <(ls -t "$TMP_BASE")
+
+  for i in "${!dirs[@]}"; do
+    echo "$((i+1)). ${dirs[$i]}  $(contents_preview "$TMP_BASE/${dirs[$i]}")" >&2
+  done
+  echo >&2
+}
 
 # Delete temp directories interactively
 if [ "$DELETE" = true ]; then
@@ -53,17 +87,7 @@ if [ "$DELETE" = true ]; then
   fi
 
   echo "Temp workspaces:" >&2
-  # Create array of directories sorted by time (newest first)
-  dirs=()
-  while IFS= read -r dir; do
-    dirs+=("$dir")
-  done < <(ls -t "$TMP_BASE")
-
-  # Display numbered list
-  for i in "${!dirs[@]}"; do
-    echo "$((i+1)). ${dirs[$i]}" >&2
-  done
-  echo >&2
+  list_workspaces
 
   # Prompt for deletion
   echo -n "Enter numbers to delete (space-separated), 'a' for all, or Enter to cancel: " >&2
@@ -126,17 +150,7 @@ fi
 if [ "$SELECT" = true ]; then
   if [ -d "$TMP_BASE" ] && [ -n "$(ls -A "$TMP_BASE" 2>/dev/null)" ]; then
     echo "Existing temp workspaces:" >&2
-    # Create array of directories sorted by time (newest first)
-    dirs=()
-    while IFS= read -r dir; do
-      dirs+=("$dir")
-    done < <(ls -t "$TMP_BASE")
-
-    # Display numbered list
-    for i in "${!dirs[@]}"; do
-      echo "$((i+1)). ${dirs[$i]}" >&2
-    done
-    echo >&2
+    list_workspaces
 
     # Prompt for selection
     echo -n "Select number (or press Enter to create new): " >&2
@@ -170,7 +184,10 @@ echo "Created temporary workspace: $TMP_DIR"
 # Output the cd command for the parent shell to eval
 echo "cd \"$TMP_DIR\""
 
-# If edit mode, output editor command with filename
-if [ "$EDIT" = true ]; then
-  echo "EDITOR_CMD:$FILENAME"
-fi
+# Emit one EDITOR_CMD line per filename for the wrapper to open in $EDITOR
+for filename in "$@"; do
+  case "$filename" in
+    */*) mkdir -p "$TMP_DIR/$(dirname "$filename")" ;;
+  esac
+  echo "EDITOR_CMD:$filename"
+done

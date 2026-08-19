@@ -129,6 +129,34 @@ run_tmp() {
     [[ "$output" == *"cd \"$TMP_BASE/"* ]]
 }
 
+@test "tmp -l: listing includes a contents preview" {
+    # Workspace with a couple of files
+    output=$(run_tmp)
+    dir=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
+    touch "$dir/test.py" "$dir/data.csv"
+
+    run bash -c "echo '' | $TEST_DIR/tmp -l"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"test.py"* ]]
+    [[ "$output" == *"data.csv"* ]]
+}
+
+@test "tmp -l: preview shows (empty) and truncates with +N more" {
+    # One empty workspace, one with 5 files
+    run_tmp > /dev/null
+    sleep 1
+    output=$(run_tmp)
+    dir=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
+    touch "$dir/a" "$dir/b" "$dir/c" "$dir/d" "$dir/e"
+
+    run bash -c "echo '' | $TEST_DIR/tmp -l"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"(empty)"* ]]
+    [[ "$output" == *"+2 more"* ]]
+}
+
 @test "tmp -l: rejects invalid selection" {
     run_tmp > /dev/null
 
@@ -140,49 +168,48 @@ run_tmp() {
 }
 
 # ============================================================================
-# EDIT MODE TESTS (-e flag)
+# FILENAME ARGUMENT TESTS
 # ============================================================================
 
-@test "tmp -e: creates workspace and outputs EDITOR_CMD marker" {
-    run run_tmp -e
+@test "tmp FILE: outputs cd and EDITOR_CMD with the filename" {
+    run run_tmp custom.py
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Created temporary workspace"* ]]
-    [[ "$output" == *'cd "'* ]]
-    [[ "$output" == *"EDITOR_CMD:"* ]]
+    echo "$output" | grep -q '^cd '
+    echo "$output" | grep -q '^EDITOR_CMD:custom\.py$'
 }
 
-@test "tmp -e: workspace directory exists" {
-    output=$(run_tmp -e)
+@test "tmp FILE...: outputs one EDITOR_CMD line per filename" {
+    run run_tmp notes.md test.py
 
-    # Extract the directory from cd command
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q '^EDITOR_CMD:notes\.md$'
+    echo "$output" | grep -q '^EDITOR_CMD:test\.py$'
+    [ "$(echo "$output" | grep -c '^EDITOR_CMD:')" -eq 2 ]
+}
+
+@test "tmp: no filenames means no EDITOR_CMD lines" {
+    run run_tmp
+
+    [ "$status" -eq 0 ]
+    ! echo "$output" | grep -q '^EDITOR_CMD:'
+}
+
+@test "tmp sub/file: creates parent directories inside the workspace" {
+    output=$(run_tmp sub/dir/file.txt)
+
     dir=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
 
-    [ -d "$dir" ]
+    [ -d "$dir/sub/dir" ]
+    echo "$output" | grep -q '^EDITOR_CMD:sub/dir/file\.txt$'
 }
 
-@test "tmp -e: outputs cd and EDITOR_CMD with default filename" {
+@test "tmp -e: is no longer a valid option" {
     run run_tmp -e
 
-    [ "$status" -eq 0 ]
-
-    # Should have cd command
-    echo "$output" | grep -q '^cd '
-
-    # Should have EDITOR_CMD with scratch.txt
-    echo "$output" | grep -q '^EDITOR_CMD:scratch\.txt$'
-}
-
-@test "tmp -e custom.py: uses custom filename" {
-    run run_tmp -e custom.py
-
-    [ "$status" -eq 0 ]
-
-    # Should have cd command
-    echo "$output" | grep -q '^cd '
-
-    # Should have EDITOR_CMD with custom filename
-    echo "$output" | grep -q '^EDITOR_CMD:custom\.py$'
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Usage:"* ]]
 }
 
 # ============================================================================
@@ -293,8 +320,8 @@ run_tmp() {
     [[ "$output" == *"Usage: tmp"* ]]
     [[ "$output" == *"-l"* ]]
     [[ "$output" == *"-r"* ]]
-    [[ "$output" == *"-e"* ]]
     [[ "$output" == *"-d"* ]]
+    [[ "$output" == *"FILE"* ]]
 }
 
 # ============================================================================
@@ -401,20 +428,35 @@ setup_wrapper() {
     [[ "$output" != *'cd "'* ]]
 }
 
-@test "tmp wrapper: -e opens editor with the filename" {
+@test "tmp wrapper: opens editor with the filename" {
     setup_wrapper
     export EDITOR="$TEST_DIR/mock-editor"
     cat > "$EDITOR" <<EOF
 #!/bin/bash
-echo "EDITED:\$1" > "$TEST_DIR/editor.log"
+echo "EDITED:\$*" > "$TEST_DIR/editor.log"
 EOF
     chmod +x "$EDITOR"
 
-    tmp -e notes.py > /dev/null
+    tmp notes.py > /dev/null
 
     [ -f "$TEST_DIR/editor.log" ]
     grep -q "EDITED:notes.py" "$TEST_DIR/editor.log"
     [[ "$PWD" == "$TMP_BASE/"* ]]
+}
+
+@test "tmp wrapper: opens multiple files in one editor invocation" {
+    setup_wrapper
+    export EDITOR="$TEST_DIR/mock-editor"
+    cat > "$EDITOR" <<EOF
+#!/bin/bash
+echo "EDITED:\$*" > "$TEST_DIR/editor.log"
+EOF
+    chmod +x "$EDITOR"
+
+    tmp notes.md test.py > /dev/null
+
+    [ -f "$TEST_DIR/editor.log" ]
+    grep -q "EDITED:notes.md test.py" "$TEST_DIR/editor.log"
 }
 
 @test "tmp wrapper: propagates failure exit code" {

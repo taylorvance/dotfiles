@@ -17,12 +17,13 @@ tmp() {
 		if [ -n "$cd_cmd" ]; then
 			eval "$cd_cmd"
 
-			# Check if editor should be opened (-e flag)
-			local editor_line=$(echo "$output" | grep '^EDITOR_CMD:')
-			if [ -n "$editor_line" ]; then
-				# Extract filename after colon
-				local filename="${editor_line#EDITOR_CMD:}"
-				${EDITOR:-nvim} "$filename"
+			# Open any requested files in the editor (one EDITOR_CMD line each)
+			local editor_files=() editor_line
+			while IFS= read -r editor_line; do
+				editor_files+=("${editor_line#EDITOR_CMD:}")
+			done < <(echo "$output" | grep '^EDITOR_CMD:')
+			if [ ${#editor_files[@]} -gt 0 ]; then
+				${EDITOR:-nvim} "${editor_files[@]}"
 			fi
 
 			# Show any other output (excluding cd and EDITOR_CMD)
