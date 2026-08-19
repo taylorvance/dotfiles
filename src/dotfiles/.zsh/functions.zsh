@@ -137,7 +137,9 @@ lt() {
 
 	# level=0 means unlimited (omit the --level flag)
 	# Page via $PAGER rather than the `r` alias: aliases only expand here if
-	# this file is sourced after they're defined, which is easy to break
+	# this file is sourced after they're defined, which is easy to break.
+	# --icons/--color must stay `always` (unlike the ls aliases): eza sees a
+	# pipe to the pager as non-TTY and would strip them under `auto`
 	if [[ $level -eq 0 ]]; then
 		eza --tree --all --icons=always --group-directories-first $git_flag --color=always --ignore-glob="$ignore_patterns" "$@" | ${PAGER:-less}
 	else

@@ -42,10 +42,10 @@ teardown() {
     skip_if_not_installed zsh
 
     # Check if common aliases work
-    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; alias ll"
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; alias l"
 
-    # Should define ll alias (even if tools not installed)
-    [ "$status" -eq 0 ] || [[ "$output" =~ "ll" ]]
+    # Should define l alias (even if tools not installed)
+    [ "$status" -eq 0 ] || [[ "$output" =~ "l" ]]
 }
 
 @test "zsh: PATH modifications work" {

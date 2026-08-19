@@ -139,13 +139,11 @@ fi
 # eza - modern ls replacement (with fallback to regular ls)
 # See also: lt() in ~/.zsh/functions.zsh
 if command -v eza >/dev/null 2>&1; then
-	alias ls='eza --icons=always --group-directories-first --color=always'
-	alias ll='eza -l --icons=always --group-directories-first --git --color=always'
-	alias la='eza -la --icons=always --group-directories-first --git --color=always'
+	alias ls='eza --icons=auto --group-directories-first'
+	alias l='eza -la --icons=auto --group-directories-first --git'
 else
 	# Fallback to regular ls with some useful flags
-	alias ll='ls -lh'
-	alias la='ls -lAh'
+	alias l='ls -lAh'
 fi
 
 # fd - modern find replacement (keep original find available)
