@@ -132,8 +132,8 @@ bash 3.2 compatible (parallel arrays, no associative arrays).
   vi mode with `jk`/`kj` escape; starship prompt (`.config/starship.toml`);
   runtimes via mise (nvm as fallback); modern CLI tools guarded by
   `command -v`. Local overrides: `~/.zshrc.local`
-- **`.zsh/functions.zsh`** — `tmp` wrapper, `mkcd`, `extract`, `backup`,
-  `fcd`, `lt`, `lsrepos`, `gw`, `raw`
+- **`.zsh/functions.zsh`** — `tmp` wrapper, `mkcd`, `backup`, `ytaudio`,
+  `ytvideo`, `fcd`, `lt`, `lsrepos`, `gw`, `raw`
 - **nvim** (`.config/nvim/`) — lazy.nvim, requires nvim 0.11+; plugin
   versions pinned via tracked `lazy-lock.json`; see `.config/nvim/README.md`
 - **`.gitconfig`** — aliases (see the file; `default` resolves the remote

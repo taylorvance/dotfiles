@@ -456,17 +456,26 @@ EOF
     run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f mkcd"
     [ "$status" -eq 0 ]
 
-    # Check if extract function exists
-    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f extract"
-    [ "$status" -eq 0 ]
-
     # Check if tmp function exists
     run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f tmp"
+    [ "$status" -eq 0 ]
+
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; declare -f ytaudio"
     [ "$status" -eq 0 ]
 
     # proj is a script, not a function; confirm it's reachable via PATH
     run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; command -v proj"
     [ "$status" -eq 0 ]
+}
+
+@test "zsh: media commands explain missing dependencies" {
+    skip_if_not_installed zsh
+
+    mkdir -p "$TEST_DIR/empty-path"
+
+    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; PATH=$TEST_DIR/empty-path; ytaudio https://example.com/video"
+    [ "$status" -eq 127 ]
+    [[ "$output" == *"ytaudio requires yt-dlp and ffmpeg"* ]]
 }
 
 # ============================================================================

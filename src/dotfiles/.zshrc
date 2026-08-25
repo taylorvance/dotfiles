@@ -81,15 +81,12 @@ else
 fi
 # `e` for "edit" has a more sophisticated implementation in ~/.local/bin/e
 
-# Load custom shell functions (tmp wrapper, mkcd, extract, fcd, lt, gw, ...)
+# Load custom shell functions (tmp wrapper, mkcd, fcd, lt, gw, ...)
 source $HOME/.zsh/functions.zsh
 
 alias python='python3'
 #poetry completions zsh > ~/.zfunc/_poetry
 #fpath+=~/.zfunc
-
-alias ytaudio='yt-dlp -x --audio-format m4a --audio-quality 0 --embed-metadata --embed-thumbnail --parse-metadata "%(playlist_title)s:%(album)s" --parse-metadata "%(playlist_index)s/%(playlist_count)s:%(track_number)s" -o "%(playlist_index&{} - |)s%(title)s [%(id)s].%(ext)s"'
-alias ytvideo='yt-dlp -f "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b" --merge-output-format mp4 --embed-metadata --embed-thumbnail'
 
 # Use nvim as default editor
 export EDITOR=nvim
@@ -144,12 +141,6 @@ if command -v eza >/dev/null 2>&1; then
 else
 	# Fallback to regular ls with some useful flags
 	alias l='ls -lAh'
-fi
-
-# fd - modern find replacement (keep original find available)
-if command -v fd >/dev/null 2>&1; then
-	# Don't alias 'find' to avoid breaking scripts, provide 'f' shortcut instead
-	alias f='fd'
 fi
 
 # ripgrep - add convenient alias if installed

@@ -122,6 +122,13 @@ Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where nee
 
 Each script documents itself — run it with `-h` for full usage.
 
+### Optional Shell Commands
+
+`ytaudio` and `ytvideo` download media through `yt-dlp`; both also require
+`ffmpeg`. Install them with your package manager (for example, `brew install
+yt-dlp ffmpeg`). If either dependency is missing, the commands print this
+instruction instead of attempting a download.
+
 ### Configurations
 
 - **zsh** - Vi mode, custom prompt, modern CLI integrations, graceful fallbacks
