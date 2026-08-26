@@ -3,6 +3,8 @@
 # Integration tests for actual config files (nvim, tmux, zsh, git)
 # @covers src/dotfiles/*
 # @covers src/symlink-manager.sh
+
+bats_require_minimum_version 1.5.0
 # These tests verify that the dotfiles work correctly in practice
 
 setup() {
@@ -475,8 +477,7 @@ EOF
 
     mkdir -p "$TEST_DIR/empty-path"
 
-    run zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; PATH=$TEST_DIR/empty-path; ytaudio https://example.com/video"
-    [ "$status" -eq 127 ]
+    run -127 zsh -c "source $TEST_HOME/.zshrc 2>/dev/null; PATH=$TEST_DIR/empty-path; ytaudio https://example.com/video"
     [[ "$output" == *"ytaudio requires yt-dlp and ffmpeg"* ]]
 }
 
