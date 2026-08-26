@@ -22,4 +22,6 @@
 .zsh/plugins
 .zshrc
 .claude/statusline-command.sh
+.claude/skills/humans-dont-like-to-read
+.claude/skills/review
 .config/gh-dash/config.yml

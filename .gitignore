@@ -4,3 +4,7 @@
 # (ignore patterns never affect tracked paths); listed here only so
 # ignore-aware tools (rg, fd) skip the source trees
 /vendor/
+
+# Tracked Claude skills/config live here; the global ignore's `.claude/`
+# (src/dotfiles/.config/git/ignore) would otherwise hide them
+!src/dotfiles/.claude/
