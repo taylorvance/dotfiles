@@ -124,7 +124,9 @@ Run any of these with `-h` for full usage — the help text is the source of tru
 
 Conventions shared by the interactive scripts: `-n` dry-run; `y/N/i` prompts
 (apply all / abort / fzf multi-select); EOF at a prompt aborts safely;
-bash 3.2 compatible (parallel arrays, no associative arrays).
+bash 3.2 compatible (parallel arrays, no associative arrays). Shell
+dialect layering (see `.declog.md`): POSIX sh where trivial, bash 3.2
+for standalone scripts, zsh only for interactive functions.
 
 ### Configuration Files
 
