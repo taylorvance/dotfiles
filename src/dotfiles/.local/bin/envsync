@@ -260,7 +260,8 @@ for sample_file in "${SAMPLE_FILES[@]}"; do
     fi
 
     REQUIRED=()
-    for key in "${MISS[@]}"; do
+    # ${arr[@]+...}: empty arrays trip `set -u` on bash 3.2 (macOS)
+    for key in ${MISS[@]+"${MISS[@]}"}; do
         sv=$(env_get "$key" "$sample_file")
         [[ -z "$sv" ]] && REQUIRED+=("$key")
         printf "    %s=%s\n" "$key" "$sv"
@@ -268,7 +269,7 @@ for sample_file in "${SAMPLE_FILES[@]}"; do
     done
 
     if [[ "$DIFF_MODE" == true ]]; then
-        for key in "${DIFFERENT[@]}"; do
+        for key in ${DIFFERENT[@]+"${DIFFERENT[@]}"}; do
             sv=$(env_get "$key" "$sample_file")
             av=$(env_get "$key" "$actual_file")
             printf "    [different]  %-30s  (sample: %s  actual: %s)\n" \
