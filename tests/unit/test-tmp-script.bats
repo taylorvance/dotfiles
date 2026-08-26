@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 
 # Unit tests for the `tmp` script (temporary workspace creator)
+# @covers src/dotfiles/.local/bin/tmp
+# @covers src/dotfiles/.zsh/functions.zsh
 
 setup() {
     export TEST_DIR=$(mktemp -d)

@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for bump-plugins.sh
+# @covers src/bump-plugins.sh
 # Runs the real script against a mock git on an isolated PATH.
 
 setup() {

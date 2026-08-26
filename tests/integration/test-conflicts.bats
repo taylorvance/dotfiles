@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Integration tests for conflict handling and backup/restore
+# @covers src/symlink-manager.sh
 
 setup() {
     export TEST_DIR=$(mktemp -d)

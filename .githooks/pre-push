@@ -1,5 +1,92 @@
 #!/usr/bin/env bash
-# Run full test suite before pushing.
+# Run the tests that cover the files being pushed (decision: .declog.md).
+#
+# Each tests/**/*.bats declares what it covers via "# @covers <path|glob>"
+# header lines. Changed files select the matching tests. Fail-open: a changed
+# file that no header matches (and isn't doc/infra-classified below) runs the
+# full suite. Docs-only pushes skip tests entirely.
+
+set -u
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+ZERO=0000000000000000000000000000000000000000
+run_all=false
+changed=""
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    [ "$local_sha" = "$ZERO" ] && continue # deleting a remote ref
+    if [ "$remote_sha" = "$ZERO" ]; then
+        run_all=true # new remote branch: no base to diff against
+        continue
+    fi
+    if files=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null); then
+        changed="$changed$files"$'\n'
+    else
+        run_all=true # base commit not available locally
+    fi
+done
+
+changed=$(printf '%s' "$changed" | sort -u)
+
+if [ "$run_all" = false ] && [ -z "$changed" ]; then
+    exit 0
+fi
+
+selected=""
+select_test() {
+    case " $selected " in
+        *" $1 "*) ;;
+        *) selected="$selected $1" ;;
+    esac
+}
+
+if [ "$run_all" = false ]; then
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        case "$file" in
+            *.md | LICENSE | .gitignore | .github/* | .githooks/* | archive/*)
+                continue ;; # cannot affect test outcomes
+            Makefile | config | tests/test-runner.sh | tests/docker/*)
+                run_all=true
+                break ;; # test infrastructure: run everything
+            tests/*.bats)
+                [ -f "$file" ] && select_test "$file"
+                continue ;;
+            tests/*)
+                run_all=true
+                break ;;
+        esac
+        matched=false
+        for tf in tests/unit/*.bats tests/integration/*.bats; do
+            [ -f "$tf" ] || continue
+            while IFS= read -r pat; do
+                [ -z "$pat" ] && continue
+                # shellcheck disable=SC2254 # $pat is a deliberate glob
+                case "$file" in
+                    $pat)
+                        select_test "$tf"
+                        matched=true
+                        break
+                        ;;
+                esac
+            done <<EOF
+$(sed -n 's/^# @covers //p' "$tf")
+EOF
+        done
+        if [ "$matched" = false ]; then
+            run_all=true # fail open: unmapped change runs the full suite
+            break
+        fi
+    done <<EOF
+$changed
+EOF
+fi
+
+if [ "$run_all" = false ] && [ -z "$selected" ]; then
+    echo "pre-push: no tests cover the pushed changes; skipping test suite."
+    exit 0
+fi
 
 if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
     echo "pre-push: Docker is not running — cannot verify tests."
@@ -7,4 +94,11 @@ if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
-make test
+if [ "$run_all" = true ]; then
+    make test
+else
+    echo "pre-push: running the tests covering the pushed changes:"
+    for tf in $selected; do echo "  $tf"; done
+    # shellcheck disable=SC2086 # word-splitting the file list is intended
+    tests/test-runner.sh $selected
+fi

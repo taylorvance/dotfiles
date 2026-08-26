@@ -24,7 +24,7 @@ make test-clean        # Remove Docker images and containers
 ### Test Runner (`test-runner.sh`)
 
 - Orchestrates Docker container build and test execution
-- Supports all tests or a single `.bats` file
+- Supports all tests or one or more `.bats` files
 - Provides interactive shell for debugging
 - BATS is baked into the test image; the runner only downloads it as a
   fallback when run outside the container
@@ -65,6 +65,18 @@ behavior (including restore and the zsh/tmux/nvim configs).
 2. Follow BATS syntax: `@test "description" { ... }`
 3. Use setup/teardown for test isolation (`mktemp -d` + `HOME` override)
 4. Test both success and failure paths
+5. Declare what the file covers in its header — one or more
+   `# @covers <path|glob>` lines (repo-relative; `*` crosses `/`)
+
+### Conditional test selection (pre-push)
+
+The pre-push hook runs only the test files whose `@covers` headers match
+the files being pushed. A changed file that no header matches falls open
+to the full suite; test-infrastructure changes (`Makefile`, `config`,
+`test-runner.sh`, `tests/docker/`) always run everything; docs-only
+pushes skip tests. `make doctor` fails on a missing `@covers` header or
+one that matches no tracked file. Design notes and the accepted coverage
+gap are recorded in `.declog.md`.
 
 **Example:**
 
@@ -107,9 +119,14 @@ bats -t tests/unit/test-symlink-manager.bats
 
 ## CI/CD Integration
 
-GitHub Actions runs `make doctor`, `make shellcheck`, and `make test` on
-pushes to `master` and on pull requests — see
-[`.github/workflows/test.yml`](../.github/workflows/test.yml).
+GitHub Actions runs `make doctor`, `make shellcheck`, the full Docker
+suite, and a native macOS run of the unit tests (real `/bin/bash` 3.2 +
+BSD tools — the environment the Docker suite can't cover; integration
+tests are container-shaped and stay Docker-only) on pushes to `master`
+and on pull requests — see
+[`.github/workflows/test.yml`](../.github/workflows/test.yml). CI always
+runs the full suite; it is the backstop for the pre-push hook's
+conditional selection.
 
 Exit codes: `0` = all tests passed, non-zero = failures.
 

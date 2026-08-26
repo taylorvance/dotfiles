@@ -29,3 +29,18 @@ jobs:
         with:
           submodules: true
       - run: make test
+
+  # Native run on the environment Docker can't cover: macOS /bin/bash 3.2
+  # and BSD coreutils — where the scripts actually run day to day.
+  # Unit tests only: the integration tests are container-shaped (.declog.md).
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install bats
+        run: |
+          curl -fsSL https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz | tar xz
+          sudo bats-core-1.11.0/install.sh /usr/local
+      - run: bats tests/unit/*.bats

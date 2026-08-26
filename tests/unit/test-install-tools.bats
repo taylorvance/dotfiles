@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for install-tools.sh
+# @covers src/install-tools.sh
 # Runs the real script against mock package managers on an isolated PATH/HOME.
 
 setup() {
@@ -87,6 +88,7 @@ create_brew_failing_for() {
 @test "install-tools: core tool failure still reaches summary and exits 1" {
     # unzip is not preinstalled in the test container, so it must go
     # through the (failing) mock package manager
+    command -v unzip >/dev/null 2>&1 && skip "host has unzip (run inside the test container)"
     create_mock failure brew
     run bash "$TEST_SCRIPT" -y
     [ "$status" -eq 1 ]
@@ -117,6 +119,7 @@ create_brew_failing_for() {
 # ============================================================================
 
 @test "install-tools: declining a prompt skips the tool" {
+    command -v ollama >/dev/null 2>&1 && skip "host has ollama (run inside the test container)"
     create_mock success brew
     run bash -c "printf 'n\nn\nn\n' | bash '$TEST_SCRIPT'"
     [ "$status" -eq 0 ]

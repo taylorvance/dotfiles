@@ -90,7 +90,8 @@ Or adopt an existing file: `make adopt F=.config/tool/config.toml` then `make li
 - **`config`**: Paths to symlink (relative to both `src/dotfiles/` and `~/`)
 - **`archive/`**: Retired configs kept for reference; not linked, not validated
 - **`.githooks/`**: pre-commit (syntax-checks changed shell files, shebang-aware)
-  and pre-push (runs `make test`)
+  and pre-push (runs the tests whose `# @covers` headers match the pushed
+  changes; falls open to the full suite — see `tests/README.md`)
 - **`.github/workflows/test.yml`**: CI — doctor + shellcheck + Docker suite,
   on master pushes and PRs
 - **`tests/`**: BATS test suite + Docker infrastructure (see `tests/README.md`)

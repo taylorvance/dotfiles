@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for the envsync script
+# @covers src/dotfiles/.local/bin/envsync
 
 setup() {
     export TEST_DIR=$(mktemp -d)

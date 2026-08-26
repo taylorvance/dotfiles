@@ -1,9 +1,12 @@
 #!/usr/bin/env bats
 
 # Unit tests for the `gw` shell function (git worktree cd)
+# @covers src/dotfiles/.zsh/functions.zsh
 
 setup() {
-    export TEST_DIR=$(mktemp -d)
+    # pwd -P: on macOS mktemp returns /var/... but git reports worktree
+    # paths under the physical /private/var/..., breaking $PWD comparisons
+    export TEST_DIR=$(cd "$(mktemp -d)" && pwd -P)
     export HOME="$TEST_DIR/home"
     mkdir -p "$HOME"
 

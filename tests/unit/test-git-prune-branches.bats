@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for the `git-prune-branches` script
+# @covers src/dotfiles/.local/bin/git-prune-branches
 
 setup() {
     export TEST_DIR=$(mktemp -d)

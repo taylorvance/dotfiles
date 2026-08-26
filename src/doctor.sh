@@ -186,6 +186,52 @@ check_unconfigured_sources() {
 	[ "$found" = true ] || ok "all source files are configured or covered by a configured directory"
 }
 
+check_test_covers() {
+	printf "\n${BLUE}Test @covers headers${NC}\n"
+
+	# The pre-push hook selects tests by matching changed files against each
+	# test's "# @covers <path|glob>" headers; validate them here so renames
+	# and deletions fail loudly instead of silently skipping tests.
+	local all_files testfile rel pats pat entry matched stale
+	all_files=$(cd "$BASEDIR" && git ls-files)
+
+	for testfile in "$BASEDIR"/tests/unit/*.bats "$BASEDIR"/tests/integration/*.bats; do
+		[ -f "$testfile" ] || continue
+		rel="${testfile#"$BASEDIR"/}"
+
+		pats=$(sed -n 's/^# @covers //p' "$testfile")
+		if [ -z "$pats" ]; then
+			error "missing '# @covers <path|glob>' header: $rel"
+			continue
+		fi
+
+		stale=false
+		while IFS= read -r pat; do
+			[ -z "$pat" ] && continue
+			matched=false
+			while IFS= read -r entry; do
+				# shellcheck disable=SC2254 # $pat is a deliberate glob
+				case "$entry" in
+					$pat)
+						matched=true
+						break
+						;;
+				esac
+			done <<-EOF
+			$all_files
+			EOF
+			if [ "$matched" = false ]; then
+				error "stale @covers in $rel: '$pat' matches no tracked file"
+				stale=true
+			fi
+		done <<-EOF
+		$pats
+		EOF
+
+		[ "$stale" = false ] && ok "$rel"
+	done
+}
+
 check_executable_bits() {
 	printf "\n${BLUE}Executable bits${NC}\n"
 
@@ -248,6 +294,7 @@ main() {
 	check_required_files
 	check_config
 	check_unconfigured_sources
+	check_test_covers
 	check_executable_bits
 	check_shell_syntax
 

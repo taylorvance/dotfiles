@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Integration tests for fresh system setup
+# @covers src/symlink-manager.sh
 
 setup() {
     # Create temporary test environment

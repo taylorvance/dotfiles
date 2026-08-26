@@ -27,8 +27,8 @@ usage() {
     echo "Usage: $0 [MODE]"
     echo ""
     echo "Test Modes:"
-    echo "  all            Run all tests (unit + integration)"
-    echo "  <file.bats>    Run a single test file"
+    echo "  all             Run all tests (unit + integration)"
+    echo "  <file.bats>...  Run one or more test files"
     echo "  shell          Drop into interactive shell in test container (Alpine)"
     echo ""
     echo "Development Modes:"
@@ -101,6 +101,7 @@ install_bats() {
 
 run_docker_tests() {
     local mode=$1
+    shift
 
     echo -e "${CYAN}═══════════════════════════════════════${NC}"
     echo -e "${CYAN}  Dotfiles Test Suite (Docker)${NC}"
@@ -118,7 +119,7 @@ run_docker_tests() {
     else
         echo -e "${BLUE}→${NC} Running tests in container..."
         echo ""
-        docker run --rm dotfiles-test:latest tests/test-runner.sh "$mode"
+        docker run --rm dotfiles-test:latest tests/test-runner.sh "$mode" "$@"
     fi
 }
 
@@ -140,6 +141,7 @@ run_dev_shell() {
 
 run_tests() {
     local mode=$1
+    shift
 
     # Install BATS if not present
     install_bats
@@ -164,13 +166,16 @@ run_tests() {
             bats tests/unit/*.bats tests/integration/*.bats || exit_code=$?
             ;;
         *.bats)
-            if [ ! -f "$mode" ]; then
-                echo -e "${RED}✗${NC} Test file not found: $mode"
-                exit 1
-            fi
-            echo -e "${YELLOW}Running: $mode${NC}"
+            local file
+            for file in "$mode" "$@"; do
+                if [ ! -f "$file" ]; then
+                    echo -e "${RED}✗${NC} Test file not found: $file"
+                    exit 1
+                fi
+            done
+            echo -e "${YELLOW}Running: $mode $*${NC}"
             echo ""
-            bats "$mode" || exit_code=$?
+            bats "$mode" "$@" || exit_code=$?
             ;;
         *)
             echo -e "${RED}✗${NC} Unknown mode: $mode"
@@ -193,7 +198,8 @@ run_tests() {
 }
 
 # Main execution
-MODE="${1:-all}"
+[ $# -eq 0 ] && set -- all
+MODE="$1"
 
 if [ "$MODE" = "help" ] || [ "$MODE" = "-h" ] || [ "$MODE" = "--help" ]; then
     usage
@@ -201,7 +207,7 @@ fi
 
 if $IS_DOCKER; then
     # Already inside Docker, run tests directly
-    run_tests "$MODE"
+    run_tests "$@"
 else
     # Outside Docker, build and run container
     case "$MODE" in
@@ -209,7 +215,7 @@ else
             run_dev_shell
             ;;
         *)
-            run_docker_tests "$MODE"
+            run_docker_tests "$@"
             ;;
     esac
 fi

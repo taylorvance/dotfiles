@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for the `e` script (editor wrapper)
+# @covers src/dotfiles/.local/bin/e
 
 setup() {
     # Create temporary test directory

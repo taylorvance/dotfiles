@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 
 # Integration tests for actual config files (nvim, tmux, zsh, git)
+# @covers src/dotfiles/*
+# @covers src/symlink-manager.sh
 # These tests verify that the dotfiles work correctly in practice
 
 setup() {

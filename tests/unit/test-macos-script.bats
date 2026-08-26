@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for macos.sh
+# @covers src/macos.sh
 # The script is macOS-only; in the Linux test container the platform guard
 # must exit 0 without touching anything.
 

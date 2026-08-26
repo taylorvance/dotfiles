@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Integration tests for idempotency (safe to run multiple times)
+# @covers src/symlink-manager.sh
 
 setup() {
     export TEST_DIR=$(mktemp -d)

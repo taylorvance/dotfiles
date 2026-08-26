@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for git-prune-worktrees
+# @covers src/dotfiles/.local/bin/git-prune-worktrees
 
 setup() {
     export TEST_DIR=$(mktemp -d)

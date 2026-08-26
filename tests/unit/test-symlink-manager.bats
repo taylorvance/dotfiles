@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for symlink-manager.sh
+# @covers src/symlink-manager.sh
 
 setup() {
     # Create temporary test directories

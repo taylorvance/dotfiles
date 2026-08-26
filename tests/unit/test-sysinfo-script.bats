@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for the `sysinfo` script (system information utility)
+# @covers src/dotfiles/.local/bin/sysinfo
 
 setup() {
     export TEST_DIR=$(mktemp -d)

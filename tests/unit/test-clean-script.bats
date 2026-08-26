@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 # Unit tests for the `clean` script (build dependency cleaner)
+# @covers src/dotfiles/.local/bin/clean
 
 setup() {
     export TEST_DIR=$(mktemp -d)
