@@ -17,17 +17,19 @@ keeps the longer form. Over budget with facts still uncut? Ship it over budget.
 
 ## Findings — one line each
 
-    P1 `file:line` — what's wrong → what it breaks. Fix: <the change>.
+    1. P1 `file:line` — what's wrong → what it breaks. Fix: <the change>.
 
-e.g. P1 `pool.ts:88` — takeout applied twice → payouts 2% low on any funded pool. Fix: drop the second `applyTakeout`.
+e.g. 1. P1 `pool.ts:88` — takeout applied twice → payouts 2% low on any funded pool. Fix: drop the second `applyTakeout`.
 
-- Severity leads the line: **P1** blocker · **P2** significant · **P3** minor/nit.
-- ≤ 20 words after the path. Won't fit → it's two findings, or you don't understand it yet.
+- Severity leads the line: **P1** worst · **P3** least. The assignment rubric belongs to whoever
+  produced the findings (for reviews, the `review` skill).
+- ~20 words after the path. Needs more → it's two findings, or you don't understand it yet.
 - Basename only, unless two changed files share one.
 - Impact is a consequence ("payouts 2% low"), not a restatement ("takeout is wrong").
 - Fix is the change ("drop the second `applyTakeout`"), not a direction ("review the takeout logic").
 - No lead-in ("I noticed"), no hedge ("may", "consider"). Unverified findings say `unverified:` and stay.
-- Worst first: P1s by blast radius, then P2s, then P3s — one flat list, no severity headings.
+- One numbered flat list (`1.`), no severity headings. The number is the priority rank — the
+  ordering itself comes from whoever produced the findings.
 
 ## Budgets
 

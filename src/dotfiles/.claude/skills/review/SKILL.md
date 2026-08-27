@@ -6,6 +6,8 @@ description: Review the current branch diff (or a given PR) before merging — t
 Review the branch diff before merging: ground it in the ticket the branch implements, use the
 repo's own review machinery where it exists, verify every finding against source, report tersely.
 
+Load `humans-dont-like-to-read` now — it is the output contract and defines the finding-line shape.
+
 ## 1. Scope the diff
 
 - Default branch: `git default` (dotfiles alias), falling back to
@@ -35,19 +37,31 @@ repo's own review machinery where it exists, verify every finding against source
 
 ## 4. Verify before reporting
 
-For each candidate finding, read the actual source and confirm: the flagged code exists and is
-really a problem; it isn't already addressed elsewhere in the diff; acceptance-criteria claims
-match the actual ticket text. Correct or drop anything that doesn't hold up.
+For each candidate finding, read the actual source and confirm: the cited line at the reviewed
+revision contains the code the finding names (not a hunk header or counted offset); the flagged
+code is really a problem; it isn't already addressed elsewhere in the diff; acceptance-criteria
+claims match the actual ticket text. Correct or drop anything that doesn't hold up.
+
+You assign the final P-labels in this pass — specialist agents' severities are input, not binding.
+The label is the decision it drives: **P1** you'd block the merge over it · **P2** fix warranted,
+wouldn't block · **P3** worth mentioning, wouldn't insist.
+Challenge each label against the rubric, in either direction: promote what a specialist undersold,
+demote a P1 that wouldn't actually block the merge, and drop a P3 you wouldn't genuinely raise
+with a colleague — it never becomes a finding.
+Merge duplicates: when specialists report the same defect, it becomes one line at the label you
+judge correct.
+
+Order the final list by severity — all P1s, then P2s, then P3s — and by impact within each
+severity. This ranked order is what gets numbered in the report.
 
 ## 5. Report
 
-Load `humans-dont-like-to-read` — it is the output contract. Print the whole report as one fenced
-code block of raw markdown syntax, copyable verbatim into a PR comment. One line per finding,
-severity (P1/P2/P3) leading each line, sections with nothing in them deleted (never kept with
-"none"):
+Per the output contract, print the whole report as one fenced code block of raw markdown syntax,
+copyable verbatim into a PR comment. One numbered line per finding, severity leading each line,
+sections with nothing in them deleted (never kept with "none"):
 
     ## Review: <branch> (<ticket-key or "no ticket">)
-    ### Findings                <- one flat list, worst first: P1 blocker, P2 significant, P3 minor
+    ### Findings                <- one numbered flat list in your step-4 rank
     ### Acceptance criteria    <- unmet or partially-met only, with evidence
     ### Scope creep
     ### Not verified           <- every check that couldn't run, and what blocked it
