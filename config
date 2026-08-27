@@ -22,6 +22,9 @@
 .zsh/plugins
 .zshrc
 .claude/statusline-command.sh
+.claude/CLAUDE.md
+.claude/commands/address-pr-feedback.md
+.claude/scripts/pr-feedback.mjs
 .claude/skills/humans-dont-like-to-read
 .claude/skills/review
 .config/gh-dash/config.yml
