@@ -27,4 +27,5 @@
 .claude/scripts/pr-feedback.mjs
 .claude/skills/humans-dont-like-to-read
 .claude/skills/review
+.codex/AGENTS.md
 .config/gh-dash/config.yml
