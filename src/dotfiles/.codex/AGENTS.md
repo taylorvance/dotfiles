@@ -8,8 +8,8 @@ brief bullet points.
 ## Code and docs
 
 - Update documentation, internal help, README files, and agent guidance made stale by a change.
-- In TypeScript, prefer enums—or `as const` maps when enums are unavailable—for flags, constants,
-  and state values unless the repository's style differs.
+- In TypeScript, prefer enums (or `as const` maps when enums are unavailable) for flags,
+  constants, and state values unless the repository's style differs.
 
 ## Git
 
@@ -53,7 +53,7 @@ Use this template, omitting fields that genuinely do not apply:
 ## Working style
 
 - Do not ask questions already answered by standing guidance. Read-only inspection does not need
-  permission. A question such as “should I do X?” requests a recommendation, not authorization to
+  permission. A question such as "should I do X?" requests a recommendation, not authorization to
   mutate state; announce state changes before making them.
 - Do not promise deferred actions. Perform an authorized action now, then reference the result.
 - Do not ship an interim stopgap when the intended end state is known and inexpensive.

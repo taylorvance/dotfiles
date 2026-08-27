@@ -29,8 +29,8 @@ Load `humans-dont-like-to-read` now — it is the output contract and defines th
 - **`.claude/agents/`**: discover relevant reviewer agents (code-reviewer, security-auditor,
   domain specialists), but do not spawn them unless the user has approved multi-agent review after
   receiving any required cost estimate. Otherwise review locally with the same scope discipline.
-  When authorized, brief each agent with the ticket context, exact changed-file list, and “stay in
-  ticket scope; out-of-scope observations go under Scope creep.”
+  When authorized, brief each agent with the ticket context, exact changed-file list, and "stay in
+  ticket scope; out-of-scope observations go under Scope creep."
 - **Repo `CLAUDE.md` and `.claude/rules/`**: read the sections relevant to the touched areas.
 - **A repo-local `/review` command or review config**: its dispatch rules (security-sensitive
   paths, extra specialists, domain checks, report add-ons) override these defaults.
@@ -70,7 +70,7 @@ sections with nothing in them deleted (never kept with "none"):
 
 Missing optional context does not prevent `ship`; list it under `Not verified`. Never report
 `ship` when a validation required for the changed code could not run or the reviewed scope could
-not be established—an audit that did not happen must not read as one that passed.
+not be established: an audit that did not happen must not read as one that passed.
 
 ## Constraints
 
