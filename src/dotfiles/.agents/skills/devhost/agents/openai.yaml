@@ -1,0 +1,4 @@
+interface:
+  display_name: "Devhost"
+  short_description: "Reuse registered local development servers"
+  default_prompt: "Use $devhost to find and inspect the local development server for this repository."

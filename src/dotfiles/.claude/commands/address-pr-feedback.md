@@ -4,7 +4,9 @@ description: Fetch all PR feedback (comments, reviews, inline threads) and addre
 
 ## Setup
 
-Fetch **all three feedback types** (top-level comments, review comments, inline threads) in one shot by running the helper script — it auto-detects owner/repo and the current branch's PR and emits the full JSON:
+Fetch **all three feedback types** (top-level comments, review comments, inline threads) by
+running the helper script. It auto-detects owner/repo and the current branch's PR, paginates every
+root and nested connection, and emits the complete JSON:
 
 ```
 node ~/.claude/scripts/pr-feedback.mjs
@@ -12,11 +14,8 @@ node ~/.claude/scripts/pr-feedback.mjs
 
 Pass a PR number as the first arg to target a specific PR: `node ~/.claude/scripts/pr-feedback.mjs 736`.
 
-If `node` or the script is unavailable, fall back to the raw GraphQL call it wraps — get the PR number, owner, and repo first (`gh pr view --json number` + `gh repo view --json owner,name`), then:
-
-```
-gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){comments(first:100){nodes{author{login}body createdAt}}reviews(first:100){nodes{author{login}state body submittedAt comments(first:100){nodes{author{login}body path line createdAt}}}}reviewThreads(first:100){nodes{isResolved isOutdated comments(first:100){nodes{author{login}body path line createdAt}}}}}}}' -f owner=OWNER -f repo=REPO -F number=PR_NUMBER
-```
+If `node` or the script is unavailable, reproduce its paginated GraphQL queries from the script
+source. Never substitute a single `first:100` query and claim the result is complete.
 
 ## Review the feedback
 
@@ -35,6 +34,9 @@ For each item, classify it as:
 ## Implement fixes
 
 Work through every blocker and every suggestion you agree with. Do not defer. If a suggestion is clearly wrong or conflicts with the project's established patterns, skip it and note why.
+
+Deduplicate inline comments by GraphQL `id`; the same comment can appear under both
+`reviews[].comments` and `reviewThreads[].comments`.
 
 For each change:
 

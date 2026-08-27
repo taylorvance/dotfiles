@@ -1,21 +1,21 @@
-## Commit Message Format
+# Global agent instructions (all machines)
+
+## Commit message format
 
 Commits should include a one-line summary of the change, optionally followed by a blank line and
 brief bullet points.
 
-## Local Dev Servers
+## Code and docs
 
-Use Devhost before starting or checking any long-running local web servers.
+- Update documentation, internal help, README files, and agent guidance made stale by a change.
+- In TypeScript, prefer enums—or `as const` maps when enums are unavailable—for flags, constants,
+  and state values unless the repository's style differs.
 
-When asked things like "is the server running?", "what URL should I open?", "open/test the app",
-or when a task requires a browser/dev server:
+## Git
 
-- First use Devhost MCP if available.
-- Call `devhost_find_project_for_path` with the current repo path.
-- If matched, use `devhost_get_project` or `devhost_get_project_urls` to check status and URL.
-- Do not start a separate dev server with `npm run dev`, Vite, Python http.server, etc. unless the
-  project is not registered in Devhost or Devhost is unavailable.
-- Only call Devhost start/stop/restart tools with permission.
+- Use `git switch` instead of `git checkout` to create or change branches.
+- Run plain git from the repository root; do not use `git -C` or inline `cd`.
+- Do not add AI attribution or co-author footers to commits or pull requests.
 
 ## declog
 
@@ -49,3 +49,14 @@ Use this template, omitting fields that genuinely do not apply:
 - Consequences:
 - Alternatives:
 ```
+
+## Working style
+
+- Do not ask questions already answered by standing guidance. Read-only inspection does not need
+  permission. A question such as “should I do X?” requests a recommendation, not authorization to
+  mutate state; announce state changes before making them.
+- Do not promise deferred actions. Perform an authorized action now, then reference the result.
+- Do not ship an interim stopgap when the intended end state is known and inexpensive.
+- Do not use heavy multi-agent workflows without an upfront cost estimate and explicit approval.
+- Never store queryable external status in memory; query it live. Keep only non-queryable
+  decisions, gotchas, and conflicts, and remove them when they cease to apply.

@@ -26,11 +26,11 @@ Load `humans-dont-like-to-read` now — it is the output contract and defines th
 
 ## 3. Repo-specific review machinery — discover, don't assume
 
-- **`.claude/agents/`**: if reviewer agents exist (code-reviewer, security-auditor, domain
-  specialists), classify the changed files, then spawn the relevant agents in parallel in a single
-  message. Brief each with the ticket context, the exact changed-file list, and "stay in ticket
-  scope; out-of-scope observations go under Scope creep" — so none re-derive the diff and drift.
-  No agents defined → do the review yourself with the same scope discipline.
+- **`.claude/agents/`**: discover relevant reviewer agents (code-reviewer, security-auditor,
+  domain specialists), but do not spawn them unless the user has approved multi-agent review after
+  receiving any required cost estimate. Otherwise review locally with the same scope discipline.
+  When authorized, brief each agent with the ticket context, exact changed-file list, and “stay in
+  ticket scope; out-of-scope observations go under Scope creep.”
 - **Repo `CLAUDE.md` and `.claude/rules/`**: read the sections relevant to the touched areas.
 - **A repo-local `/review` command or review config**: its dispatch rules (security-sensitive
   paths, extra specialists, domain checks, report add-ons) override these defaults.
@@ -68,8 +68,9 @@ sections with nothing in them deleted (never kept with "none"):
     ### Verdict
     ship | needs fixes | blocked
 
-**Never report `ship` for a check that couldn't run** — an audit that didn't happen must not read
-as one that passed.
+Missing optional context does not prevent `ship`; list it under `Not verified`. Never report
+`ship` when a validation required for the changed code could not run or the reviewed scope could
+not be established—an audit that did not happen must not read as one that passed.
 
 ## Constraints
 

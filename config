@@ -21,6 +21,7 @@
 .zsh/functions.zsh
 .zsh/plugins
 .zshrc
+.agents/skills/devhost
 .claude/statusline-command.sh
 .claude/CLAUDE.md
 .claude/commands/address-pr-feedback.md
