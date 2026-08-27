@@ -6,6 +6,9 @@
 # rate_limits.seven_day, but on plans with a model-scoped weekly limit (e.g.
 # Fable) that field is absent — fall back to the /usage cache Claude Code keeps
 # in ~/.claude.json (cachedUsageUtilization.utilization.limits, group "weekly").
+# Usage pct color is absolute (pct_color); the (time left) color is the pace
+# signal: will usage last until reset (see pace_calc). A colored timer also
+# shows the burn ratio, e.g. "(4.9d 1.6x)".
 # Docs: https://code.claude.com/docs/en/statusline
 
 input=$(cat)
@@ -120,6 +123,29 @@ DIM='\033[02;37m'
 RESET='\033[00m'
 SEP="${DIM} · ${RESET}"
 
+# pace for the (time left) part: dim means nothing needs attention, and a
+# colored timer is always information, carrying the used%/elapsed% burn
+# ratio so the math is on screen. Yellow when burning >1.2x the window's
+# pace (the slack absorbs work-hours burstiness), red beyond 1.6x; green
+# (on pace, <=1.2x) shows only against a yellow/red pct as reassurance, and
+# stays dim next to a green pct. Dim below 25% used (pace not meaningful
+# yet). Sets pace_hue, and pace_ratio (used%/elapsed% in tenths for integer
+# math; empty when the timer is dim).
+pace_calc() {
+  local used=$1 left=$2 window=$3 elapsed ratio
+  pace_hue=$DIM pace_ratio=""
+  if [ "$used" -ge 25 ] 2>/dev/null && [ "$left" -gt 0 ] 2>/dev/null; then
+    elapsed=$((window - left))
+    if [ "$elapsed" -gt 0 ]; then
+      ratio=$((used * window / (elapsed * 10)))
+      if [ "$ratio" -gt 16 ]; then pace_hue=$DEL_RED pace_ratio=$ratio
+      elif [ "$ratio" -gt 12 ]; then pace_hue=$YELLOW pace_ratio=$ratio
+      elif [ "$used" -ge 50 ]; then pace_hue=$ADD_GREEN pace_ratio=$ratio
+      fi
+    fi
+  fi
+}
+
 # green under 50%, yellow under 80%, red at 80%+
 pct_color() {
   if [ "$1" -ge 80 ] 2>/dev/null; then printf '\033[01;31m'
@@ -144,12 +170,20 @@ fmt_left() {
   fi
 }
 
-# usage segment: label, percent, seconds-left -> e.g. "5h 4% (2h10m)"
+# usage segment: label, percent, seconds-left, window-seconds
+# -> e.g. "5h 4% (2h10m)", "7d 45% (4.9d 1.6x)"; pct colored by absolute
+# use, time left by pace (with the burn ratio whenever it's colored)
 usage_segment() {
   printf '%b%b%s %s%%%b' "$SEP" "$(pct_color "$2")" "$1" "$2" "$RESET"
   local left
   left=$(fmt_left "$3")
-  [ -n "$left" ] && printf ' %b(%s)%b' "$DIM" "$left" "$RESET"
+  [ -n "$left" ] || return 0
+  pace_calc "$2" "$3" "$4"
+  if [ -n "$pace_ratio" ]; then
+    printf ' %b(%s %d.%dx)%b' "$pace_hue" "$left" $((pace_ratio / 10)) $((pace_ratio % 10)) "$RESET"
+  else
+    printf ' %b(%s)%b' "$pace_hue" "$left" "$RESET"
+  fi
 }
 
 printf '%b%s%b' "$BLUE" "$dir" "$RESET"
@@ -170,8 +204,8 @@ elif [ -n "$effort" ]; then
   printf '%b%b%s%b' "$SEP" "$MAGENTA" "$effort" "$RESET"
 fi
 
-[ -n "$five_hour" ] && usage_segment "5h" "$five_hour" "$five_hour_left"
-[ -n "$seven_day" ] && usage_segment "7d" "$seven_day" "$seven_day_left"
+[ -n "$five_hour" ] && usage_segment "5h" "$five_hour" "$five_hour_left" 18000
+[ -n "$seven_day" ] && usage_segment "7d" "$seven_day" "$seven_day_left" 604800
 
 # context usage: hidden until 60%, then a yellow/red auto-compact heads-up
 if [ -n "$ctx_pct" ] && [ "$ctx_pct" -ge 60 ] 2>/dev/null; then
