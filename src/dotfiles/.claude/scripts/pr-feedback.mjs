@@ -145,7 +145,13 @@ query($id:ID!,$cursor:String){
 }`
 
 try {
-    const [prArg] = process.argv.slice(2)
+    const cliArgs = process.argv.slice(2)
+    const unresolvedOnly = cliArgs.includes('--unresolved')
+    const positional = cliArgs.filter((arg) => arg !== '--unresolved')
+    const unknownFlag = positional.find((arg) => arg.startsWith('-'))
+    if (unknownFlag) throw new Error(`unknown flag: ${unknownFlag} (usage: pr-feedback.mjs [PR_NUMBER] [--unresolved])`)
+
+    const [prArg] = positional
     const number = parsePrNumber(prArg)
     const { owner, repo } = currentRepo()
     const variables = { owner, repo, number }
@@ -153,10 +159,15 @@ try {
     const comments = collectRootConnection(COMMENTS_QUERY, 'comments', variables)
     const reviews = collectRootConnection(REVIEWS_QUERY, 'reviews', variables)
     for (const review of reviews) {
-        review.comments = collectNodeComments(REVIEW_COMMENTS_QUERY, review.id)
+        review.comments = unresolvedOnly
+            ? { nodes: [] }
+            : collectNodeComments(REVIEW_COMMENTS_QUERY, review.id)
     }
 
-    const reviewThreads = collectRootConnection(THREADS_QUERY, 'reviewThreads', variables)
+    let reviewThreads = collectRootConnection(THREADS_QUERY, 'reviewThreads', variables)
+    if (unresolvedOnly) {
+        reviewThreads = reviewThreads.filter((thread) => !thread.isResolved && !thread.isOutdated)
+    }
     for (const thread of reviewThreads) {
         thread.comments = collectNodeComments(THREAD_COMMENTS_QUERY, thread.id)
     }

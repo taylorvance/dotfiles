@@ -51,8 +51,11 @@ case "$query" in
         printf '{"data":{"node":{"comments":%s}}}\n' "$value"
         ;;
     *'reviewThreads(first:'*)
-        if [ -z "$cursor" ]; then value=$(connection T1 true '"T_NEXT"')
-        else value=$(connection T2 false null); fi
+        if [ -z "$cursor" ]; then
+            value='{"nodes":[{"id":"T1","isResolved":false,"isOutdated":false}],"pageInfo":{"hasNextPage":true,"endCursor":"T_NEXT"}}'
+        else
+            value='{"nodes":[{"id":"T2","isResolved":true,"isOutdated":false},{"id":"T3","isResolved":false,"isOutdated":true}],"pageInfo":{"hasNextPage":false,"endCursor":null}}'
+        fi
         printf '{"data":{"repository":{"pullRequest":{"reviewThreads":%s}}}}\n' "$value"
         ;;
     *'reviews(first:'*)
@@ -81,9 +84,30 @@ teardown() {
     run node "$SCRIPT" 42
 
     [ "$status" -eq 0 ]
-    for id in C1 C2 R1 R2 RC1 RC2 RC3 T1 T2 TC1 TC2 TC3; do
+    for id in C1 C2 R1 R2 RC1 RC2 RC3 T1 T2 T3 TC1 TC2 TC3; do
         [[ "$output" == *"\"$id\""* ]]
     done
+}
+
+@test "pr-feedback --unresolved drops resolved and outdated threads and their comment queries" {
+    run node "$SCRIPT" 42 --unresolved
+
+    [ "$status" -eq 0 ]
+    for id in T1 TC1 TC2 C1 C2 R1 R2; do
+        [[ "$output" == *"\"$id\""* ]]
+    done
+    # resolved/outdated threads dropped; review-nested inline comments emptied
+    # so each inline comment appears exactly once, under its unresolved thread
+    for id in T2 T3 TC3 RC1 RC2 RC3; do
+        [[ "$output" != *"\"$id\""* ]]
+    done
+}
+
+@test "pr-feedback rejects an unknown flag before calling gh" {
+    run node "$SCRIPT" --nope
+
+    [ "$status" -eq 1 ]
+    [ "$output" = "unknown flag: --nope (usage: pr-feedback.mjs [PR_NUMBER] [--unresolved])" ]
 }
 
 @test "pr-feedback rejects an invalid explicit PR number before calling gh" {
