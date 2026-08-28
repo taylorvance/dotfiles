@@ -1,6 +1,6 @@
 ---
 name: review
-description: Review the current branch diff (or a given PR) before merging — ticket-grounded, uses the repo's own reviewer agents when defined, verifies findings, reports one line each
+description: Review the current branch diff (or a given PR) before merging: ticket-grounded, dispatches whatever reviewers the repo and the client provide, verifies every finding, reports one line each
 ---
 
 Review the branch diff before merging: ground it in the ticket the branch implements, use the
@@ -25,18 +25,26 @@ SKILL.md from the sibling directory) — it is the output contract and defines t
 - If a key is found and an Atlassian tool is available, fetch the ticket; capture summary and
   acceptance criteria. Otherwise proceed and record the gap under `### Not verified`.
 
-## 3. Repo-specific review machinery — discover, don't assume
+## 3. Review machinery: discover, don't assume
 
-- **Reviewer agents**: discover relevant repository-provided agents (code-reviewer,
-  security-auditor, domain specialists) through the locations and capabilities exposed by the
-  current client. Do not spawn them unless the user has approved multi-agent review after receiving
-  any required cost estimate. Otherwise review locally with the same scope discipline. When
-  authorized, brief each agent with the ticket context, exact changed-file list, and "stay in ticket
-  scope; out-of-scope observations go under Scope creep."
+Invoking this skill is the request to dispatch reviewers: run the ones the diff calls for without
+stopping to ask. Never assume a given agent, plugin, or skill exists; use what your client lists as
+available, in this order:
+
+1. **Repo-provided machinery** (reviewer agents, a review command, a review skill). Its dispatch
+   rules (security-sensitive paths, extra specialists, domain checks, report add-ons) override
+   these defaults.
+2. **General-purpose reviewers your client offers**, selected by what the diff touches: tests,
+   error handling, type design, new doc comments, security-sensitive paths.
+3. **Yourself**, for whatever the first two did not cover. Absent machinery never skips the review.
+
+- You write the single report. Delegate for findings, not for the write-up, unless the repo
+  defines its own report format.
+- Never dispatch anything that edits code; this review is read-only.
+- Brief every reviewer with the ticket context, the exact changed-file list, and "stay in ticket
+  scope; out-of-scope observations go under Scope creep", so none re-derive the diff and drift.
 - **Repository guidance**: read applicable agent instruction and rules files, focusing on sections
   relevant to the touched areas.
-- **A repo-local review skill, command, or config**: its dispatch rules (security-sensitive paths,
-  extra specialists, domain checks, report add-ons) override these defaults.
 
 ## 4. Verify before reporting
 
@@ -88,9 +96,15 @@ sections with nothing in them deleted (never kept with "none"):
     ### Deploy gate            <- release preconditions, not diff defects; unnumbered
     ### Acceptance criteria    <- unmet or partially-met only, with evidence
     ### Scope creep
+    ### Checked clean          <- risk areas inspected and found sound; one line each
     ### Not verified           <- every check that couldn't run, and what blocked it
     ### Verdict
     ship | needs fixes | blocked
+
+`Checked clean` names the risk areas this diff puts in play that you read and found sound (auth
+path, money math, migration ordering), one line each with the evidence, so a quiet review is
+distinguishable from an absent one. Only what you actually inspected, and only what the diff
+implicates: never pad it.
 
 Missing optional context does not prevent `ship`; list it under `Not verified`. A `Deploy gate`
 entry does not prevent `ship` either: the verdict is about the branch, and a release precondition

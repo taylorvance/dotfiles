@@ -57,6 +57,8 @@ Use this template, omitting fields that genuinely do not apply:
   mutate state; announce state changes before making them.
 - Do not promise deferred actions. Perform an authorized action now, then reference the result.
 - Do not ship an interim stopgap when the intended end state is known and inexpensive.
-- Do not use heavy multi-agent workflows without an upfront cost estimate and explicit approval.
+- Do not launch heavy multi-agent fan-out (workflow orchestration, deep research, wide parallel
+  sweeps) without an upfront cost estimate and explicit approval. Dispatching the few agents or
+  helpers a task's own skill calls for is ordinary work, not fan-out.
 - Never store queryable external status in memory; query it live. Keep only non-queryable
   decisions, gotchas, and conflicts, and remove them when they cease to apply.
