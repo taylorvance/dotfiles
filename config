@@ -22,6 +22,8 @@
 .zsh/plugins
 .zshrc
 .agents/skills/devhost
+.agents/skills/humans-dont-like-to-read
+.agents/skills/review
 .claude/statusline-command.sh
 .claude/CLAUDE.md
 .claude/commands/address-pr-feedback.md

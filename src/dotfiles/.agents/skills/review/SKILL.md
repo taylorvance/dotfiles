@@ -6,7 +6,8 @@ description: Review the current branch diff (or a given PR) before merging — t
 Review the branch diff before merging: ground it in the ticket the branch implements, use the
 repo's own review machinery where it exists, verify every finding against source, report tersely.
 
-Load `humans-dont-like-to-read` now — it is the output contract and defines the finding-line shape.
+Load the `humans-dont-like-to-read` skill now (if your harness has no skill loader, read its
+SKILL.md from the sibling directory) — it is the output contract and defines the finding-line shape.
 
 ## 1. Scope the diff
 
@@ -14,8 +15,8 @@ Load `humans-dont-like-to-read` now — it is the output contract and defines th
   `git symbolic-ref --short refs/remotes/origin/HEAD`.
 - `git diff <default>...HEAD --name-only` for changed files, `git log <default>..HEAD --oneline`
   for commit context. Empty diff → say so and stop.
-- If `$ARGUMENTS` names a PR number or another branch, review that instead — in a worktree, never
-  by switching the checkout.
+- If the invocation arguments (`$ARGUMENTS` where the harness expands it) name a PR number or
+  another branch, review that instead — in a worktree, never by switching the checkout.
 
 ## 2. Ticket + PR context
 
