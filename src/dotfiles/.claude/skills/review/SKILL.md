@@ -42,12 +42,32 @@ revision contains the code the finding names (not a hunk header or counted offse
 code is really a problem; it isn't already addressed elsewhere in the diff; acceptance-criteria
 claims match the actual ticket text. Correct or drop anything that doesn't hold up.
 
+The cited `file:line` must be a line the PR changes, so it can anchor an inline review comment.
+When the defect manifests in code the PR doesn't touch, cite the causal changed line (the call
+site, signature, or removed guard that makes the untouched code wrong) and name the untouched
+location in the finding text. If no causal in-diff line exists, the problem is pre-existing:
+report it under Scope creep, not as a finding.
+
 You assign the final P-labels in this pass — specialist agents' severities are input, not binding.
 The label is the decision it drives: **P1** you'd block the merge over it · **P2** fix warranted,
 wouldn't block · **P3** worth mentioning, wouldn't insist.
 Challenge each label against the rubric, in either direction: promote what a specialist undersold,
 demote a P1 that wouldn't actually block the merge, and drop a P3 you wouldn't genuinely raise
 with a colleague — it never becomes a finding.
+
+Two tests make a label falsifiable before you print it:
+
+- **A P1 must name a change to the reviewed diff.** If the fix is a process action (enforce a
+  ticket, gate a release, have someone check production data), it is not a ranked finding: put it
+  under its own `### Deploy gate` heading and leave it out of the numbered list. A deferral you
+  called defensible cannot also be a blocker.
+- **A clean branch is a valid result.** Never promote a finding to fill a severity tier; the length
+  of the findings list is not evidence of review effort.
+
+When a label is challenged after the report is printed, re-derive it from the rubric, not from the
+tone of the challenge. Say which happened: "re-derivation lands the same, here is why", or "this
+was wrong when I wrote it, here is the inconsistency".
+
 Merge duplicates: when specialists report the same defect, it becomes one line at the label you
 judge correct.
 
@@ -62,15 +82,18 @@ sections with nothing in them deleted (never kept with "none"):
 
     ## Review: <branch> (<ticket-key or "no ticket">)
     ### Findings                <- one numbered flat list in your step-4 rank
+    ### Deploy gate            <- release preconditions, not diff defects; unnumbered
     ### Acceptance criteria    <- unmet or partially-met only, with evidence
     ### Scope creep
     ### Not verified           <- every check that couldn't run, and what blocked it
     ### Verdict
     ship | needs fixes | blocked
 
-Missing optional context does not prevent `ship`; list it under `Not verified`. Never report
-`ship` when a validation required for the changed code could not run or the reviewed scope could
-not be established: an audit that did not happen must not read as one that passed.
+Missing optional context does not prevent `ship`; list it under `Not verified`. A `Deploy gate`
+entry does not prevent `ship` either: the verdict is about the branch, and a release precondition
+is not a defect in it. Never report `ship` when a validation required for the changed code could
+not run or the reviewed scope could not be established: an audit that did not happen must not read
+as one that passed.
 
 ## Constraints
 

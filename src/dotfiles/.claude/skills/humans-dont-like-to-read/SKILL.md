@@ -24,6 +24,7 @@ e.g. 1. P1 `pool.ts:88` — takeout applied twice → payouts 2% low on any fund
 - Severity leads the line: **P1** worst · **P3** least. The assignment rubric belongs to whoever
   produced the findings (for reviews, the `review` skill).
 - ~20 words after the path. Needs more → it's two findings, or you don't understand it yet.
+- One physical line per finding: never hard-wrap or indent continuation text; the display wraps it.
 - Basename only, unless two changed files share one.
 - Impact is a consequence ("payouts 2% low"), not a restatement ("takeout is wrong").
 - Fix is the change ("drop the second `applyTakeout`"), not a direction ("review the takeout logic").
