@@ -14,11 +14,12 @@ node ~/.claude/scripts/pr-feedback.mjs
 
 Pass a PR number as the first arg to target a specific PR: `node ~/.claude/scripts/pr-feedback.mjs 736`.
 
-On very large PRs (hundreds of inline threads), add `--unresolved` to drop resolved and outdated
-threads and skip their comment queries. It also empties `reviews[].comments`, so each inline
-comment appears exactly once, under its unresolved thread (no dedup needed). Prefer the default
-complete output when size allows: resolved threads are what let you verify "already addressed"
-claims.
+Bot-authored comments and reviews (CI status dumps like cypress or semanticdiff) are dropped; the
+output's `botFeedbackOmitted` field counts what was hidden. Fetch those with gh directly on the
+rare occasion they matter. Bot-authored inline threads are always kept.
+
+Outdated threads (`isOutdated: true`) with `isResolved: false` deserve particular attention: those
+are typically feedback the author pushed fixes over, exactly what needs checking.
 
 If `node` or the script is unavailable, reproduce its paginated GraphQL queries from the script
 source. Never substitute a single `first:100` query and claim the result is complete.

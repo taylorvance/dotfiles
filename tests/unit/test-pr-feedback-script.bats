@@ -35,8 +35,10 @@ case "$query" in
             value=$(connection TC1 true '"TC_NEXT"')
         elif [ "$id" = "T1" ]; then
             value=$(connection TC2 false null)
-        else
+        elif [ "$id" = "T3" ]; then
             value=$(connection TC3 false null)
+        else
+            value=$(connection TC_RESOLVED false null)
         fi
         printf '{"data":{"node":{"comments":%s}}}\n' "$value"
         ;;
@@ -60,12 +62,12 @@ case "$query" in
         ;;
     *'reviews(first:'*)
         if [ -z "$cursor" ]; then value=$(connection R1 true '"R_NEXT"')
-        else value=$(connection R2 false null); fi
+        else value='{"nodes":[{"id":"R2"},{"id":"RB","author":{"login":"semanticdiff-com","__typename":"Bot"}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}'; fi
         printf '{"data":{"repository":{"pullRequest":{"reviews":%s}}}}\n' "$value"
         ;;
     *'comments(first:'*)
         if [ -z "$cursor" ]; then value=$(connection C1 true '"C_NEXT"')
-        else value=$(connection C2 false null); fi
+        else value='{"nodes":[{"id":"C2"},{"id":"CB","author":{"login":"cypress","__typename":"Bot"}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}'; fi
         printf '{"data":{"repository":{"pullRequest":{"comments":%s}}}}\n' "$value"
         ;;
     *)
@@ -84,30 +86,26 @@ teardown() {
     run node "$SCRIPT" 42
 
     [ "$status" -eq 0 ]
-    for id in C1 C2 R1 R2 RC1 RC2 RC3 T1 T2 T3 TC1 TC2 TC3; do
+    for id in C1 C2 R1 R2 RC1 RC2 RC3 T1 T2 T3 TC1 TC2 TC3 TC_RESOLVED; do
         [[ "$output" == *"\"$id\""* ]]
     done
 }
 
-@test "pr-feedback --unresolved drops resolved and outdated threads and their comment queries" {
-    run node "$SCRIPT" 42 --unresolved
+@test "pr-feedback drops bot comments and reviews and reports the omission" {
+    run node "$SCRIPT" 42
 
     [ "$status" -eq 0 ]
-    for id in T1 TC1 TC2 C1 C2 R1 R2; do
-        [[ "$output" == *"\"$id\""* ]]
-    done
-    # resolved/outdated threads dropped; review-nested inline comments emptied
-    # so each inline comment appears exactly once, under its unresolved thread
-    for id in T2 T3 TC3 RC1 RC2 RC3; do
+    for id in CB RB; do
         [[ "$output" != *"\"$id\""* ]]
     done
+    [[ "$output" == *botFeedbackOmitted* ]]
 }
 
-@test "pr-feedback rejects an unknown flag before calling gh" {
-    run node "$SCRIPT" --nope
+@test "pr-feedback rejects a flag before calling gh" {
+    run node "$SCRIPT" --unresolved
 
     [ "$status" -eq 1 ]
-    [ "$output" = "unknown flag: --nope (usage: pr-feedback.mjs [PR_NUMBER] [--unresolved])" ]
+    [ "$output" = "unknown flag: --unresolved (usage: pr-feedback.mjs [PR_NUMBER])" ]
 }
 
 @test "pr-feedback rejects an invalid explicit PR number before calling gh" {

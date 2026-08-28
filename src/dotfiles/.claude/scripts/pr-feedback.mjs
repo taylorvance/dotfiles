@@ -70,7 +70,7 @@ function collectNodeComments(query, id) {
 
 const COMMENT_FIELDS = `
     id
-    author { login }
+    author { login __typename }
     body
     createdAt
     url
@@ -101,7 +101,7 @@ query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$number){
       reviews(first:${PAGE_SIZE},after:$cursor){
-        nodes { id author { login } state body submittedAt }
+        nodes { id author { login __typename } state body submittedAt }
         pageInfo { hasNextPage endCursor }
       }
     }
@@ -146,37 +146,49 @@ query($id:ID!,$cursor:String){
 
 try {
     const cliArgs = process.argv.slice(2)
-    const unresolvedOnly = cliArgs.includes('--unresolved')
-    const positional = cliArgs.filter((arg) => arg !== '--unresolved')
-    const unknownFlag = positional.find((arg) => arg.startsWith('-'))
-    if (unknownFlag) throw new Error(`unknown flag: ${unknownFlag} (usage: pr-feedback.mjs [PR_NUMBER] [--unresolved])`)
+    const unknownFlag = cliArgs.find((arg) => arg.startsWith('-'))
+    if (unknownFlag) throw new Error(`unknown flag: ${unknownFlag} (usage: pr-feedback.mjs [PR_NUMBER])`)
 
-    const [prArg] = positional
+    const [prArg] = cliArgs
     const number = parsePrNumber(prArg)
     const { owner, repo } = currentRepo()
     const variables = { owner, repo, number }
 
+    // GitHub Apps (semanticdiff, cypress, ...) author as __typename Bot; their
+    // status dumps can dwarf the human feedback, so they are always dropped.
+    // Bot output, when genuinely needed, comes straight from gh instead.
+    const isBot = (item) => item.author?.__typename === 'Bot'
+
     const comments = collectRootConnection(COMMENTS_QUERY, 'comments', variables)
     const reviews = collectRootConnection(REVIEWS_QUERY, 'reviews', variables)
-    for (const review of reviews) {
-        review.comments = unresolvedOnly
-            ? { nodes: [] }
-            : collectNodeComments(REVIEW_COMMENTS_QUERY, review.id)
+    const omittedBots = {
+        comments: comments.filter(isBot).length,
+        reviews: reviews.filter(isBot).length,
+    }
+    const humanComments = comments.filter((item) => !isBot(item))
+    const humanReviews = reviews.filter((item) => !isBot(item))
+    for (const review of humanReviews) {
+        review.comments = collectNodeComments(REVIEW_COMMENTS_QUERY, review.id)
     }
 
-    let reviewThreads = collectRootConnection(THREADS_QUERY, 'reviewThreads', variables)
-    if (unresolvedOnly) {
-        reviewThreads = reviewThreads.filter((thread) => !thread.isResolved && !thread.isOutdated)
-    }
+    const reviewThreads = collectRootConnection(THREADS_QUERY, 'reviewThreads', variables)
     for (const thread of reviewThreads) {
+        // Thread comments are never bot-filtered: bot-authored inline threads
+        // (e.g. Copilot review comments) are code-anchored feedback, not status noise.
         thread.comments = collectNodeComments(THREAD_COMMENTS_QUERY, thread.id)
     }
 
     const pullRequest = {
         number,
-        comments: { nodes: comments },
-        reviews: { nodes: reviews },
+        comments: { nodes: humanComments },
+        reviews: { nodes: humanReviews },
         reviewThreads: { nodes: reviewThreads },
+    }
+    if (omittedBots.comments || omittedBots.reviews) {
+        pullRequest.botFeedbackOmitted = {
+            ...omittedBots,
+            note: 'bot-authored items hidden; fetch them with gh directly if needed',
+        }
     }
     process.stdout.write(`${JSON.stringify({ data: { repository: { pullRequest } } }, null, 2)}\n`)
 } catch (error) {

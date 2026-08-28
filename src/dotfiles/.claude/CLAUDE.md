@@ -10,9 +10,10 @@
 - When checking a PR for feedback (assume the PR for the current checked-out branch), run the
   helper script: `node ~/.claude/scripts/pr-feedback.mjs [PR_NUMBER]`. It auto-detects owner/repo
   and the current branch's PR (works from any repo), then emits the full
-  comments+reviews+reviewThreads JSON; pass a PR number to target a specific PR, and
-  `--unresolved` to drop resolved/outdated threads on very large PRs. If `node` or the
-  script is unavailable, reproduce its paginated GraphQL queries (see the script source).
+  comments+reviews+reviewThreads JSON. Bot-authored comments and reviews (CI status dumps) are
+  dropped and counted in `botFeedbackOmitted`; fetch those with gh directly on the rare occasion
+  they matter. Pass a PR number to target a specific PR. If `node` or the script is unavailable,
+  reproduce its paginated GraphQL queries (see the script source).
 - When asked about PR feedback, always check all three sources: PR comments, inline review
   comments, and reviews.
 - When addressing PR feedback, implement directly related non-blocking suggestions that you agree
