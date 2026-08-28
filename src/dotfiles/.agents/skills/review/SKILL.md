@@ -15,8 +15,8 @@ SKILL.md from the sibling directory) — it is the output contract and defines t
   `git symbolic-ref --short refs/remotes/origin/HEAD`.
 - `git diff <default>...HEAD --name-only` for changed files, `git log <default>..HEAD --oneline`
   for commit context. Empty diff → say so and stop.
-- If the invocation arguments (`$ARGUMENTS` where the harness expands it) name a PR number or
-  another branch, review that instead — in a worktree, never by switching the checkout.
+- If the invocation names a PR number or another branch, review that instead — in a worktree,
+  never by switching the checkout.
 
 ## 2. Ticket + PR context
 
@@ -27,14 +27,16 @@ SKILL.md from the sibling directory) — it is the output contract and defines t
 
 ## 3. Repo-specific review machinery — discover, don't assume
 
-- **`.claude/agents/`**: discover relevant reviewer agents (code-reviewer, security-auditor,
-  domain specialists), but do not spawn them unless the user has approved multi-agent review after
-  receiving any required cost estimate. Otherwise review locally with the same scope discipline.
-  When authorized, brief each agent with the ticket context, exact changed-file list, and "stay in
-  ticket scope; out-of-scope observations go under Scope creep."
-- **Repo `CLAUDE.md` and `.claude/rules/`**: read the sections relevant to the touched areas.
-- **A repo-local `/review` command or review config**: its dispatch rules (security-sensitive
-  paths, extra specialists, domain checks, report add-ons) override these defaults.
+- **Reviewer agents**: discover relevant repository-provided agents (code-reviewer,
+  security-auditor, domain specialists) through the locations and capabilities exposed by the
+  current client. Do not spawn them unless the user has approved multi-agent review after receiving
+  any required cost estimate. Otherwise review locally with the same scope discipline. When
+  authorized, brief each agent with the ticket context, exact changed-file list, and "stay in ticket
+  scope; out-of-scope observations go under Scope creep."
+- **Repository guidance**: read applicable agent instruction and rules files, focusing on sections
+  relevant to the touched areas.
+- **A repo-local review skill, command, or config**: its dispatch rules (security-sensitive paths,
+  extra specialists, domain checks, report add-ons) override these defaults.
 
 ## 4. Verify before reporting
 

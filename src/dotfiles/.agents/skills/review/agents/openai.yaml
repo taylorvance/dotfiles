@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review"
+  short_description: "Review a branch or PR before merging"
+  default_prompt: "Use $review to review the current branch before merging."

@@ -135,6 +135,8 @@ instruction instead of attempting a download.
 - **nvim** - lazy.nvim plugin manager
 - **git** - Common aliases, delta diff integration
 - **tmux** - `C-Space` prefix, vim-like navigation
+- **agents** - Shared guidance and skills under `.agents`, exposed through client-specific
+  discovery adapters where required
 
 ## Project Structure
 
@@ -147,6 +149,9 @@ dotfiles/
 │   ├── adopt.sh            # Adopt existing home files into src/dotfiles/
 │   ├── symlink-manager.sh  # Symlink management (install/uninstall/status/restore)
 │   └── dotfiles/           # Your actual dotfiles
+│       ├── .agents/        # Canonical shared agent guidance and skills
+│       ├── .claude/        # Claude-specific config and shared-skill adapters
+│       ├── .codex/         # Codex discovery adapter for shared AGENTS.md
 │       ├── .config/
 │       ├── .local/bin/
 │       ├── .tmux/plugins   # -> vendor/tmux

@@ -21,6 +21,7 @@
 .zsh/functions.zsh
 .zsh/plugins
 .zshrc
+.agents/AGENTS.md
 .agents/skills/devhost
 .agents/skills/humans-dont-like-to-read
 .agents/skills/review

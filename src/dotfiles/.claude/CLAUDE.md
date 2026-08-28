@@ -1,6 +1,6 @@
 # Global Claude instructions
 
-@~/.codex/AGENTS.md
+@~/.agents/AGENTS.md
 
 ## PRs & reviews
 

@@ -1,6 +1,6 @@
 ---
 name: devhost
-description: Inspect and control local development servers registered with Devhost. Use when asked whether a local app or server is running, what URL to open, to open or test an app, or whenever browser testing requires a local development server.
+description: Inspect and control local development servers registered with Devhost. Use when Devhost MCP tools are available and asked whether a local app or server is running, what URL to open, to open or test an app, or whenever browser testing requires a local development server.
 ---
 
 1. Call `devhost_find_project_for_path` with the current repository path.
