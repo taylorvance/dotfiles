@@ -16,6 +16,10 @@
 - If a relevant live file is not represented in `config` or `src/dotfiles/`, say so before
   changing it. Do not assume it should be adopted: some applications keep mutable,
   machine-specific state in otherwise useful configuration files.
+- Zsh/tmux plugins are commit-pinned git submodules under `vendor/`; nvim plugins pin separately
+  via `lazy-lock.json` (the nvim config requires nvim >= 0.11). `make bump-plugins` upgrades
+  interactively; the symlinked plugin dirs go live the moment code is checked out, so audit the
+  incoming commits before confirming checkout.
 
 ## Working in this repository
 
@@ -25,9 +29,13 @@
 - Custom scripts live under `src/dotfiles/.local/bin/`; their `-h` output is the source of truth
   for user-facing behavior. Read and update it whenever changing or documenting a command's
   interface.
-- Keep the README, tests, and agent guidance current when behavior changes.
-- Standalone scripts target Bash 3.2 unless they are deliberately POSIX `sh`; interactive shell
-  integration belongs in zsh.
+- Keep the README, tests, and agent guidance current when behavior changes. Do not duplicate
+  documentation across those places: commands are documented by `make help`, scripts by their
+  `-h` output, testing by `tests/README.md`, and config files by their own header comments.
+- Standalone scripts target Bash 3.2 (parallel arrays, no associative arrays) unless they are
+  deliberately POSIX `sh`; interactive shell integration belongs in zsh.
+- Interactive scripts share conventions: `-n` dry-run; `y/N/i` prompts (apply all / abort /
+  fzf multi-select); EOF at a prompt aborts safely.
 
 ## Verification
 
