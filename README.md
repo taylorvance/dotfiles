@@ -172,6 +172,7 @@ dotfiles/
 │       └── .zshrc          # Your original files
 ├── config                  # Paths to symlink
 ├── Makefile                # Command interface
+├── AGENTS.md               # Repository guidance for coding agents
 ├── CLAUDE.md               # AI assistant instructions
 └── README.md               # This file
 ```
