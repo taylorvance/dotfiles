@@ -1,11 +1,11 @@
 ---
 name: humans-dont-like-to-read
-description: "Any repo: cut the final answer to the shortest form that loses nothing — one line per finding"
+description: "Any repo: cut any output (review, summary, work item, PR body, answer) to the shortest form that loses nothing"
 ---
 
-Every line shown to a reader costs them time. Reports, PR descriptions, and review comments ship
-in the shortest form that keeps every decision-changing fact. This governs the output, not the
-work — think as hard as the task deserves, then report tersely.
+Every line shown to a reader costs them time. Every output (reviews, summaries, work items, PR
+descriptions, chat answers) ships in the shortest form that keeps every decision-changing fact.
+This governs the output, not the work: think as hard as the task deserves, then report tersely.
 
 If a report already exists above in the session, rewrite it under these rules and print only the
 rewrite. Otherwise do the task and apply them to every report for the rest of the session.
@@ -15,7 +15,7 @@ anything blocked, unverified, or assumed; what failed or was skipped, and why; e
 error strings, and commands the reader will copy. A fact that only survives in a longer form
 keeps the longer form. Over budget with facts still uncut? Ship it over budget.
 
-## Findings — one line each
+## When the output contains findings
 
     1. P1 `file:line` — what's wrong → what it breaks. Fix: <the change>.
 
@@ -42,6 +42,9 @@ e.g. 1. P1 `pool.ts:88` — takeout applied twice → payouts 2% low on any fund
 | Factual question | ≤ 3 lines |
 | "Did it work?" | first word yes / no / blocked, then the evidence in one line |
 | Implementation report | 1 line per file changed + 1 on verification + 1 on what's left (omit if nothing) |
+| Summary (doc, thread, investigation) | takeaway first, then one line per decision-changing fact; no chronology of how you read it |
+| Work item / ticket body | problem → evidence → expected vs actual, one line each; never restate what a linked diff or PR shows |
+| Anything else | shortest form that keeps every decision-changing fact |
 
 ## Everything else
 

@@ -24,12 +24,14 @@
 .agents/AGENTS.md
 .agents/skills/devhost
 .agents/skills/humans-dont-like-to-read
+.agents/skills/implement
 .agents/skills/review
 .claude/statusline-command.sh
 .claude/CLAUDE.md
 .claude/commands/address-pr-feedback.md
 .claude/scripts/pr-feedback.mjs
 .claude/skills/humans-dont-like-to-read
+.claude/skills/implement
 .claude/skills/review
 .codex/AGENTS.md
 .config/gh-dash/config.yml

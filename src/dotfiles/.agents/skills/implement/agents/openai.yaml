@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement"
+  short_description: "Implement a feature or fix a bug from a work item"
+  default_prompt: "Use $implement to implement a work item end-to-end."
