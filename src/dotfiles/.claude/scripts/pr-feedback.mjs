@@ -76,12 +76,13 @@ const COMMENT_FIELDS = `
     url
 `
 
+// No diffHunk: `path` + `line` locate the comment, and the hunks dominated the
+// payload (one anchored to a reformatted markdown table carried KBs of table).
 const INLINE_COMMENT_FIELDS = `
     ${COMMENT_FIELDS}
     path
     line
     originalLine
-    diffHunk
 `
 
 const COMMENTS_QUERY = `
@@ -96,24 +97,14 @@ query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
   }
 }`
 
+// State and summary body only. Inline comments come from reviewThreads below,
+// which carry the same comments plus isResolved / isOutdated.
 const REVIEWS_QUERY = `
 query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$number){
       reviews(first:${PAGE_SIZE},after:$cursor){
-        nodes { id author { login __typename } state body submittedAt }
-        pageInfo { hasNextPage endCursor }
-      }
-    }
-  }
-}`
-
-const REVIEW_COMMENTS_QUERY = `
-query($id:ID!,$cursor:String){
-  node(id:$id){
-    ... on PullRequestReview {
-      comments(first:${PAGE_SIZE},after:$cursor){
-        nodes { ${INLINE_COMMENT_FIELDS} }
+        nodes { author { login __typename } state body submittedAt }
         pageInfo { hasNextPage endCursor }
       }
     }
@@ -167,9 +158,6 @@ try {
     }
     const humanComments = comments.filter((item) => !isBot(item))
     const humanReviews = reviews.filter((item) => !isBot(item))
-    for (const review of humanReviews) {
-        review.comments = collectNodeComments(REVIEW_COMMENTS_QUERY, review.id)
-    }
 
     const reviewThreads = collectRootConnection(THREADS_QUERY, 'reviewThreads', variables)
     for (const thread of reviewThreads) {

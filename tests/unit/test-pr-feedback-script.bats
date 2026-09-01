@@ -42,16 +42,6 @@ case "$query" in
         fi
         printf '{"data":{"node":{"comments":%s}}}\n' "$value"
         ;;
-    *'... on PullRequestReview {'*)
-        if [ "$id" = "R1" ] && [ -z "$cursor" ]; then
-            value=$(connection RC1 true '"RC_NEXT"')
-        elif [ "$id" = "R1" ]; then
-            value=$(connection RC2 false null)
-        else
-            value=$(connection RC3 false null)
-        fi
-        printf '{"data":{"node":{"comments":%s}}}\n' "$value"
-        ;;
     *'reviewThreads(first:'*)
         if [ -z "$cursor" ]; then
             value='{"nodes":[{"id":"T1","isResolved":false,"isOutdated":false}],"pageInfo":{"hasNextPage":true,"endCursor":"T_NEXT"}}'
@@ -86,7 +76,7 @@ teardown() {
     run node "$SCRIPT" 42
 
     [ "$status" -eq 0 ]
-    for id in C1 C2 R1 R2 RC1 RC2 RC3 T1 T2 T3 TC1 TC2 TC3 TC_RESOLVED; do
+    for id in C1 C2 R1 R2 T1 T2 T3 TC1 TC2 TC3 TC_RESOLVED; do
         [[ "$output" == *"\"$id\""* ]]
     done
 }
