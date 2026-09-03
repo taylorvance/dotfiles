@@ -1,5 +1,6 @@
 #!/bin/bash
 # tmp - Quick temporary workspace creator
+set -euo pipefail
 
 USAGE="Usage: tmp [-l|-r|-d] [FILE...]
 Create and cd to a timestamped temporary directory
@@ -9,6 +10,9 @@ Options:
                select one, or create new if none selected
   -r           cd to most recent temp directory
   -d           Delete temp directories (interactive: enter numbers, 'a' for all, or Enter to cancel)
+  -h, --help   Show this help message
+
+-l, -r and -d select a mode and cannot be combined.
 
 FILE arguments are opened in \$EDITOR inside the new workspace.
 
@@ -25,6 +29,13 @@ RECENT=false
 SELECT=false
 DELETE=false
 
+# getopts handles single-letter flags only, so catch the long help form up front
+for arg in "$@"; do
+  case "$arg" in
+    --help) echo "$USAGE"; exit 0 ;;
+  esac
+done
+
 # Parse options
 while getopts "rldh" opt; do
   case $opt in
@@ -38,6 +49,18 @@ done
 
 # Shift past options; remaining arguments are filenames to open
 shift $((OPTIND - 1))
+
+# -l/-r/-d are three separate modes. Refusing the combination beats silently
+# honoring whichever one the branches below happen to test first.
+MODES=0
+[ "$RECENT" = true ] && MODES=$((MODES + 1))
+[ "$SELECT" = true ] && MODES=$((MODES + 1))
+[ "$DELETE" = true ] && MODES=$((MODES + 1))
+if [ "$MODES" -gt 1 ]; then
+  echo "tmp: -l, -r and -d cannot be combined" >&2
+  echo "$USAGE" >&2
+  exit 1
+fi
 
 # Short comma-separated preview of a workspace's contents, e.g.
 # "test.py, data.csv, +3 more" or "(empty)"
@@ -89,9 +112,13 @@ if [ "$DELETE" = true ]; then
   echo "Temp workspaces:" >&2
   list_workspaces
 
-  # Prompt for deletion
-  echo -n "Enter numbers to delete (space-separated), 'a' for all, or Enter to cancel: " >&2
-  read -r choice
+  # Prompt for deletion (read -p writes to stderr, keeping stdout eval-clean)
+  if ! read -rp "Enter numbers to delete (space-separated), 'a' for all, or Enter to cancel: " choice; then
+    # EOF rather than an answer: abort instead of acting on a blank reply
+    echo >&2
+    echo "Aborted." >&2
+    exit 0
+  fi
 
   # If empty, cancel
   if [ -z "$choice" ]; then
@@ -114,7 +141,9 @@ if [ "$DELETE" = true ]; then
       dir_to_delete="${dirs[$((num-1))]}"
       rm -rf "${TMP_BASE:?}/$dir_to_delete"
       echo "Deleted: $dir_to_delete" >&2
-      ((deleted_count++))
+      # Arithmetic assignment, not ((deleted_count++)): the latter returns 1
+      # when the pre-increment value is 0, which is a trap under set -e
+      deleted_count=$((deleted_count + 1))
     else
       echo "Invalid number: $num (skipping)" >&2
     fi
@@ -131,8 +160,15 @@ fi
 # cd to most recent temp directory
 if [ "$RECENT" = true ]; then
   if [ -d "$TMP_BASE" ]; then
+    # Read the first line rather than `ls | head`: under pipefail, head exiting
+    # early can SIGPIPE ls and fail the whole pipeline once the listing grows
+    # past the pipe buffer.
+    LATEST_DIR=""
     # shellcheck disable=SC2012  # workspace names are self-generated timestamps
-    LATEST_DIR=$(ls -t "$TMP_BASE" | head -n 1)
+    while IFS= read -r name; do
+      LATEST_DIR="$name"
+      break
+    done < <(ls -t "$TMP_BASE")
     if [ -n "$LATEST_DIR" ]; then
       echo "cd \"$TMP_BASE/$LATEST_DIR\""
     else
@@ -152,9 +188,13 @@ if [ "$SELECT" = true ]; then
     echo "Existing temp workspaces:" >&2
     list_workspaces
 
-    # Prompt for selection
-    echo -n "Select number (or press Enter to create new): " >&2
-    read -r choice
+    # Prompt for selection (read -p writes to stderr, keeping stdout eval-clean)
+    if ! read -rp "Select number (or press Enter to create new): " choice; then
+      # EOF rather than an answer: abort instead of falling through to create
+      echo >&2
+      echo "Aborted." >&2
+      exit 0
+    fi
 
     # If empty, fall through to create new
     if [ -z "$choice" ]; then
@@ -177,7 +217,18 @@ fi
 mkdir -p "$TMP_BASE"
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 TMP_DIR="$TMP_BASE/$TIMESTAMP"
-mkdir -p "$TMP_DIR"
+
+# Plain mkdir (no -p) is atomic and fails when the name is taken, so two runs
+# in the same second get separate workspaces instead of silently sharing one.
+SUFFIX=2
+while ! mkdir "$TMP_DIR" 2>/dev/null; do
+  if [ ! -d "$TMP_DIR" ]; then
+    echo "Failed to create workspace: $TMP_DIR" >&2
+    exit 1
+  fi
+  TMP_DIR="$TMP_BASE/$TIMESTAMP-$SUFFIX"
+  SUFFIX=$((SUFFIX + 1))
+done
 
 echo "Created temporary workspace: $TMP_DIR"
 

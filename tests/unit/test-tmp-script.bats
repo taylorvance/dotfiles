@@ -65,9 +65,8 @@ run_tmp() {
 # ============================================================================
 
 @test "tmp -r: returns most recent workspace" {
-    # Create two workspaces with delay
+    # Create two workspaces
     run_tmp > /dev/null
-    sleep 1
     run_tmp > /dev/null
 
     # Get the most recent
@@ -101,7 +100,6 @@ run_tmp() {
 @test "tmp -l: shows existing workspaces" {
     # Create workspaces
     run_tmp > /dev/null
-    sleep 1
     run_tmp > /dev/null
 
     # Run with empty selection (should fall through to create new)
@@ -118,10 +116,30 @@ run_tmp() {
     [[ "$output" == *"Created temporary workspace"* ]]
 }
 
+@test "tmp -l: Enter still creates new when workspaces exist" {
+    run_tmp > /dev/null
+
+    run bash -c "echo '' | $TEST_DIR/tmp -l"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Created temporary workspace"* ]]
+}
+
+@test "tmp -l: aborts on EOF instead of creating a workspace" {
+    run_tmp > /dev/null
+    before=$(ls -1 "$TMP_BASE" | wc -l)
+
+    run bash -c "$TEST_DIR/tmp -l < /dev/null"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted."* ]]
+    [[ "$output" != *"Created temporary workspace"* ]]
+    [ "$(ls -1 "$TMP_BASE" | wc -l)" -eq "$before" ]
+}
+
 @test "tmp -l: selects workspace by number" {
     # Create two workspaces
     run_tmp > /dev/null
-    sleep 1
     run_tmp > /dev/null
 
     # Select first one (most recent)
@@ -147,7 +165,6 @@ run_tmp() {
 @test "tmp -l: preview shows (empty) and truncates with +N more" {
     # One empty workspace, one with 5 files
     run_tmp > /dev/null
-    sleep 1
     output=$(run_tmp)
     dir=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
     touch "$dir/a" "$dir/b" "$dir/c" "$dir/d" "$dir/e"
@@ -227,6 +244,17 @@ run_tmp() {
     [[ "$output" == *"Temp workspaces:"* ]]
 }
 
+@test "tmp -d: aborts on EOF" {
+    run_tmp > /dev/null
+
+    run bash -c "$TEST_DIR/tmp -d < /dev/null"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted."* ]]
+    # Workspace should still exist
+    [ "$(ls -1 "$TMP_BASE" | wc -l)" -eq 1 ]
+}
+
 @test "tmp -d: cancels on empty input" {
     run_tmp > /dev/null
 
@@ -261,7 +289,6 @@ run_tmp() {
 
 @test "tmp -d: deletes specific workspace by number" {
     run_tmp > /dev/null
-    sleep 1
     run_tmp > /dev/null
 
     initial_count=$(ls -1 "$TMP_BASE" | wc -l | tr -d ' ')
@@ -279,9 +306,7 @@ run_tmp() {
 @test "tmp -d: deletes multiple workspaces" {
     # Create 3 workspaces
     run_tmp > /dev/null
-    sleep 1
     run_tmp > /dev/null
-    sleep 1
     run_tmp > /dev/null
 
     # Delete workspace 1 and 3
@@ -314,6 +339,28 @@ run_tmp() {
 # ============================================================================
 # HELP TEXT
 # ============================================================================
+
+@test "tmp --help: shows help" {
+    run run_tmp --help
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Usage: tmp"* ]]
+    # No workspace created as a side effect
+    [ ! -d "$TMP_BASE" ]
+}
+
+@test "tmp: rejects combined mode flags" {
+    for combo in "-r -d" "-l -d" "-r -l" "-r -l -d"; do
+        # shellcheck disable=SC2086  # deliberate word splitting of the combo
+        run run_tmp $combo
+
+        [ "$status" -eq 1 ]
+        [[ "$output" == *"cannot be combined"* ]]
+    done
+
+    # Nothing was created or deleted on the way out
+    [ ! -d "$TMP_BASE" ]
+}
 
 @test "tmp -h: shows help" {
     run run_tmp -h
@@ -352,18 +399,24 @@ run_tmp() {
     [ -n "$cd_cmd" ]
 }
 
-@test "tmp: creates unique timestamps" {
-    output1=$(run_tmp)
-    sleep 1  # Ensure timestamps differ
-    output2=$(run_tmp)
+@test "tmp: same-second runs get a numbered suffix" {
+    # Freeze date so every run computes an identical timestamp. Real `date`
+    # can't be forced into one second, so this is what actually guarantees the
+    # collision path runs.
+    mkdir -p "$TEST_DIR/bin"
+    printf '#!/bin/sh\necho "20260101-000000"\n' > "$TEST_DIR/bin/date"
+    chmod +x "$TEST_DIR/bin/date"
 
-    # Extract directory names
-    dir1=$(echo "$output1" | grep 'cd "' | sed 's/.*cd "\(.*\)"/\1/')
-    dir2=$(echo "$output2" | grep 'cd "' | sed 's/.*cd "\(.*\)"/\1/')
+    dir1=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | sed -n 's/^cd "\(.*\)"$/\1/p')
+    dir2=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | sed -n 's/^cd "\(.*\)"$/\1/p')
+    dir3=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | sed -n 's/^cd "\(.*\)"$/\1/p')
 
-    [ "$dir1" != "$dir2" ]
+    [ "$(basename "$dir1")" = "20260101-000000" ]
+    [ "$(basename "$dir2")" = "20260101-000000-2" ]
+    [ "$(basename "$dir3")" = "20260101-000000-3" ]
     [ -d "$dir1" ]
     [ -d "$dir2" ]
+    [ -d "$dir3" ]
 }
 
 # ============================================================================
