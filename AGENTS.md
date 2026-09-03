@@ -23,7 +23,10 @@
 
 ## Working in this repository
 
-- Read `.declog.md` before significant architectural decisions.
+- Read `.declog.md` before deciding **or recommending** anything architectural, including when
+  merely answering a question about how the repo is set up. A recommendation is a decision the
+  user has to evaluate, so it needs the same grounding. Several entries exist specifically because
+  the decision was already re-litigated at least once.
 - Add new managed dotfiles under `src/dotfiles/`, add their relative paths to `config`, and use
   `make adopt F=.path` when adopting an existing home-directory file.
 - Custom scripts live under `src/dotfiles/.local/bin/`; their `-h` output is the source of truth
@@ -40,5 +43,15 @@
 ## Verification
 
 - Run `make doctor` and `make shellcheck` after modifying scripts or managed configuration.
-- Run tests through Docker with `make test` or `make test F=tests/unit/test-name.bats`; do not run
-  BATS directly on the host.
+- Run tests through Docker with `make test` or `make test F=tests/unit/test-name.bats`.
+- **Never run BATS on the host, and never propose it.** This is settled, not a default awaiting a
+  good enough safety argument (`.declog.md`, 2026-02-18). The suite deploys symlinks into `$HOME`
+  and `src/macos.sh` writes real system preferences via `defaults`, which ignores `$HOME`
+  entirely. Host isolation today rests on per-file `setup()` sandboxing plus one hand-written
+  `skip` in `test-macos-script.bats`, i.e. on convention that nothing enforces. Docker isolates
+  regardless of whether anyone remembered. Do not re-open this with a fresh audit; the previous
+  151-line audit was deleted precisely because auditing convention is not a boundary.
+- Native macOS coverage is already solved and needs no local run: `.github/workflows/test.yml`
+  runs the unit suite on a disposable `macos-latest` runner (bash 3.2 + BSD userland). Integration
+  tests are unit-only there and their native failures are undiagnosed; diagnose in a throwaway CI
+  job, never locally.
