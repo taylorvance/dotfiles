@@ -52,9 +52,32 @@ mkcd() {
 	mkdir -p "$1" && cd "$1"
 }
 
-# backup - quick backup of a file
+# backup - timestamped copy of a file, saved next to the original
+# Usage: backup FILE  (prints the backup path)
 backup() {
-	cp "$1" "$1.backup-$(date +%Y%m%d-%H%M%S)"
+	if [ $# -ne 1 ]; then
+		echo "Usage: backup FILE" >&2
+		return 2
+	fi
+	if [ ! -e "$1" ]; then
+		echo "backup: no such file: $1" >&2
+		return 1
+	fi
+	if [ -d "$1" ]; then
+		echo "backup: $1 is a directory; backup handles single files" >&2
+		return 1
+	fi
+
+	local dest="$1.backup-$(date +%Y%m%d-%H%M%S)"
+	if [ -e "$dest" ]; then
+		echo "backup: $dest already exists" >&2
+		return 1
+	fi
+
+	# Deliberately no -R/-P: a deployed dotfile is usually a symlink into this
+	# repo, and its backup has to capture the content, not a link that follows
+	# every later edit.
+	cp -p -- "$1" "$dest" && echo "$dest"
 }
 
 # ytaudio - download a video or playlist as high-quality M4A audio
