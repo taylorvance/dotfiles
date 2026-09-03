@@ -2,6 +2,9 @@
 
 # Unit tests for the `e` script (editor wrapper)
 # @covers src/dotfiles/.local/bin/e
+# @covers tests/helpers/fzf.bash
+
+load ../helpers/fzf
 
 setup() {
     # Create temporary test directory
@@ -297,13 +300,69 @@ run_e() {
 # ============================================================================
 
 @test "e -mui: combined short flags work" {
-    skip "Interactive mode requires fzf"
-    # This would test -m -u -i combined, but requires fzf
+    # The cluster must set all three: -m modified, -u untracked, -i interactive
+    echo "orig" > mod.txt
+    git add mod.txt
+    git commit -q -m "initial"
+    echo "changed" > mod.txt
+    echo "new" > newfile.txt
+    stub_fzf_match "newfile.txt"
+
+    run_e -mui
+
+    [ "$status" -eq 0 ]
+    # -m and -u decided the menu, -i narrowed it to the one picked
+    offered=$(fzf_candidates)
+    [[ "$offered" == *"mod.txt"* ]]
+    [[ "$offered" == *"newfile.txt"* ]]
+    [[ "$output" == *"newfile.txt"* ]]
+    [[ "$output" != *"mod.txt"* ]]
 }
 
 @test "e -ai: combined short flags for all files interactive" {
-    skip "Interactive mode requires fzf"
-    # This would test -a -i combined, but requires fzf
+    echo "one" > alpha.txt
+    echo "two" > beta.txt
+    echo "three" > untracked-gamma.txt
+    git add alpha.txt beta.txt
+    git commit -q -m "initial"
+    stub_fzf_match "beta.txt"
+
+    run_e -ai
+
+    [ "$status" -eq 0 ]
+    offered=$(fzf_candidates)
+    # -a offers all tracked files, and only tracked ones
+    [[ "$offered" == *"alpha.txt"* ]]
+    [[ "$offered" == *"beta.txt"* ]]
+    [[ "$offered" != *"untracked-gamma.txt"* ]]
+    [[ "$output" == *"beta.txt"* ]]
+    [[ "$output" != *"alpha.txt"* ]]
+}
+
+@test "e -i: selecting nothing opens no editor" {
+    echo "one" > alpha.txt
+    git add alpha.txt
+    git commit -q -m "initial"
+    stub_fzf_none
+
+    run_e -i
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No files selected"* ]]
+    [[ "$output" != *"alpha.txt"* ]]
+}
+
+@test "e -i: without fzf, dies rather than opening everything" {
+    echo "one" > alpha.txt
+    git add alpha.txt
+    git commit -q -m "initial"
+    no_fzf
+
+    cd "$TEST_REPO"
+    run env PATH="$NO_FZF_PATH" EDITOR="$EDITOR" "$TEST_DIR/e" -i
+
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"fzf is not installed"* ]]
 }
 
 @test "e -i: implies -a (all tracked files)" {

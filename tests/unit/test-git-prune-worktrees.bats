@@ -2,6 +2,9 @@
 
 # Unit tests for git-prune-worktrees
 # @covers src/dotfiles/.local/bin/git-prune-worktrees
+# @covers tests/helpers/fzf.bash
+
+load ../helpers/fzf
 
 setup() {
     export TEST_DIR=$(mktemp -d)
@@ -361,4 +364,74 @@ create_unpublished_worktree() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Aborted"* ]]
     [ -d "$wt_path" ]
+}
+
+# ============================================================================
+# INTERACTIVE SELECTION (i)
+# ============================================================================
+
+@test "git-prune-worktrees i: removes only the selected worktree" {
+    create_synced_worktree "pick-me" >/dev/null
+    create_synced_worktree "leave-me" >/dev/null
+    stub_fzf_match "pick-me"
+
+    cd "$REPO_DIR"
+    run bash -c "echo i | git-prune-worktrees"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Removed pick-me"* ]]
+    [ ! -d "$TEST_DIR/wt-pick-me" ]
+    [ -d "$TEST_DIR/wt-leave-me" ]
+}
+
+@test "git-prune-worktrees i: never offers a dirty worktree" {
+    create_synced_worktree "clean-one" >/dev/null
+    create_dirty_worktree "has-uncommitted-work" >/dev/null
+    stub_fzf_none
+
+    cd "$REPO_DIR"
+    run bash -c "echo i | git-prune-worktrees"
+
+    [ "$status" -eq 0 ]
+    offered=$(fzf_candidates)
+    [[ "$offered" == *"clean-one"* ]]
+    # Removal uses --force, so an unsafe worktree on this menu would destroy
+    # uncommitted work with one keystroke
+    [[ "$offered" != *"has-uncommitted-work"* ]]
+    [ -d "$TEST_DIR/wt-has-uncommitted-work" ]
+}
+
+@test "git-prune-worktrees i: ESC aborts without removing" {
+    create_synced_worktree "survives-esc" >/dev/null
+    stub_fzf_abort
+
+    cd "$REPO_DIR"
+    run bash -c "echo i | git-prune-worktrees"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted."* ]]
+    [ -d "$TEST_DIR/wt-survives-esc" ]
+}
+
+@test "git-prune-worktrees i: selecting nothing removes nothing" {
+    create_synced_worktree "survives-empty" >/dev/null
+    stub_fzf_none
+
+    cd "$REPO_DIR"
+    run bash -c "echo i | git-prune-worktrees"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Nothing selected."* ]]
+    [ -d "$TEST_DIR/wt-survives-empty" ]
+}
+
+@test "git-prune-worktrees i: without fzf, reports it and removes nothing" {
+    create_synced_worktree "survives-no-fzf" >/dev/null
+    no_fzf
+
+    cd "$REPO_DIR"
+    run env PATH="$NO_FZF_PATH" bash -c "echo i | git-prune-worktrees"
+
+    [[ "$output" == *"fzf required for interactive mode"* ]]
+    [ -d "$TEST_DIR/wt-survives-no-fzf" ]
 }

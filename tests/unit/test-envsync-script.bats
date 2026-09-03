@@ -2,6 +2,9 @@
 
 # Unit tests for the envsync script
 # @covers src/dotfiles/.local/bin/envsync
+# @covers tests/helpers/fzf.bash
+
+load ../helpers/fzf
 
 setup() {
     export TEST_DIR=$(mktemp -d)
@@ -572,4 +575,116 @@ teardown() {
 @test "envsync: script checks for fzf in interactive mode" {
     grep -q 'command -v fzf' "$TEST_DIR/envsync"
     grep -q 'fzf required for interactive mode' "$TEST_DIR/envsync"
+}
+
+# ============================================================================
+# INTERACTIVE SELECTION (i) — COPYING MISSING KEYS
+# ============================================================================
+
+@test "envsync i: copies only the selected missing variable" {
+    printf 'A_KEY=1\nB_KEY=2\nC_KEY=3\n' > "$PROJ/.env.sample"
+    printf 'A_KEY=1\n' > "$PROJ/.env"
+    stub_fzf_match "B_KEY"
+
+    run bash -c 'printf "i\n" | "$TEST_DIR/envsync" "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    content=$(cat "$PROJ/.env")
+    [[ "$content" == *"B_KEY"* ]]
+    [[ "$content" != *"C_KEY"* ]]
+}
+
+@test "envsync i: multi-select copies every selected variable" {
+    printf 'A_KEY=1\nB_KEY=2\nC_KEY=3\n' > "$PROJ/.env.sample"
+    printf 'A_KEY=1\n' > "$PROJ/.env"
+    stub_fzf_match "B_KEY" "C_KEY"
+
+    run bash -c 'printf "i\n" | "$TEST_DIR/envsync" "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    content=$(cat "$PROJ/.env")
+    [[ "$content" == *"B_KEY"* ]]
+    [[ "$content" == *"C_KEY"* ]]
+}
+
+@test "envsync i: offers only missing keys, never ones already set" {
+    printf 'A_KEY=1\nB_KEY=2\n' > "$PROJ/.env.sample"
+    printf 'A_KEY=keep-my-value\n' > "$PROJ/.env"
+    stub_fzf_none
+
+    run bash -c 'printf "i\n" | "$TEST_DIR/envsync" "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    offered=$(fzf_candidates)
+    [[ "$offered" == *"B_KEY"* ]]
+    [[ "$offered" != *"A_KEY"* ]]
+    # And the already-set value is untouched
+    [[ "$(cat "$PROJ/.env")" == *"A_KEY=keep-my-value"* ]]
+}
+
+@test "envsync i: without fzf, reports it and copies nothing" {
+    printf 'A_KEY=1\nB_KEY=2\n' > "$PROJ/.env.sample"
+    printf 'A_KEY=1\n' > "$PROJ/.env"
+    no_fzf
+
+    run env PATH="$NO_FZF_PATH" bash -c 'printf "i\n" | "$TEST_DIR/envsync" "$PROJ"'
+
+    [[ "$output" == *"fzf required for interactive mode"* ]]
+    [[ "$(cat "$PROJ/.env")" != *"B_KEY"* ]]
+}
+
+# ============================================================================
+# INTERACTIVE SELECTION (i) — OVERWRITING DIFFERING VALUES
+# ============================================================================
+
+@test "envsync -d i: overwrites only the selected variable" {
+    printf 'DB_HOST=localhost\nDB_PORT=5432\n' > "$PROJ/.env.sample"
+    printf 'DB_HOST=prod.db\nDB_PORT=9999\n' > "$PROJ/.env"
+    stub_fzf_match "DB_HOST"
+
+    run bash -c 'printf "i\n" | "$TEST_DIR/envsync" -d "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    content=$(cat "$PROJ/.env")
+    [[ "$content" == *"DB_HOST=localhost"* ]]
+    # The variable left unselected keeps its real value
+    [[ "$content" == *"DB_PORT=9999"* ]]
+}
+
+@test "envsync -d i: candidates show both sample and actual values" {
+    printf 'DB_HOST=localhost\n' > "$PROJ/.env.sample"
+    printf 'DB_HOST=prod.db\n' > "$PROJ/.env"
+    stub_fzf_none
+
+    run bash -c 'printf "i\n" | "$TEST_DIR/envsync" -d "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    offered=$(fzf_candidates)
+    # You cannot judge an overwrite without seeing what you would lose
+    [[ "$offered" == *"sample='localhost'"* ]]
+    [[ "$offered" == *"actual='prod.db'"* ]]
+}
+
+@test "envsync -d i: ESC aborts without overwriting" {
+    printf 'DB_HOST=localhost\n' > "$PROJ/.env.sample"
+    printf 'DB_HOST=prod.db\n' > "$PROJ/.env"
+    stub_fzf_abort
+
+    run bash -c 'printf "i\n" | "$TEST_DIR/envsync" -d "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted."* ]]
+    [[ "$(cat "$PROJ/.env")" == *"DB_HOST=prod.db"* ]]
+}
+
+@test "envsync -d i: selecting nothing overwrites nothing" {
+    printf 'DB_HOST=localhost\n' > "$PROJ/.env.sample"
+    printf 'DB_HOST=prod.db\n' > "$PROJ/.env"
+    stub_fzf_none
+
+    run bash -c 'printf "i\n" | "$TEST_DIR/envsync" -d "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Nothing selected."* ]]
+    [[ "$(cat "$PROJ/.env")" == *"DB_HOST=prod.db"* ]]
 }

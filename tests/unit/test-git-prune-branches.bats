@@ -2,6 +2,9 @@
 
 # Unit tests for the `git-prune-branches` script
 # @covers src/dotfiles/.local/bin/git-prune-branches
+# @covers tests/helpers/fzf.bash
+
+load ../helpers/fzf
 
 setup() {
     export TEST_DIR=$(mktemp -d)
@@ -355,4 +358,88 @@ create_squash_merged_branch() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Aborted"* ]]
     git show-ref --verify --quiet refs/heads/feature/eof
+}
+
+# ============================================================================
+# INTERACTIVE SELECTION (i)
+# ============================================================================
+
+@test "git-prune-branches i: deletes only the selected branch" {
+    create_merged_branch "feature-pick-me"
+    create_merged_branch "feature-leave-me"
+    stub_fzf_match "feature-pick-me"
+
+    run bash -c 'echo i | "$1" 2>&1' _ "$TEST_DIR/git-prune-branches"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Deleted feature-pick-me"* ]]
+    [[ "$output" != *"Deleted feature-leave-me"* ]]
+
+    cd "$WORK_REPO"
+    [ -z "$(git branch --list feature-pick-me)" ]
+    [ -n "$(git branch --list feature-leave-me)" ]
+}
+
+@test "git-prune-branches i: multi-select deletes every selected branch" {
+    create_merged_branch "feature-one"
+    create_merged_branch "feature-two"
+    create_merged_branch "feature-three"
+    stub_fzf_match "feature-one" "feature-three"
+
+    run bash -c 'echo i | "$1" 2>&1' _ "$TEST_DIR/git-prune-branches"
+
+    [ "$status" -eq 0 ]
+    cd "$WORK_REPO"
+    [ -z "$(git branch --list feature-one)" ]
+    [ -z "$(git branch --list feature-three)" ]
+    [ -n "$(git branch --list feature-two)" ]
+}
+
+@test "git-prune-branches i: never offers the current or default branch" {
+    create_merged_branch "feature-offered"
+    stub_fzf_none
+
+    run bash -c 'echo i | "$1" 2>&1' _ "$TEST_DIR/git-prune-branches"
+
+    [ "$status" -eq 0 ]
+    offered=$(fzf_candidates)
+    [[ "$offered" == *"feature-offered"* ]]
+    # The branch you are standing on is merged into itself; it must never
+    # reach a menu whose only action is deletion
+    [[ "$offered" != *"$DEFAULT_BRANCH"* ]]
+}
+
+@test "git-prune-branches i: ESC aborts without deleting" {
+    create_merged_branch "feature-survives-esc"
+    stub_fzf_abort
+
+    run bash -c 'echo i | "$1" 2>&1' _ "$TEST_DIR/git-prune-branches"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted."* ]]
+    cd "$WORK_REPO"
+    [ -n "$(git branch --list feature-survives-esc)" ]
+}
+
+@test "git-prune-branches i: selecting nothing deletes nothing" {
+    create_merged_branch "feature-survives-empty"
+    stub_fzf_none
+
+    run bash -c 'echo i | "$1" 2>&1' _ "$TEST_DIR/git-prune-branches"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Nothing selected."* ]]
+    cd "$WORK_REPO"
+    [ -n "$(git branch --list feature-survives-empty)" ]
+}
+
+@test "git-prune-branches i: without fzf, reports it and deletes nothing" {
+    create_merged_branch "feature-survives-no-fzf"
+    no_fzf
+
+    run env PATH="$NO_FZF_PATH" bash -c 'echo i | "$1" 2>&1' _ "$TEST_DIR/git-prune-branches"
+
+    [[ "$output" == *"fzf required for interactive mode"* ]]
+    cd "$WORK_REPO"
+    [ -n "$(git branch --list feature-survives-no-fzf)" ]
 }

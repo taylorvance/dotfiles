@@ -37,7 +37,7 @@ doctor: ## Validate repo config, scripts, and dotfile wiring without touching HO
 
 .PHONY: shellcheck
 shellcheck: ## Lint all shell scripts with shellcheck
-	@shellcheck src/*.sh tests/test-runner.sh .githooks/* src/dotfiles/.local/bin/*
+	@shellcheck src/*.sh tests/test-runner.sh tests/helpers/*.bash .githooks/* src/dotfiles/.local/bin/*
 	@echo "✓ shellcheck passed"
 
 .PHONY: install

@@ -2,6 +2,9 @@
 
 # Unit tests for the `clean` script (build dependency cleaner)
 # @covers src/dotfiles/.local/bin/clean
+# @covers tests/helpers/fzf.bash
+
+load ../helpers/fzf
 
 setup() {
     export TEST_DIR=$(mktemp -d)
@@ -311,4 +314,77 @@ run_clean() {
     # Static check: verify the script contains fzf availability check
     grep -q 'command -v fzf' "$TEST_DIR/clean"
     grep -q 'fzf required for interactive mode' "$TEST_DIR/clean"
+}
+
+# ============================================================================
+# INTERACTIVE SELECTION (i)
+# ============================================================================
+
+@test "clean i: deletes only the selected directory" {
+    stub_fzf_match "webapp/node_modules"
+
+    run bash -c "echo 'i' | $TEST_DIR/clean $TEST_DIR/projects"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Deleting webapp/node_modules"* ]]
+    [ ! -d "$TEST_DIR/projects/webapp/node_modules" ]
+    # Everything left unselected survives
+    [ -d "$TEST_DIR/projects/api/node_modules" ]
+    [ -d "$TEST_DIR/projects/ml/.venv" ]
+}
+
+@test "clean i: multi-select deletes every selected directory" {
+    stub_fzf_match "webapp/node_modules" "ml/.venv"
+
+    run bash -c "echo 'i' | $TEST_DIR/clean $TEST_DIR/projects"
+
+    [ "$status" -eq 0 ]
+    [ ! -d "$TEST_DIR/projects/webapp/node_modules" ]
+    [ ! -d "$TEST_DIR/projects/ml/.venv" ]
+    [ -d "$TEST_DIR/projects/api/node_modules" ]
+}
+
+@test "clean i: ESC aborts without deleting" {
+    stub_fzf_abort
+
+    run bash -c "echo 'i' | $TEST_DIR/clean $TEST_DIR/projects"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aborted."* ]]
+    [ -d "$TEST_DIR/projects/webapp/node_modules" ]
+    [ -d "$TEST_DIR/projects/ml/.venv" ]
+}
+
+@test "clean i: selecting nothing deletes nothing" {
+    stub_fzf_none
+
+    run bash -c "echo 'i' | $TEST_DIR/clean $TEST_DIR/projects"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Nothing selected."* ]]
+    [ -d "$TEST_DIR/projects/webapp/node_modules" ]
+}
+
+@test "clean i: offers cleanable dirs and never the source tree" {
+    stub_fzf_none
+
+    run bash -c "echo 'i' | $TEST_DIR/clean $TEST_DIR/projects"
+
+    [ "$status" -eq 0 ]
+    offered=$(fzf_candidates)
+    [[ "$offered" == *"node_modules"* ]]
+    [[ "$offered" == *".venv"* ]]
+    # Source directories must never reach the deletion menu
+    [[ "$offered" != *"webapp/src"* ]]
+}
+
+@test "clean i: without fzf, reports it and deletes nothing" {
+    no_fzf
+
+    run env PATH="$NO_FZF_PATH" bash -c "echo 'i' | $TEST_DIR/clean $TEST_DIR/projects"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"fzf required for interactive mode"* ]]
+    [ -d "$TEST_DIR/projects/webapp/node_modules" ]
+    [ -d "$TEST_DIR/projects/ml/.venv" ]
 }

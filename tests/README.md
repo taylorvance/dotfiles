@@ -49,6 +49,7 @@ tests/
 ├── unit/                  # One test file per script (test-<name>.bats)
 ├── integration/           # End-to-end: fresh setup, idempotency,
 │                          # conflicts/backup/restore, config validity
+├── helpers/               # Shared helpers, loaded with `load ../helpers/<name>`
 ├── docker/                # Container definitions
 └── test-runner.sh         # Main orchestration script
 ```
@@ -56,6 +57,13 @@ tests/
 Unit tests cover each custom script and the symlink manager; integration
 tests install the real dotfiles into an isolated `$HOME` and verify
 behavior (including restore and the zsh/tmux/nvim configs).
+
+`helpers/fzf.bash` stubs `fzf` so the `i` branch of the shared `y/N/i`
+prompts is testable: it selects from the candidates the script actually
+offered (several scripts parse an index or key off the returned line), saves
+that candidate list so a test can assert what was *offered*, and can build a
+PATH with `fzf` genuinely absent. A test file that uses it should declare
+`# @covers tests/helpers/fzf.bash` so helper changes re-run it.
 
 ## Development Workflow
 

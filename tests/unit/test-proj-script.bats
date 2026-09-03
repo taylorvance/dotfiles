@@ -2,6 +2,9 @@
 
 # Unit tests for the `proj` script (tmux session manager)
 # @covers src/dotfiles/.local/bin/proj
+# @covers tests/helpers/fzf.bash
+
+load ../helpers/fzf
 
 setup() {
     export TEST_DIR=$(mktemp -d)
@@ -292,13 +295,13 @@ run_proj() {
 @test "proj -k: outside tmux with no fzf and no arg, errors helpfully" {
     unset TMUX
     echo "session_a" >> "$MOCK_TMUX_SESSIONS"
-    # A real fzf may be installed (e.g. via homebrew); restrict PATH to the
-    # mocks + system dirs so "fzf not installed" actually holds
+    # Build a PATH with fzf genuinely absent (mocks included, fzf excluded)
+    # rather than skipping wherever a real fzf happens to be installed, which
+    # silently dropped this coverage on any machine that has it
     rm -f "$TEST_DIR/fzf"
-    export PATH="$TEST_DIR:/usr/bin:/bin"
-    command -v fzf >/dev/null 2>&1 && skip "fzf installed in a system dir"
+    no_fzf
 
-    run run_proj -k
+    run env PATH="$NO_FZF_PATH" "$TEST_DIR/proj" -k
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"fzf"* ]] || [[ "$output" == *"session name"* ]]
@@ -404,12 +407,11 @@ run_proj() {
 
 @test "proj: no args without fzf, errors" {
     echo "session_a" >> "$MOCK_TMUX_SESSIONS"
-    # See the -k no-fzf test: a real fzf may be installed; restrict PATH
+    # See the -k no-fzf test: absence is built, not assumed
     rm -f "$TEST_DIR/fzf"
-    export PATH="$TEST_DIR:/usr/bin:/bin"
-    command -v fzf >/dev/null 2>&1 && skip "fzf installed in a system dir"
+    no_fzf
 
-    run run_proj
+    run env PATH="$NO_FZF_PATH" "$TEST_DIR/proj"
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"fzf"* ]]
