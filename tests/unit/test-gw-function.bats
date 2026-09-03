@@ -2,6 +2,9 @@
 
 # Unit tests for the `gw` shell function (git worktree cd)
 # @covers src/dotfiles/.zsh/functions.zsh
+# @covers tests/helpers/fzf.bash
+
+load ../helpers/fzf
 
 setup() {
     # pwd -P: on macOS mktemp returns /var/... but git reports worktree
@@ -119,9 +122,11 @@ teardown() {
 @test "gw -l: lists worktrees when fzf not available" {
     cd "$REPO_DIR"
 
-    # Hide fzf
+    # Hide fzf deterministically: a real fzf in a system dir used to make this
+    # assert nothing
+    no_fzf
     local real_path="$PATH"
-    export PATH="/usr/bin:/bin"
+    export PATH="$NO_FZF_PATH"
     # Also unset any fzf function/alias
     unset -f fzf 2>/dev/null || true
 
@@ -152,5 +157,39 @@ teardown() {
     cd "$WT_DIR/subdir/nested"
 
     gw
+    [ "$PWD" = "$REPO_DIR" ]
+}
+
+# ============================================================================
+# -l WITH FZF AVAILABLE
+# ============================================================================
+
+@test "gw -l: cds to the worktree picked with fzf" {
+    cd "$REPO_DIR"
+    stub_fzf_match "$WT_DIR"
+
+    # Called directly, not via run: a subshell would discard the cd
+    gw -l
+
+    [ "$PWD" = "$WT_DIR" ]
+}
+
+@test "gw -l: offers every worktree" {
+    cd "$REPO_DIR"
+    stub_fzf_none
+
+    gw -l
+
+    offered=$(fzf_candidates)
+    [[ "$offered" == *"$REPO_DIR"* ]]
+    [[ "$offered" == *"$WT_DIR"* ]]
+}
+
+@test "gw -l: stays put when nothing is selected" {
+    cd "$REPO_DIR"
+    stub_fzf_none
+
+    gw -l
+
     [ "$PWD" = "$REPO_DIR" ]
 }
