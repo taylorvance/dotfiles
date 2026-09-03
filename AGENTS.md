@@ -51,6 +51,11 @@
   `skip` in `test-macos-script.bats`, i.e. on convention that nothing enforces. Docker isolates
   regardless of whether anyone remembered. Do not re-open this with a fresh audit; the previous
   151-line audit was deleted precisely because auditing convention is not a boundary.
+- An audit of what the scripts do *today* proves nothing about tomorrow: the suite executes
+  whatever a script becomes, and rewriting a script usually rewrites its tests in the same pass,
+  so the sandboxing convention and the destructive code under test share one author and one
+  mistake. Docker's isolation has no such coupling. Read the blast radius as "whatever the next
+  version of `clean` or `symlink-manager` does", not as today's behavior.
 - Native macOS coverage is already solved and needs no local run: `.github/workflows/test.yml`
   runs the unit suite on a disposable `macos-latest` runner (bash 3.2 + BSD userland). Integration
   tests are unit-only there and their native failures are undiagnosed; diagnose in a throwaway CI

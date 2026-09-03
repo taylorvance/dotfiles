@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   doctor:
@@ -44,3 +45,53 @@ jobs:
           curl -fsSL https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz | tar xz
           sudo bats-core-1.11.0/install.sh /usr/local
       - run: bats tests/unit/*.bats
+
+  # TEMPORARY, diagnostic only. Runs the FULL suite natively to collect the
+  # integration failures that .declog.md records as never diagnosed. All 86
+  # integration tests fail natively, which points at one systemic setup()
+  # problem rather than 86 quirks. This exists so that diagnosis happens on a
+  # disposable runner instead of on a real Mac; never run these locally.
+  #
+  # Manual dispatch only (no push noise) and non-blocking. Delete this job once
+  # the integration tests are either fixed or recorded as permanently
+  # container-shaped.
+  test-macos-full-diagnostic:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    continue-on-error: true
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install bats
+        run: |
+          curl -fsSL https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz | tar xz
+          sudo bats-core-1.11.0/install.sh /usr/local
+      - name: Full suite, native
+        run: |
+          # Each integration test copies the whole 18M repo, so this is slow.
+          bats tests/unit/*.bats tests/integration/*.bats 2>&1 | tee /tmp/bats.log || true
+      - name: Summarize to the run page
+        if: always()
+        run: |
+          total=$(grep -cE '^(ok|not ok) ' /tmp/bats.log || true)
+          failed=$(grep -cE '^not ok ' /tmp/bats.log || true)
+          {
+            echo "## Native macOS full-suite diagnostic"
+            echo
+            echo "bash \`$(/bin/bash -c 'echo $BASH_VERSION')\`, $(sw_vers -productVersion)"
+            echo
+            echo "- tests run: ${total:-0}"
+            echo "- failures: ${failed:-0}"
+            echo
+            if [ "${failed:-0}" -gt 0 ]; then
+              echo "<details><summary>Failures with context</summary>"
+              echo
+              echo '```'
+              grep -E -A3 '^not ok ' /tmp/bats.log || true
+              echo '```'
+              echo
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
