@@ -49,6 +49,14 @@ jobs:
         run: |
           curl -fsSL https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz | tar xz
           sudo bats-core-1.11.0/install.sh /usr/local
+      # Matches what the Alpine image installs, so the tmux and nvim configs
+      # get parsed by macOS's builds too, not only Alpine's. Deliberately not
+      # install-tools.sh (this job tests the dotfiles, not the installer, which
+      # test-install-tools.bats covers) and deliberately NOT fzf: several tests
+      # assert the no-fzf fallback paths by clearing PATH to /usr/bin:/bin, so
+      # a system-dir fzf breaks them instead of covering more.
+      - name: Install tools the config tests need
+        run: brew install tmux neovim
       - name: Full suite, native
         run: |
           # pipefail is not on by default in a run: block, and without it the
