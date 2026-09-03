@@ -32,35 +32,15 @@ jobs:
       - run: make test
 
   # Native run on the environment Docker can't cover: macOS /bin/bash 3.2
-  # and BSD coreutils — where the scripts actually run day to day.
-  # Unit tests only for now; the integration suite's native failures are fixed as of
-  # 2026-09-03 (cp -R) but not yet confirmed green natively (.declog.md).
+  # and BSD coreutils — where the scripts actually run day to day. This is the
+  # only coverage `symlink-manager.sh` gets on the platform whose $HOME it
+  # writes to, so it runs the full suite and blocks. Integration adds ~2min.
+  #
+  # Local BATS runs are forbidden (AGENTS.md, .declog.md 2026-02-18); this job
+  # is where native breakage is meant to be found instead.
   test-macos:
     runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - name: Install bats
-        run: |
-          curl -fsSL https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz | tar xz
-          sudo bats-core-1.11.0/install.sh /usr/local
-      - run: bats tests/unit/*.bats
-
-  # TEMPORARY, diagnostic only. Runs the FULL suite natively to collect the
-  # integration failures that .declog.md records as never diagnosed. All 86
-  # integration tests fail natively, which points at one systemic setup()
-  # problem rather than 86 quirks. This exists so that diagnosis happens on a
-  # disposable runner instead of on a real Mac; never run these locally.
-  #
-  # Manual dispatch only (no push noise) and non-blocking. Delete this job once
-  # the integration tests are either fixed or recorded as permanently
-  # container-shaped.
-  test-macos-full-diagnostic:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
-    continue-on-error: true
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,20 +51,25 @@ jobs:
           sudo bats-core-1.11.0/install.sh /usr/local
       - name: Full suite, native
         run: |
-          # Each integration test copies the whole 18M repo, so this is slow.
-          bats tests/unit/*.bats tests/integration/*.bats 2>&1 | tee /tmp/bats.log || true
+          # pipefail is not on by default in a run: block, and without it the
+          # step would take tee's exit status and report a red suite as green.
+          set -o pipefail
+          # Each integration test copies the whole 18M repo, hence the timeout.
+          bats tests/unit/*.bats tests/integration/*.bats 2>&1 | tee /tmp/bats.log
       - name: Summarize to the run page
         if: always()
         run: |
           total=$(grep -cE '^(ok|not ok) ' /tmp/bats.log || true)
           failed=$(grep -cE '^not ok ' /tmp/bats.log || true)
+          skipped=$(grep -cE '^ok .*# skip' /tmp/bats.log || true)
           {
-            echo "## Native macOS full-suite diagnostic"
+            echo "## Native macOS suite"
             echo
-            echo "bash \`$(/bin/bash -c 'echo $BASH_VERSION')\`, $(sw_vers -productVersion)"
+            echo "bash \`$(/bin/bash -c 'echo $BASH_VERSION')\`, macOS $(sw_vers -productVersion)"
             echo
             echo "- tests run: ${total:-0}"
             echo "- failures: ${failed:-0}"
+            echo "- skipped: ${skipped:-0}"
             echo
             if [ "${failed:-0}" -gt 0 ]; then
               echo "<details><summary>Failures with context</summary>"
