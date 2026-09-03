@@ -9,7 +9,9 @@ setup() {
     export TEST_DOTFILES="$TEST_DIR/dotfiles"
 
     mkdir -p "$TEST_HOME"
-    cp -r "$BATS_TEST_DIRNAME/../.." "$TEST_DOTFILES"
+    # -R, not -r: BSD cp -r dereferences symlinks and fails on the dangling
+    # ones under vendor/tmux/tmux-resurrect (uninitialized nested submodule)
+    cp -R "$BATS_TEST_DIRNAME/../.." "$TEST_DOTFILES"
 
     export HOME="$TEST_HOME"
 

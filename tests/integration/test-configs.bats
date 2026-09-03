@@ -15,7 +15,9 @@ setup() {
     mkdir -p "$TEST_HOME"
 
     # Copy entire dotfiles repository including real configs
-    cp -r "$BATS_TEST_DIRNAME/../.." "$TEST_DOTFILES"
+    # -R, not -r: BSD cp -r dereferences symlinks and fails on the dangling
+    # ones under vendor/tmux/tmux-resurrect (uninitialized nested submodule)
+    cp -R "$BATS_TEST_DIRNAME/../.." "$TEST_DOTFILES"
 
     export HOME="$TEST_HOME"
 

@@ -12,7 +12,9 @@ setup() {
     mkdir -p "$TEST_HOME"
 
     # Copy entire dotfiles structure
-    cp -r "$BATS_TEST_DIRNAME/../.." "$TEST_DOTFILES"
+    # -R, not -r: BSD cp -r dereferences symlinks and fails on the dangling
+    # ones under vendor/tmux/tmux-resurrect (uninitialized nested submodule)
+    cp -R "$BATS_TEST_DIRNAME/../.." "$TEST_DOTFILES"
 
     # Override HOME
     export HOME="$TEST_HOME"
