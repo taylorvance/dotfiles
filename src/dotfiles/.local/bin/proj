@@ -257,6 +257,9 @@ main() {
 				die "Unknown option: $1"
 				;;
 			*)
+				# Overwriting an already-set name would silently run the last
+				# one and drop the rest
+				[ -n "$name" ] && die "Too many arguments: $1"
 				name="$1"
 				shift
 				;;

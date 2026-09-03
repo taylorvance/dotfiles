@@ -146,6 +146,20 @@ run_proj() {
     [[ "$output" == *"Unknown option"* ]]
 }
 
+@test "proj: extra positional argument errors" {
+    run run_proj first second
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Too many arguments: second"* ]]
+}
+
+@test "proj -c: extra positional argument errors" {
+    run run_proj -c first second
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Too many arguments: second"* ]]
+}
+
 @test "proj: errors when tmux not installed" {
     # Empty PATH so the guard trips even on systems with tmux installed
     mkdir -p "$TEST_DIR/empty-bin"
