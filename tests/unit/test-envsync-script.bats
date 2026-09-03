@@ -460,6 +460,25 @@ teardown() {
     [[ "$content" == *"DB_PORT=5432"* ]]
 }
 
+@test "envsync -d: y preserves the actual file's permissions" {
+    printf 'DB_HOST=localhost\n' > "$PROJ/.env.sample"
+    printf 'DB_HOST=prod.db\n' > "$PROJ/.env"
+    chmod 644 "$PROJ/.env"
+
+    run bash -c 'printf "y\n" | "$TEST_DIR/envsync" -d "$PROJ"'
+
+    [ "$status" -eq 0 ]
+    # Without a mode copy the mktemp rename would leave this 600.
+    # GNU and BSD stat need separate flags and cannot be chained: GNU reads the
+    # BSD format string as a filesystem path and prints its own report.
+    if stat --version >/dev/null 2>&1; then
+        mode=$(stat -c '%a' "$PROJ/.env")
+    else
+        mode=$(stat -f '%Lp' "$PROJ/.env")
+    fi
+    [ "$mode" = "644" ]
+}
+
 @test "envsync -d: N does not modify actual file" {
     printf 'DB_HOST=localhost\n' > "$PROJ/.env.sample"
     printf 'DB_HOST=prod.db\n' > "$PROJ/.env"

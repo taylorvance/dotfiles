@@ -149,7 +149,24 @@ append_keys() {
     } >> "$actual_file"
 }
 
-# Replace a key's value in-place via temp file (preserves export prefix and symlinks)
+# Permission bits of a file as octal digits, or empty if unobtainable.
+# GNU and BSD stat disagree here, and they cannot be chained: GNU reads the
+# BSD format string as a filesystem path and dumps its own report to stdout.
+file_mode() {
+    local mode
+    if stat --version >/dev/null 2>&1; then
+        mode=$(stat -c '%a' "$1" 2>/dev/null || true)   # GNU
+    else
+        mode=$(stat -f '%Lp' "$1" 2>/dev/null || true)  # BSD
+    fi
+    # Never pass anything on that chmod would reject
+    if [[ "$mode" =~ ^[0-7]{3,4}$ ]]; then
+        printf '%s' "$mode"
+    fi
+    return 0
+}
+
+# Replace a key's value in-place via temp file (preserves export prefix, mode, and symlinks)
 env_set() {
     local key="$1" val="$2" file="$3"
     local tmp
@@ -168,6 +185,12 @@ env_set() {
     if [[ -L "$file" ]]; then
         cat "$tmp" > "$file" && rm -f "$tmp"
     else
+        # mktemp makes the temp 0600, and the rename carries that mode onto the
+        # real file, so copy the original's mode over first. Syncing keys should
+        # not quietly change who can read the file.
+        local mode
+        mode=$(file_mode "$file")
+        [[ -n "$mode" ]] && chmod "$mode" "$tmp"
         mv "$tmp" "$file"
     fi
 }
