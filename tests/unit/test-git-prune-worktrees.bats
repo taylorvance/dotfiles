@@ -392,6 +392,12 @@ create_unpublished_worktree() {
     cd "$REPO_DIR"
     run bash -c "echo i | git-prune-worktrees"
 
+    # This failed on the macOS runner while passing in the container and on a
+    # local macOS repro; surface enough to tell why if it happens again
+    if [ "$status" -ne 0 ]; then
+        printf 'unexpected exit %s\noutput:\n%s\ncandidates:\n%s\n' \
+            "$status" "$output" "$(fzf_candidates 2>/dev/null)" >&2
+    fi
     [ "$status" -eq 0 ]
     offered=$(fzf_candidates)
     [[ "$offered" == *"clean-one"* ]]
