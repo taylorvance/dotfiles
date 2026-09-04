@@ -50,6 +50,10 @@ Use `.declog.md` as the repository's decision log.
   if ownership is unclear, ask.
 - Do not log routine implementation choices, easily reversible decisions, or facts already
   obvious from the code.
+- Keep entries short: at most two sentences per field, and state the decision reached rather than
+  the deliberation that reached it. Give one reason under `Rationale`, the one that would change a
+  future maintainer's mind. Omit a field instead of padding it. Length is not thoroughness here;
+  a long entry usually means the decision is still being argued.
 - Keep entries newest-first: insert new entries immediately below the introductory text; never
   append them to the end.
 - Legacy entries do not need every current field. Normalize structure when convenient, but never

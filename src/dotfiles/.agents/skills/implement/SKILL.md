@@ -81,9 +81,9 @@ rerun until clean; report anything that cannot run.
 - Commit per repo convention, referencing the work item key or issue number when one exists.
 - Stop after committing. Never push or open a PR unless explicitly asked; offer it as the next
   step instead.
-- Load the `humans-dont-like-to-read` skill (if your harness has no skill loader, read
-  `../humans-dont-like-to-read/SKILL.md` relative to this skill's directory) and report tersely:
-  what was done, decisions made, and anything remaining or not verified.
+- Load the `terse` skill (if your harness has no skill loader, read `../terse/SKILL.md`
+  relative to this skill's directory) and report tersely: what was done, decisions made,
+  and anything remaining or not verified.
 - Present the adjacent problems collected in step 4 as a numbered list, ordered by how strongly
   you would take each on now, and ask which to handle; the numbers let the user answer by
   reference.

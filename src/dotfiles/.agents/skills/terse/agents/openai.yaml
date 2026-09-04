@@ -1,0 +1,4 @@
+interface:
+  display_name: "Terse"
+  short_description: "Compress output without losing substance"
+  default_prompt: "Use $terse to compress this output without losing substance."

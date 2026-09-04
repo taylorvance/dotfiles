@@ -1,4 +1,0 @@
-interface:
-  display_name: "Humans Don't Like to Read"
-  short_description: "Compress reports without losing substance"
-  default_prompt: "Use $humans-dont-like-to-read to compress this report without losing substance."
