@@ -4,9 +4,8 @@
 
 ## PRs & reviews
 
-- Never push or open PRs without my explicit consent. Open PRs as one clean commit; push review
-  fixes as separate commits (squash at merge).
-- Never post a PR comment claiming fixes until the code is committed and pushed.
+Shared PR rules live in `~/.agents/AGENTS.md`; only Claude Code specifics belong here.
+
 - When checking a PR for feedback (assume the PR for the current checked-out branch), run the
   helper script: `node ~/.claude/scripts/pr-feedback.mjs [PR_NUMBER]`. It auto-detects owner/repo
   and the current branch's PR (works from any repo), then emits the full
@@ -14,25 +13,11 @@
   dropped and counted in `botFeedbackOmitted`; fetch those with gh directly on the rare occasion
   they matter. Pass a PR number to target a specific PR. If `node` or the script is unavailable,
   reproduce its paginated GraphQL queries (see the script source).
-- When asked about PR feedback, always check all three sources: PR comments, inline review
-  comments, and reviews.
-- When addressing PR feedback, implement directly related non-blocking suggestions that you agree
-  with. Report unrelated improvements as scope creep instead of silently expanding the change.
-- Post PR review feedback as a review, never a plain `gh pr comment`: `--request-changes` if any
-  blocker, `--approve` only if I accepted an approve recommendation, else `--comment`.
-- Review other people's PRs in a git worktree; never switch my checkout. Worktrees live OUTSIDE
-  the repo at `~/dev/worktrees/<repo>/<slug>` via `git worktree add` (slug: letters/digits/hyphens
-  only; `+` etc. break jest's unescaped `<rootDir>` ignore regexes). Never place my worktrees
-  under any `.claude/` path (every file edit inside one trips the "edit its own settings"
-  approval) or anywhere inside the repo tree (jest haste maps, lint scripts, and watchers crawl
-  nested worktrees). Permission scoping outside the repo comes from
-  `permissions.additionalDirectories` (`~/dev/worktrees` in `~/.claude/settings.json`). Don't use
+- Worktree permission scoping outside the repo comes from `permissions.additionalDirectories`
+  (`~/dev/worktrees` in `~/.claude/settings.json`). Never place a worktree under any `.claude/`
+  path: every file edit inside one trips the "edit its own settings" approval. Don't use
   EnterWorktree's `name` mode (it creates under `.claude/worktrees/`); entering an existing
-  worktree via its `path` param is fine. Copy only ignored environment files required for
-  validation, preserve their permissions, and ensure they remain untracked.
-- Numbering items in PR comments is fine, but never with the `#` sign (GitHub auto-links `#N` to
-  issues/PRs).
-- Do not request PR reviewers (`--reviewer`) unless asked.
+  worktree via its `path` param is fine.
 
 ## Shell & tools
 

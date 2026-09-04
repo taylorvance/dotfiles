@@ -99,18 +99,18 @@ sections with nothing in them deleted (never kept with "none"):
     ### Checked clean          <- risk areas inspected and found sound; one line each
     ### Not verified           <- every check that couldn't run, and what blocked it
     ### Verdict
-    ship | needs fixes | blocked
+    approve | request changes | comment
 
 `Checked clean` names the risk areas this diff puts in play that you read and found sound (auth
 path, money math, migration ordering), one line each with the evidence, so a quiet review is
 distinguishable from an absent one. Only what you actually inspected, and only what the diff
 implicates: never pad it.
 
-Missing optional context does not prevent `ship`; list it under `Not verified`. A `Deploy gate`
-entry does not prevent `ship` either: the verdict is about the branch, and a release precondition
-is not a defect in it. Never report `ship` when a validation required for the changed code could
-not run or the reviewed scope could not be established: an audit that did not happen must not read
-as one that passed.
+Missing optional context does not prevent `approve`; list it under `Not verified`. A `Deploy gate`
+entry does not prevent `approve` either: the verdict is about the branch, and a release
+precondition is not a defect in it. Never report `approve` when a validation required for the
+changed code could not run or the reviewed scope could not be established: an audit that did not
+happen must not read as one that passed. Report `comment` instead.
 
 ## Constraints
 
