@@ -356,30 +356,50 @@ run_proj() {
     grep -q "switch-client.*dotfiles" "$MOCK_TMUX_CALLS"
 }
 
-@test "proj NAME: no match prompts to create, y creates session" {
+@test "proj NAME: no match errors and never creates" {
     unset TMUX
+    echo "dotfiles" >> "$MOCK_TMUX_SESSIONS"
 
-    run bash -c 'echo "y" | '"$TEST_DIR"'/proj brandnew'
+    run run_proj brandnew
 
-    [ "$status" -eq 0 ]
-    grep -qxF "brandnew" "$MOCK_TMUX_SESSIONS"
-}
-
-@test "proj NAME: no match prompts to create, N aborts" {
-    unset TMUX
-
-    run bash -c 'echo "N" | '"$TEST_DIR"'/proj brandnew'
-
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no session matching 'brandnew'"* ]]
     ! grep -qxF "brandnew" "$MOCK_TMUX_SESSIONS"
+    ! grep -q "new-session" "$MOCK_TMUX_CALLS"
 }
 
-@test "proj NAME: prompt shows cwd" {
+@test "proj NAME: no match lists live sessions and hints -c" {
+    unset TMUX
+    echo "dotfiles" >> "$MOCK_TMUX_SESSIONS"
+    echo "workstuff" >> "$MOCK_TMUX_SESSIONS"
+
+    run run_proj brandnew
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"dotfiles"* ]]
+    [[ "$output" == *"workstuff"* ]]
+    [[ "$output" == *"proj -c brandnew"* ]]
+}
+
+@test "proj NAME: no sessions at all errors without listing" {
     unset TMUX
 
-    run bash -c 'echo "N" | '"$TEST_DIR"'/proj brandnew'
+    run run_proj brandnew
 
-    [[ "$output" == *"$PWD"* ]]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no tmux sessions running"* ]]
+    [[ "$output" == *"proj -c brandnew"* ]]
+}
+
+@test "proj NAME: query is matched literally, not as a regex" {
+    export TMUX=mock_socket
+    echo "axb" >> "$MOCK_TMUX_SESSIONS"
+
+    # As a regex, "a.b" matches "axb" and would silently attach to it
+    run run_proj a.b
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no session matching 'a.b'"* ]]
 }
 
 # ============================================================================
@@ -455,8 +475,8 @@ EOF
     [ "$status" -eq 0 ]
     grep -q "restore" "$MOCK_RESTORE_CALLS"
     grep -q "attach-session.*dotfiles" "$MOCK_TMUX_CALLS"
-    # Restore happened BEFORE lookup: no create prompt was shown
-    [[ "$output" != *"Create one here"* ]]
+    # Restore happened BEFORE lookup, so the name resolved
+    [[ "$output" != *"no session matching"* ]]
     [[ "$output" == *"Restoring saved tmux sessions"* ]]
 }
 
@@ -508,15 +528,15 @@ EOF
     [[ "$output" == *"already exists"* ]]
 }
 
-@test "proj NAME: resurrect not installed - dead server prompts to create as before" {
+@test "proj NAME: resurrect not installed - dead server errors on an unknown name" {
     unset TMUX
     # No MOCK_RESURRECT_* set: show-option returns empty, default script path
     # doesn't exist under the test HOME
 
-    run bash -c 'echo "N" | '"$TEST_DIR"'/proj brandnew'
+    run run_proj brandnew
 
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Create one here"* ]]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no tmux sessions running"* ]]
     # No saves on disk: nothing to warn about
     [[ "$output" != *"Warning"* ]]
 }
@@ -528,44 +548,31 @@ EOF
     mkdir -p "$MOCK_RESURRECT_DIR"
     touch "$MOCK_RESURRECT_DIR/last"
 
-    run bash -c 'echo "N" | '"$TEST_DIR"'/proj brandnew'
+    run run_proj brandnew
 
-    [ "$status" -eq 0 ]
     [[ "$output" == *"Warning: tmux-resurrect saves exist but restore script is missing"* ]]
-    # Still proceeds normally after warning
-    [[ "$output" == *"Create one here"* ]]
+    # Still proceeds to the normal lookup after warning
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no tmux sessions running"* ]]
 }
 
-@test "proj NAME: resurrection race - session restored before Y is processed, attaches" {
-    unset TMUX
-    # Session exists for has-session but NOT list-sessions (resurrection in-progress)
-    echo "dotfiles" >> "$MOCK_TMUX_HAS_ONLY_SESSIONS"
-
-    run bash -c 'echo "y" | '"$TEST_DIR"'/proj dotfiles'
-
-    [ "$status" -eq 0 ]
-    # Should attach to the resurrected session, not try to create a new one
-    # (the throwaway __proj_restore__ session is the only new-session allowed)
-    grep -q "attach-session.*dotfiles" "$MOCK_TMUX_CALLS"
-    ! grep -q "new-session.*dotfiles" "$MOCK_TMUX_CALLS"
-}
-
-@test "proj NAME: resurrection race - in tmux, new-session fails but session restored, switches" {
+@test "proj -c NAME: resurrection race - in tmux, new-session fails but session restored, switches" {
     export TMUX=mock_socket
     export MOCK_NEW_SESSION_FAIL=1
-    # No session in list-sessions initially (so find_matching_sessions returns nothing)
+    # Session is in neither list, so the pre-create check passes; the mock then
+    # makes new-session fail while registering the name (resurrection landing)
 
-    run bash -c 'echo "y" | '"$TEST_DIR"'/proj dotfiles'
+    run run_proj -c dotfiles
 
     [ "$status" -eq 0 ]
     # new-session -d failed, but session appeared (resurrection), so switch-client is called
     grep -q "switch-client.*dotfiles" "$MOCK_TMUX_CALLS"
 }
 
-@test "proj NAME: outside tmux, new-session uses -A to handle late resurrection" {
+@test "proj -c NAME: outside tmux, new-session uses -A to handle late resurrection" {
     unset TMUX
 
-    run bash -c 'echo "y" | '"$TEST_DIR"'/proj brandnew'
+    run run_proj -c brandnew
 
     [ "$status" -eq 0 ]
     grep -q "new-session.*-A" "$MOCK_TMUX_CALLS"

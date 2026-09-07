@@ -14,7 +14,7 @@ Tmux session manager.
 USAGE:
     proj                 fzf picker of existing sessions → attach
     proj NAME            attach to session by name (fzf on multiple matches,
-                         prompt to create if none found)
+                         error if none match)
     proj -c [NAME]       create session from cwd (name defaults to basename \$PWD)
     proj -k [NAME]       kill session (current session if in tmux, else fzf picker)
 
@@ -27,7 +27,7 @@ EXAMPLES:
     proj                 Pick from existing sessions
     proj dotfiles        Attach to "dotfiles" session
     proj dot             Attach if unambiguous, fzf if multiple matches,
-                         prompt to create if none
+                         error if none match
     proj -c              Create session named after current directory
     proj -c myapp        Create session named "myapp" from current directory
     proj -k              Kill current session (or fzf pick if not in tmux)
@@ -163,14 +163,15 @@ find_matching_sessions() {
 	sessions=$(list_sessions 2>/dev/null) || return 0
 	[ -z "$sessions" ] && return 0
 
-	# Exact match first
-	if echo "$sessions" | grep -qx "$query"; then
+	# Exact match first. -F throughout: a session name is a literal, so a query
+	# containing '+' or '.' must not be read as a regex
+	if echo "$sessions" | grep -qxF "$query"; then
 		echo "$query"
 		return 0
 	fi
 
 	# Substring match
-	echo "$sessions" | grep -i "$query" || true
+	echo "$sessions" | grep -iF "$query" || true
 }
 
 do_attach() {
@@ -209,20 +210,17 @@ do_attach() {
 		[ -z "$selected" ] && exit 0
 		attach_session "$selected"
 	else
-		# No matches: prompt to create
-		printf "No session '%s'. Create one here? (cwd: %s) [y/N] " "$name" "$PWD"
-		read -r response
-		case "$response" in
-			[yY])
-				# Re-check: tmux-resurrect may have restored the session while we waited
-				if session_exists "$name"; then
-					attach_session "$name"
-				else
-					do_create "$name"
-				fi
-				;;
-			*) exit 0 ;;
-		esac
+		# Creating is always explicit (proj -c)
+		local sessions
+		sessions=$(list_sessions) || true
+		if [ -n "$sessions" ]; then
+			echo "Error: no session matching '$name'" >&2
+			echo "Running: $(echo "$sessions" | tr '\n' ' ')" >&2
+		else
+			echo "Error: no tmux sessions running" >&2
+		fi
+		echo "Create one here with: proj -c $name" >&2
+		exit 1
 	fi
 }
 
