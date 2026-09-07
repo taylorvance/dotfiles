@@ -114,7 +114,8 @@ maybe_restore() {
 do_create() {
 	local name="$1"
 	[ -z "$name" ] && name=$(basename "$PWD")
-	# tmux rejects '.' and ':' in session names; normalize spaces too
+	# tmux rewrites '.' and ':' to '_' itself, but keeps spaces, which would
+	# need quoting at every call site; normalize all three for a predictable name
 	name=$(printf '%s' "$name" | tr '.: ' '___')
 
 	if session_exists "$name"; then
