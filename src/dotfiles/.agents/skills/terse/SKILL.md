@@ -31,7 +31,7 @@ skill's directory: read it when the output has findings, skip it otherwise.
 
 | Output | Budget |
 | --- | --- |
-| Review / report | 1-2 sentences on the character of the work + 1 line per finding + 1 verdict line |
+| Review / report | verdict-first topline + 1 line per finding, and nothing else: no section headings, no finding counts, no assessment of the work's character. One `unverified:` line only when a required check couldn't run |
 | PR description | `## Not fixed` (first, or absent) → `## What changed` → `## Review`; one line per item; GitHub already renders the diff and file list, so don't retype either |
 | PR review comment | finding lines only: no "overall looks good", no restating the diff |
 | Factual question | ≤ 3 lines |
@@ -39,7 +39,6 @@ skill's directory: read it when the output has findings, skip it otherwise.
 | Implementation report | 1 line per file changed + 1 on verification + 1 on what's left (omit if nothing) |
 | Summary (doc, thread, investigation) | takeaway first, then one line per decision-changing fact; no chronology of how you read it |
 | Work item / ticket body | problem → evidence → expected vs actual, one line each; never restate what a linked diff or PR shows |
-| Decision log entry | ≤ 2 sentences per template field; the decision reached, never the deliberation that reached it. One reason under `Rationale`: the one that would change a future maintainer's mind. Drop a field rather than pad it |
 | Anything else | shortest form that keeps every decision-changing fact |
 
 ## Everything else

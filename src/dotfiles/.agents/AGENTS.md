@@ -25,10 +25,10 @@ brief bullet points.
 - When asked about PR feedback, always check all three sources: PR comments, inline review
   comments, and reviews.
 - When addressing PR feedback, implement directly related non-blocking suggestions that you agree
-  with. Report unrelated improvements as scope creep instead of silently expanding the change.
+  with.
 - Post PR review feedback as a review, never a plain `gh pr comment`. The `gh pr review` flag
-  carries the verdict, so omit the report's `### Verdict` line from the posted body. Non-blocking
-  nits ride in the approving review rather than downgrading it to `--comment`.
+  carries the verdict, so the posted body states no verdict of its own. Non-blocking nits ride in
+  the approving review rather than downgrading it to `--comment`.
 - Review other people's PRs in a git worktree; never switch my checkout. Worktrees live OUTSIDE
   the repo at `~/dev/worktrees/<repo>/<slug>` via `git worktree add` (slug: letters/digits/hyphens
   only; `+` etc. break jest's unescaped `<rootDir>` ignore regexes). Never place them inside the
@@ -61,13 +61,19 @@ Use `.declog.md` as the repository's decision log.
   clarified, or superseded.
 - When replacing a decision, add the replacement at the top, change the old status to
   `superseded`, and identify the replacement under `Refs`.
+- A decision declined on its own goes in as `rejected`, so a later session does not re-propose it
+  cold. An option that merely lost to a winner belongs in that winner's `Alternatives`, not its own
+  entry. There is no `proposed`: a deferral is a decision, recorded `accepted` with the trigger
+  that would revisit it.
+
+The following fields are the entry's whole vocabulary; never invent new ones.
 
 Use this template, omitting fields that genuinely do not apply:
 
 ```markdown
 ## YYYY-MM-DD Title
 
-- Status: proposed | accepted | superseded
+- Status: accepted | superseded | rejected
 - Topics:
 - Refs:
 - Decision:
