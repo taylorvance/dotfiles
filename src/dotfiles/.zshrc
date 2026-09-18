@@ -85,6 +85,8 @@ fi
 source $HOME/.zsh/functions.zsh
 
 alias python='python3'
+# Global alias: `git dip SS` prints only the diff summary line (files/insertions/deletions)
+alias -g SS='--shortstat'
 #poetry completions zsh > ~/.zfunc/_poetry
 #fpath+=~/.zfunc
 
