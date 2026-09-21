@@ -1,0 +1,5 @@
+{
+  "name": "agent-hooks",
+  "description": "Adapter that loads the shared ~/.agents/hooks rules into Claude Code (loaded as agent-hooks@skills-dir, no install step)",
+  "version": "1.0.0"
+}

@@ -11,11 +11,17 @@ brief bullet points.
 - In TypeScript, prefer enums (or `as const` maps when enums are unavailable) for flags,
   constants, and state values unless the repository's style differs.
 
+## Hooks
+
+Mechanically checkable rules below are enforced by shared hooks (`~/.agents/hooks`, see
+`agent-hook -h`). A denial is the rule firing, not a glitch: fix the command; never retry it
+verbatim or route around the hook.
+
 ## Git
 
-- Use `git switch` instead of `git checkout` to create or change branches.
-- Run plain git from the repository root; do not use `git -C` or inline `cd`.
-- Do not add AI attribution or co-author footers to commits or pull requests.
+- Use `git switch` and `git restore`, never `git checkout` (hook-enforced).
+- Run plain git from the repository root: no `git -C`, no inline `cd` (hook-enforced).
+- No AI attribution or co-author footers on commits or pull requests (hook-enforced).
 
 ## PRs & reviews
 
@@ -26,17 +32,13 @@ brief bullet points.
   comments, and reviews.
 - When addressing PR feedback, implement directly related non-blocking suggestions that you agree
   with.
-- Post PR review feedback as a review, never a plain `gh pr comment`. The `gh pr review` flag
-  carries the verdict, so the posted body states no verdict of its own. Non-blocking nits ride in
+- Post PR review feedback with `gh pr review`, never `gh pr comment` (hook-enforced). The review
+  flag carries the verdict, so the posted body states none of its own. Non-blocking nits ride in
   the approving review rather than downgrading it to `--comment`.
-- Review other people's PRs in a git worktree; never switch my checkout. Worktrees live OUTSIDE
-  the repo at `~/dev/worktrees/<repo>/<slug>` via `git worktree add` (slug: letters/digits/hyphens
-  only; `+` etc. break jest's unescaped `<rootDir>` ignore regexes). Never place them inside the
-  repo tree either (jest haste maps, lint scripts, and watchers crawl nested worktrees). Copy only
-  ignored environment files required for validation, preserve their permissions, and ensure they
-  remain untracked.
-- Numbering items in PR comments is fine, but never with the `#` sign (GitHub auto-links `#N` to
-  issues/PRs).
+- Review other people's PRs in a git worktree at `~/dev/worktrees/<repo>/<slug>` (path and slug
+  hook-enforced); never switch my checkout. Copy only ignored environment files required for
+  validation, preserve their permissions, and ensure they remain untracked.
+- Number PR items without the `#` sign (hook-enforced; GitHub auto-links `#N`).
 - Do not request PR reviewers (`--reviewer`) unless asked.
 
 ## declog
@@ -55,7 +57,7 @@ Use `.declog.md` as the repository's decision log.
   future maintainer's mind. Omit a field instead of padding it. Length is not thoroughness here;
   a long entry usually means the decision is still being argued.
 - Keep entries newest-first: insert new entries immediately below the introductory text; never
-  append them to the end.
+  append them to the end (order and field vocabulary hook-enforced; fields over two sentences or three lines nudged).
 - Legacy entries do not need every current field. Normalize structure when convenient, but never
   invent historical rationale or consequences. Update an old entry when it is relied upon,
   clarified, or superseded.

@@ -1,0 +1,29 @@
+{
+  "description": "Shared hooks for Claude Code and Codex. Canonical copy: ~/.agents/hooks/hooks.json; client adapters symlink here. Rules live in bin/agent-hook (see its -h).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|EnterWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.agents/hooks/bin/agent-hook",
+            "statusMessage": "Checking command against shared agent rules"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.agents/hooks/bin/agent-hook",
+            "statusMessage": "Checking edited file against shared agent rules"
+          }
+        ]
+      }
+    ]
+  }
+}

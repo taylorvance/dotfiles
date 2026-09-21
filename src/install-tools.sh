@@ -343,6 +343,7 @@ main() {
 	install_optional_tool eza
 	install_optional_tool fd
 	install_optional_tool rg ripgrep
+	install_optional_tool jq  # ~/.agents/hooks parses hook events with it
 	install_optional_tool delta git-delta
 	install_optional_tool atuin
 	install_optional_tool starship

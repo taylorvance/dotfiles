@@ -12,6 +12,7 @@ RUN apk add --no-cache \
     ncurses \
     nodejs \
     findutils \
+    jq \
     grep \
     sed \
     tar \

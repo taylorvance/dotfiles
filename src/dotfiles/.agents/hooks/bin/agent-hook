@@ -1,0 +1,357 @@
+#!/bin/bash
+# agent-hook - PreToolUse / PostToolUse hook shared by Claude Code and Codex
+#
+# Enforces the mechanically checkable rules from ~/.agents/AGENTS.md so they
+# no longer depend on the model remembering prose. Reads the hook event JSON on
+# stdin and prints a deny (PreToolUse) or block (PostToolUse) decision, same
+# JSON contract in both clients, when a rule is violated; prints nothing when
+# the call is fine. Fails open: any problem in the hook itself (no jq,
+# unparsable input) allows the call.
+#
+# Wiring: ~/.agents/hooks/hooks.json is canonical; ~/.codex/hooks.json and
+# ~/.claude/skills/agent-hooks/hooks/hooks.json symlink to it.
+#
+# Bash 3.2 compatible (macOS /bin/bash).
+
+set -u
+
+CONF="${AGENT_HOOKS_CONF:-$HOME/.agents/hooks.conf}"
+
+usage() {
+	cat <<EOF
+Usage: agent-hook [-h]
+
+PreToolUse and PostToolUse hook for Claude Code and Codex. Reads the tool-call
+event JSON on stdin; prints a JSON deny (PreToolUse) or block (PostToolUse)
+with the reason when a rule is violated, nothing otherwise. Exit status is
+always 0 (the decision travels in the JSON).
+
+PreToolUse rules enforced on every machine (from ~/.agents/AGENTS.md):
+  git checkout            use git switch / git restore
+  git -C, cd ... && git   run plain git from the repository root
+  git worktree add PATH   PATH must be ~/dev/worktrees/<repo>/<slug>, slug
+                          [A-Za-z0-9-]+, never under a .claude/ path
+  EnterWorktree name=...  Claude tool; creates under .claude/worktrees (use path=)
+  attribution footers     no Co-Authored-By / Claude-Session / "Generated with"
+                          in git commit or gh pr commands
+  gh pr comment           post feedback as gh pr review instead
+  #N in gh pr bodies      GitHub auto-links it; number items without #
+  ad hoc PR feedback      gh api graphql / REST reviews / gh pr view --comments
+                          are denied; run node ~/.claude/scripts/pr-feedback.mjs
+                          (REST issues/N/comments stays allowed for bot output)
+
+PostToolUse rules (Edit / Write / apply_patch on a .declog.md):
+  entry shape             blocks when the newest entry is not first (by date)
+                          or uses a field outside the template vocabulary;
+                          a field over two sentences or three lines only earns a nudge
+
+Work-repo rules, active only when the optional config exists and the current
+repository's origin URL matches WORK_REMOTE_RE:
+  new branch names        must match WORK_BRANCH_RE
+                          (git switch -c, git branch, git worktree add -b)
+  gh pr create --title    must match WORK_PR_TITLE_RE
+  gh pr create            must pass --assignee WORK_PR_ASSIGNEE
+
+Config: $CONF (untracked; override with \$AGENT_HOOKS_CONF)
+  A shell fragment assigning any of WORK_REMOTE_RE, WORK_BRANCH_RE,
+  WORK_PR_TITLE_RE (POSIX EREs) and WORK_PR_ASSIGNEE (literal). Example:
+    WORK_REMOTE_RE='github.com[:/]MyOrg/'
+    WORK_BRANCH_RE='^tv/[A-Z][A-Z0-9]+-[0-9]+-[a-z0-9-]+\$'
+    WORK_PR_TITLE_RE='[A-Z][A-Z0-9]+-[0-9]+'
+    WORK_PR_ASSIGNEE='@me'
+EOF
+}
+
+case "${1:-}" in
+	-h | --help)
+		usage
+		exit 0
+		;;
+esac
+
+# Fail open: a hook that cannot run must never block the client.
+command -v jq >/dev/null 2>&1 || exit 0
+INPUT=$(cat) || exit 0
+
+json_field() {
+	printf '%s' "$INPUT" | jq -r "$1 // empty" 2>/dev/null
+}
+
+TOOL=$(json_field '.tool_name')
+CWD=$(json_field '.cwd')
+EVENT=$(json_field '.hook_event_name')
+[ -n "$TOOL" ] || exit 0
+
+deny() {
+	# PreToolUse: $1 rule label, $2 reason and remedy
+	jq -n --arg reason "$1: $2" \
+		'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
+	exit 0
+}
+
+block() {
+	# PostToolUse: the call already ran; $1 rule label, $2 what to fix
+	jq -n --arg reason "$1: $2" '{decision: "block", reason: $reason}'
+	exit 0
+}
+
+nudge() {
+	# PostToolUse, non-blocking: context the model sees but may overrule
+	jq -n --arg ctx "$1" \
+		'{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $ctx}}'
+	exit 0
+}
+
+# Work-repo config is machine-local and optional.
+WORK_REMOTE_RE=""
+WORK_BRANCH_RE=""
+WORK_PR_TITLE_RE=""
+WORK_PR_ASSIGNEE=""
+if [ -f "$CONF" ]; then
+	# shellcheck source=/dev/null
+	. "$CONF"
+fi
+
+is_work_repo() {
+	[ -n "$WORK_REMOTE_RE" ] || return 1
+	local url
+	url=$(git -C "${CWD:-.}" remote get-url origin 2>/dev/null) || return 1
+	[[ "$url" =~ $WORK_REMOTE_RE ]]
+}
+
+# Value of a command-line option inside a command string. $1 is an ERE
+# alternation of option spellings (e.g. '--title|-t'); handles "quoted",
+# 'quoted', and bare values. Returns 1 when the option is absent.
+opt_value() {
+	local re="(^|[[:space:]])($1)([[:space:]]+|=)(\"([^\"]*)\"|'([^']*)'|([^[:space:]]+))"
+	[[ "$CMD" =~ $re ]] || return 1
+	printf '%s' "${BASH_REMATCH[5]}${BASH_REMATCH[6]}${BASH_REMATCH[7]}"
+}
+
+check_branch_name() {
+	# $1 proposed branch name
+	[ -n "$WORK_BRANCH_RE" ] || return 0
+	is_work_repo || return 0
+	[[ "$1" =~ $WORK_BRANCH_RE ]] ||
+		deny "branch name" "'$1' does not match the work convention $WORK_BRANCH_RE"
+}
+
+check_worktree_add() {
+	local rest="$1" path="" branch="" tok=""
+	rest=${rest%%[;&|]*}
+	# shellcheck disable=SC2086
+	set -- $rest
+	while [ $# -gt 0 ]; do
+		tok=$1
+		shift
+		case "$tok" in
+			-b | -B | --reason | --orphan)
+				[ $# -gt 0 ] && branch=$1 && shift
+				;;
+			-*) ;;
+			*)
+				[ -z "$path" ] && path=$tok
+				;;
+		esac
+	done
+	[ -n "$path" ] || return 0
+
+	# The command string is unexpanded shell text, so ~ and $HOME are literal here
+	# shellcheck disable=SC2016
+	case "$path" in
+		'~'/*) path="$HOME/${path#\~/}" ;;
+		'$HOME'/*) path="$HOME/${path#\$HOME/}" ;;
+		'${HOME}'/*) path="$HOME/${path#\$\{HOME\}/}" ;;
+	esac
+	[ "${path%/}" = "$path" ] || path=${path%/}
+
+	case "/$path/" in
+		*/.claude/*)
+			deny "worktree path" "never place a worktree under a .claude/ path (Claude re-approves every edit inside one). Use ~/dev/worktrees/<repo>/<slug>"
+			;;
+	esac
+
+	local root="$HOME/dev/worktrees/"
+	case "$path" in
+		"$root"*) ;;
+		*)
+			deny "worktree path" "'$path' is not under ~/dev/worktrees/<repo>/<slug>. Worktrees live outside the repo tree (jest haste maps, lint scripts, and watchers crawl nested worktrees)"
+			;;
+	esac
+
+	local tail=${path#"$root"} repo slug
+	repo=${tail%%/*}
+	slug=${tail#*/}
+	if [ -z "$repo" ] || [ "$repo" = "$tail" ] || [ -z "$slug" ] || [ "${slug#*/}" != "$slug" ]; then
+		deny "worktree path" "'$path' must be exactly ~/dev/worktrees/<repo>/<slug>"
+	fi
+	[[ "$slug" =~ ^[A-Za-z0-9-]+$ ]] ||
+		deny "worktree slug" "'$slug' may contain only letters, digits, and hyphens (+ and other characters break jest's unescaped <rootDir> ignore regexes)"
+
+	[ -n "$branch" ] && check_branch_name "$branch"
+	return 0
+}
+
+check_bash() {
+	CMD=$(json_field '.tool_input.command')
+	[ -n "$CMD" ] || return 0
+
+	local git_re='(^|[[:space:];&|(])git[[:space:]]+'
+	local re
+
+	re="${git_re}checkout([[:space:]]|$)"
+	[[ "$CMD" =~ $re ]] &&
+		deny "git checkout" "use git switch to change or create branches and git restore for files"
+
+	re="${git_re}-C([[:space:]]|$)"
+	[[ "$CMD" =~ $re ]] &&
+		deny "git -C" "run plain git from the repository root (the working directory persists between calls)"
+
+	re='(^|[;&|(][[:space:]]*)cd[[:space:]]+[^;&|]*[;&]+[[:space:]]*git([[:space:]]|$)'
+	[[ "$CMD" =~ $re ]] &&
+		deny "inline cd" "do not chain cd into git; run plain git from the repository root"
+
+	re="${git_re}worktree[[:space:]]+add[[:space:]]+(.*)"
+	[[ "$CMD" =~ $re ]] && check_worktree_add "${BASH_REMATCH[2]}"
+
+	re="${git_re}switch[[:space:]]+(-c|-C|--create|--force-create)[[:space:]]+([^[:space:];&|]+)"
+	[[ "$CMD" =~ $re ]] && check_branch_name "${BASH_REMATCH[3]}"
+
+	re="${git_re}branch[[:space:]]+([^-[:space:]][^[:space:];&|]*)"
+	[[ "$CMD" =~ $re ]] && check_branch_name "${BASH_REMATCH[2]}"
+
+	re='(^|[[:space:];&|(])(git[[:space:]]+(commit|tag|notes)|gh[[:space:]]+(pr|issue))([[:space:]]|$)'
+	if [[ "$CMD" =~ $re ]]; then
+		re='Co-Authored-By:|Claude-Session:|Generated with \[Claude|claude\.ai/code/session'
+		[[ "$CMD" =~ $re ]] &&
+			deny "attribution" "no AI attribution or co-author footers in commits or pull requests"
+	fi
+
+	re='(^|[[:space:];&|(])gh[[:space:]]+pr[[:space:]]+comment([[:space:]]|$)'
+	[[ "$CMD" =~ $re ]] &&
+		deny "gh pr comment" "post feedback as a review (gh pr review); the review flag carries the verdict"
+
+	# PR feedback has one entry point. Ad hoc GraphQL, the REST reviews
+	# endpoints, and gh pr view --comments all reinvent it; only the REST
+	# top-level comments endpoint stays open, for the bot output the script drops.
+	local feedback_re='(^|[[:space:];&|(])gh[[:space:]]+api[[:space:]]+graphql.*(reviewThreads|reviews|comments)'
+	re="$feedback_re|(^|[[:space:];&|(])gh[[:space:]]+api[[:space:]]+.*pulls/[^[:space:]]*/(reviews|comments)|(^|[[:space:];&|(])gh[[:space:]]+pr[[:space:]]+view[^;&|]*--comments"
+	[[ "$CMD" =~ $re ]] &&
+		deny "ad hoc PR feedback" "run node ~/.claude/scripts/pr-feedback.mjs [PR] for comments, reviews, and review threads; gh api repos/<o>/<r>/issues/<n>/comments is the only direct fetch (bot output)"
+
+	re='(^|[[:space:];&|(])gh[[:space:]]+pr[[:space:]]+(create|review|edit|merge)([[:space:]]|$)'
+	if [[ "$CMD" =~ $re ]]; then
+		re='(^|[^[:alnum:]_&])#[0-9]+'
+		[[ "$CMD" =~ $re ]] &&
+			deny "#N in PR text" "GitHub auto-links #N to issues and PRs; number items without the # sign"
+	fi
+
+	re='(^|[[:space:];&|(])gh[[:space:]]+pr[[:space:]]+create([[:space:]]|$)'
+	if [[ "$CMD" =~ $re ]] && is_work_repo; then
+		local title
+		if [ -n "$WORK_PR_TITLE_RE" ] && title=$(opt_value '--title|-t'); then
+			[[ "$title" =~ $WORK_PR_TITLE_RE ]] ||
+				deny "PR title" "'$title' lacks the work ticket key ($WORK_PR_TITLE_RE)"
+		fi
+		if [ -n "$WORK_PR_ASSIGNEE" ]; then
+			local assignee
+			assignee=$(opt_value '--assignee|-a') || assignee=""
+			[ "$assignee" = "$WORK_PR_ASSIGNEE" ] ||
+				deny "PR assignee" "gh pr create in a work repo must pass --assignee $WORK_PR_ASSIGNEE"
+		fi
+	fi
+	return 0
+}
+
+check_enter_worktree() {
+	local name
+	name=$(json_field '.tool_input.name')
+	[ -n "$name" ] &&
+		deny "EnterWorktree name" "name mode creates the worktree under .claude/worktrees; create it at ~/dev/worktrees/<repo>/<slug> and enter it via path"
+	return 0
+}
+
+# Sentences in a field's text: code spans are dropped first so paths and
+# versions do not count, then terminal punctuation followed by space or EOL.
+# shellcheck disable=SC2016
+count_sentences() {
+	local text
+	text=$(printf '%s' "$1" | sed -E 's/`[^`]*`//g; s/(^|[^[:alnum:]])(e\.g|i\.e|vs|etc)\./\1\2/g')
+	printf '%s' "$text" | grep -oE '[.!?]+([[:space:]]|$)' | wc -l | tr -d ' '
+}
+
+check_declog() {
+	local file
+	file=$(json_field '.tool_input.file_path')
+	[ -n "$file" ] || file=$(json_field '.tool_input.path')
+	[ -n "$file" ] || return 0
+	[ "${file##*/}" = ".declog.md" ] || return 0
+	[ -f "$file" ] || return 0
+
+	local date_re='^## ([0-9]{4}-[0-9]{2}-[0-9]{2})'
+	local first_date="" second_date="" in_entry=0 line
+	local field="" text="" name="" long_fields="" lines=0
+	local vocab=" Status Topics Refs Decision Rationale Consequences Alternatives "
+
+	finish_field() {
+		[ -n "$field" ] || return 0
+		if [ "$(count_sentences "$text")" -gt 2 ] || [ "$lines" -gt 3 ]; then
+			long_fields="${long_fields:+$long_fields, }$field"
+		fi
+		field=""
+		text=""
+	}
+
+	while IFS= read -r line || [ -n "$line" ]; do
+		if [[ "$line" =~ $date_re ]]; then
+			if [ "$in_entry" -eq 0 ]; then
+				first_date=${BASH_REMATCH[1]}
+				in_entry=1
+				continue
+			fi
+			second_date=${BASH_REMATCH[1]}
+			break
+		fi
+		[ "$in_entry" -eq 1 ] || continue
+		if [[ "$line" =~ ^-[[:space:]]+([A-Za-z]+):(.*)$ ]]; then
+			finish_field
+			name=${BASH_REMATCH[1]}
+			case "$vocab" in
+				*" $name "*) ;;
+				*)
+					block "declog field" "'$name' is not in the entry vocabulary ($vocab); fold it into an existing field or drop it"
+					;;
+			esac
+			field=$name
+			text=${BASH_REMATCH[2]}
+			lines=1
+		elif [ -n "$field" ]; then
+			text="$text ${line# }"
+			lines=$((lines + 1))
+		fi
+	done < "$file"
+	finish_field
+
+	[ -n "$first_date" ] || return 0
+	if [ -n "$second_date" ] && [[ "$first_date" < "$second_date" ]]; then
+		block "declog order" "entries are newest-first; the first entry ($first_date) is older than the next ($second_date). Move the new entry directly below the intro"
+	fi
+	[ -n "$long_fields" ] &&
+		nudge "declog: $long_fields run past two sentences or three lines in the newest entry. AGENTS.md asks for at most two sentences per field; trim unless each one changes a maintainer's mind."
+	return 0
+}
+
+case "$EVENT" in
+	PostToolUse)
+		case "$TOOL" in
+			Edit | Write | MultiEdit | apply_patch) check_declog ;;
+		esac
+		;;
+	*)
+		case "$TOOL" in
+			Bash) check_bash ;;
+			EnterWorktree) check_enter_worktree ;;
+		esac
+		;;
+esac
+exit 0

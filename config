@@ -22,6 +22,7 @@
 .zsh/plugins
 .zshrc
 .agents/AGENTS.md
+.agents/hooks
 .agents/skills/devhost
 .agents/skills/implement
 .agents/skills/review
@@ -30,7 +31,9 @@
 .claude/CLAUDE.md
 .claude/commands/address-pr-feedback.md
 .claude/scripts/pr-feedback.mjs
+.claude/skills/agent-hooks
 .claude/skills/implement
 .claude/skills/review
 .claude/skills/terse
 .codex/AGENTS.md
+.codex/hooks.json

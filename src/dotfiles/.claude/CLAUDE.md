@@ -7,17 +7,16 @@
 Shared PR rules live in `~/.agents/AGENTS.md`; only Claude Code specifics belong here.
 
 - When checking a PR for feedback (assume the PR for the current checked-out branch), run the
-  helper script: `node ~/.claude/scripts/pr-feedback.mjs [PR_NUMBER]`. It auto-detects owner/repo
-  and the current branch's PR (works from any repo), then emits the full
-  comments+reviews+reviewThreads JSON. Bot-authored comments and reviews (CI status dumps) are
-  dropped and counted in `botFeedbackOmitted`; fetch those with gh directly on the rare occasion
-  they matter. Pass a PR number to target a specific PR. If `node` or the script is unavailable,
-  reproduce its paginated GraphQL queries (see the script source).
+  helper script: `node ~/.claude/scripts/pr-feedback.mjs [PR_NUMBER]` (ad hoc gh fetches of PR
+  feedback are hook-denied). It auto-detects owner/repo and the current branch's PR (works from
+  any repo), then emits the full comments+reviews+reviewThreads JSON. Bot-authored comments and
+  reviews (CI status dumps) are dropped and counted in `botFeedbackOmitted`; the REST
+  `issues/<n>/comments` endpoint stays open for the rare occasion they matter. Pass a PR number
+  to target a specific PR. If `node` or the script is unavailable, reproduce its paginated
+  GraphQL queries (see the script source).
 - Worktree permission scoping outside the repo comes from `permissions.additionalDirectories`
-  (`~/dev/worktrees` in `~/.claude/settings.json`). Never place a worktree under any `.claude/`
-  path: every file edit inside one trips the "edit its own settings" approval. Don't use
-  EnterWorktree's `name` mode (it creates under `.claude/worktrees/`); entering an existing
-  worktree via its `path` param is fine.
+  (`~/dev/worktrees` in `~/.claude/settings.json`). Enter an existing worktree via
+  EnterWorktree's `path` param; its `name` mode is hook-denied (creates under `.claude/`).
 
 ## Shell & tools
 

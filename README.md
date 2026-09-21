@@ -107,7 +107,7 @@ make link
 
 ### Tools Installed
 
-Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where needed. The installer also attempts to install recommended CLI tools (fzf, zoxide, eza, fd, ripgrep, delta, atuin, bat, starship, lazygit, tree-sitter, gh) and development tools (mise for node — global versions live in `~/.config/mise/config.toml` — plus python3), but the shell config is designed to degrade gracefully when optional tools are missing.
+Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where needed. The installer also attempts to install recommended CLI tools (fzf, zoxide, eza, fd, ripgrep, jq, delta, atuin, bat, starship, lazygit, tree-sitter, gh) and development tools (mise for node — global versions live in `~/.config/mise/config.toml` — plus python3), but the shell config is designed to degrade gracefully when optional tools are missing.
 
 ### Custom Scripts (`~/.local/bin/`)
 
@@ -135,8 +135,9 @@ instruction instead of attempting a download.
 - **nvim** - lazy.nvim plugin manager
 - **git** - Common aliases, delta diff integration
 - **tmux** - `C-Space` prefix, vim-like navigation
-- **agents** - Shared guidance and skills under `.agents`, exposed through client-specific
-  discovery adapters where required
+- **agents** - Shared guidance, skills, and PreToolUse hooks under `.agents`, exposed through
+  client-specific discovery adapters where required (`~/.agents/hooks/bin/agent-hook -h`
+  lists the enforced rules and the optional work-repo config)
 
 ## Project Structure
 
@@ -149,9 +150,9 @@ dotfiles/
 │   ├── adopt.sh            # Adopt existing home files into src/dotfiles/
 │   ├── symlink-manager.sh  # Symlink management (install/uninstall/status/restore)
 │   └── dotfiles/           # Your actual dotfiles
-│       ├── .agents/        # Canonical shared agent guidance and skills
-│       ├── .claude/        # Claude-specific config and shared-skill adapters
-│       ├── .codex/         # Codex discovery adapter for shared AGENTS.md
+│       ├── .agents/        # Canonical shared agent guidance, skills, and hooks
+│       ├── .claude/        # Claude-specific config, shared-skill and hook adapters
+│       ├── .codex/         # Codex adapters for shared AGENTS.md and hooks.json
 │       ├── .config/
 │       ├── .local/bin/
 │       ├── .tmux/plugins   # -> vendor/tmux

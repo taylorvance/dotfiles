@@ -236,7 +236,7 @@ check_executable_bits() {
 	printf "\n${BLUE}Executable bits${NC}\n"
 
 	local file
-	for file in "$BASEDIR"/src/*.sh "$SOURCEDIR"/.local/bin/* "$BASEDIR"/tests/test-runner.sh "$BASEDIR"/.githooks/*; do
+	for file in "$BASEDIR"/src/*.sh "$SOURCEDIR"/.local/bin/* "$SOURCEDIR"/.agents/hooks/bin/* "$BASEDIR"/tests/test-runner.sh "$BASEDIR"/.githooks/*; do
 		[ -f "$file" ] || continue
 		if [ -x "$file" ]; then
 			ok "${file#"$BASEDIR"/}"
@@ -265,9 +265,9 @@ check_shell_syntax() {
 		check_one_syntax bash "$file"
 	done
 
-	# Extensionless bin scripts: pick the checker from the shebang so new
+	# Extensionless bin and hook scripts: pick the checker from the shebang so new
 	# scripts are covered automatically
-	for file in "$SOURCEDIR"/.local/bin/*; do
+	for file in "$SOURCEDIR"/.local/bin/* "$SOURCEDIR"/.agents/hooks/bin/*; do
 		[ -f "$file" ] || continue
 		shebang=$(head -n1 "$file")
 		case "$shebang" in
