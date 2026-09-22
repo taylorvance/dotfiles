@@ -125,7 +125,9 @@ check_git_repo() {
 # absolute and resolvable from any working directory
 prefix_git_root() {
 	local git_files="$1"
-	if [ -z "$git_root" ] || [ "$git_root" = "$PWD" ]; then
+	# -ef, not a string compare: on macOS $TMPDIR is /var/... but git reports
+	# the toplevel as /private/var/..., and the two must count as the same dir
+	if [ -z "$git_root" ] || [ "$git_root" -ef "$PWD" ]; then
 		# Already at git root or not in git repo
 		echo "$git_files"
 	else

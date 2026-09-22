@@ -49,6 +49,20 @@ json() {
     fi
 }
 
+# "rate_limits" member from triples: window pct seconds-from-now, e.g.
+# `rate_limits five_hour 4 9240 seven_day 20 259230`. Built here rather than
+# inline because bash 3.2 brace-expands `{\"a\":1,\"b\":2}` nested inside
+# "$( )", which turns the fixture into invalid JSON on macOS.
+rate_limits() {
+    local out="" member
+    while [ $# -ge 3 ]; do
+        member=$(printf '"%s":{"used_percentage":%s,"resets_at":%s}' "$1" "$2" "$((NOW + $3))")
+        out="${out:+$out,}$member"
+        shift 3
+    done
+    printf '"rate_limits":{%s}' "$out"
+}
+
 # ============================================================================
 # PATH SQUEEZE
 # ============================================================================
@@ -178,24 +192,24 @@ make_repo() {
 
 @test "usage: 5h segment shows percent and hours left, floored to tenths" {
     # 2h34m left = 9240s -> 25.6 tenths of an hour -> "2.5h"
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":4,\"resets_at\":$((NOW + 9240))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 4 9240)")"
     [[ "$output" == *" · 5h 4% (2.5h)" ]]
 }
 
 @test "usage: under an hour shows minutes; over a day shows days" {
     # Fixtures sit ~30s past each boundary: the script reads the clock a
     # second or two after setup did, and tenths are floored
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":10,\"resets_at\":$((NOW + 2630))},\"seven_day\":{\"used_percentage\":20,\"resets_at\":$((NOW + 259230))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 10 2630 seven_day 20 259230)")"
     [[ "$output" == *" · 5h 10% (43m) · 7d 20% (3d)" ]]
 }
 
 @test "usage: whole hours print without a decimal" {
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":10,\"resets_at\":$((NOW + 7230))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 10 7230)")"
     [[ "$output" == *"(2h)"* ]]
 }
 
 @test "usage: past or missing reset drops the time-left part" {
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":10,\"resets_at\":$((NOW - 5))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 10 -5)")"
     [[ "$output" == *" · 5h 10%" ]]
     [[ "$output" != *"("* ]]
 }
@@ -203,26 +217,26 @@ make_repo() {
 @test "pace: burn ratio appears when over 1.2x the window pace" {
     # 60% used with 14990s of the 18000s window left: elapsed ~3010,
     # ratio = 60*18000/(3010*10) = 35 tenths -> "3.5x", past the 1.6x red line
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":60,\"resets_at\":$((NOW + 14990))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 60 14990)")"
     [[ "$output" == *"5h 60% (4.1h 3.5x)"* ]]
 }
 
 @test "pace: on-pace usage under 50 percent shows no ratio" {
     # 30% used, 70% of the window left: ratio 1.0x, and pct < 50 -> dim, no ratio
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":30,\"resets_at\":$((NOW + 12630))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 30 12630)")"
     [[ "$output" == *"5h 30% (3.5h)"* ]]
     [[ "$output" != *"x)"* ]]
 }
 
 @test "pace: on-pace usage at 50 percent or more shows the ratio as reassurance" {
     # 50% used, half the window left: ratio 1.0x, pct >= 50 -> green with ratio
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":50,\"resets_at\":$((NOW + 9030))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 50 9030)")"
     [[ "$output" == *"5h 50% (2.5h 1.0x)"* ]]
 }
 
 @test "pace: below 25 percent used the ratio is never shown" {
     # 20% used with almost no time left would be a huge ratio; suppressed
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"five_hour\":{\"used_percentage\":20,\"resets_at\":$((NOW + 100))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits five_hour 20 100)")"
     [[ "$output" == *"5h 20% (1m)"* ]]
 }
 
@@ -245,7 +259,7 @@ EOF
 
 @test "weekly: stdin seven_day wins over the cache" {
     printf '{"cachedUsageUtilization":{"utilization":{"limits":[{"group":"weekly","percent":90}]}}}' > "$HOME/.claude.json"
-    run_sl "$(json "$PLAIN" "\"rate_limits\":{\"seven_day\":{\"used_percentage\":20,\"resets_at\":$((NOW + 90000))}}")"
+    run_sl "$(json "$PLAIN" "$(rate_limits seven_day 20 90000)")"
     [[ "$output" == *" · 7d 20% (1d)" ]]
     [[ "$output" != *"90"* ]]
 }
