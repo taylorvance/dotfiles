@@ -15,7 +15,8 @@ brief bullet points.
 
 Mechanically checkable rules below are enforced by shared hooks (`~/.agents/hooks`, see
 `agent-hook -h`). A denial is the rule firing, not a glitch: fix the command; never retry it
-verbatim or route around the hook.
+verbatim or route around the hook. Every denial is logged (`agent-hook -s` tallies them); a
+rule that has not fired in ninety days is retired from the hook and kept only as prose.
 
 ## Git
 

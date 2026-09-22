@@ -16,15 +16,26 @@
 set -u
 
 CONF="${AGENT_HOOKS_CONF:-$HOME/.agents/hooks.conf}"
+LOG="${AGENT_HOOKS_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/agent-hooks/log}"
 
 usage() {
 	cat <<EOF
-Usage: agent-hook [-h]
+Usage: agent-hook [-h | -s]
 
 PreToolUse and PostToolUse hook for Claude Code and Codex. Reads the tool-call
 event JSON on stdin; prints a JSON deny (PreToolUse) or block (PostToolUse)
 with the reason when a rule is violated, nothing otherwise. Exit status is
 always 0 (the decision travels in the JSON).
+
+Every deny, block, and nudge appends one tab-separated line to the log:
+  <UTC timestamp> <decision> <rule> <tool> <repo or ->
+so a rule that never fires can be retired and one that fires constantly can be
+fixed at the source. Allowed calls are not logged.
+
+  -s, --stats   Count log lines by decision and rule, most frequent first
+  -h, --help    Show this help message
+
+Log: $LOG (override with \$AGENT_HOOKS_LOG)
 
 PreToolUse rules enforced on every machine (from ~/.agents/AGENTS.md):
   git checkout            use git switch / git restore
@@ -67,6 +78,17 @@ case "${1:-}" in
 		usage
 		exit 0
 		;;
+	-s | --stats)
+		if [ ! -s "$LOG" ]; then
+			echo "No log at $LOG (nothing has been denied, blocked, or nudged yet)"
+			exit 0
+		fi
+		printf 'Since %s, %s lines\n\n' "$(head -n 1 "$LOG" | cut -f1)" "$(wc -l < "$LOG" | tr -d ' ')"
+		# uniq -c yields "  N decision<TAB>rule"; split the count off the first field
+		cut -f2,3 "$LOG" | sort | uniq -c | sort -rn \
+			| awk -F'\t' '{ split($1, a, " "); printf "%6s  %-7s %s\n", a[1], a[2], $2 }'
+		exit 0
+		;;
 esac
 
 # Fail open: a hook that cannot run must never block the client.
@@ -82,8 +104,21 @@ CWD=$(json_field '.cwd')
 EVENT=$(json_field '.hook_event_name')
 [ -n "$TOOL" ] || exit 0
 
+# Append one log line: timestamp, decision, rule, tool, repo. Best effort:
+# a log that cannot be written must not change the decision.
+log_event() {
+	local repo
+	repo=$(git -C "${CWD:-.}" rev-parse --show-toplevel 2>/dev/null) || repo=""
+	repo=${repo##*/}
+	{
+		mkdir -p "${LOG%/*}" &&
+			printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$TOOL" "${repo:--}" >> "$LOG"
+	} 2>/dev/null || true
+}
+
 deny() {
 	# PreToolUse: $1 rule label, $2 reason and remedy
+	log_event deny "$1"
 	jq -n --arg reason "$1: $2" \
 		'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
 	exit 0
@@ -91,13 +126,15 @@ deny() {
 
 block() {
 	# PostToolUse: the call already ran; $1 rule label, $2 what to fix
+	log_event block "$1"
 	jq -n --arg reason "$1: $2" '{decision: "block", reason: $reason}'
 	exit 0
 }
 
 nudge() {
-	# PostToolUse, non-blocking: context the model sees but may overrule
-	jq -n --arg ctx "$1" \
+	# PostToolUse, non-blocking: $1 rule label, $2 context the model may overrule
+	log_event nudge "$1"
+	jq -n --arg ctx "$2" \
 		'{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $ctx}}'
 	exit 0
 }
@@ -337,7 +374,7 @@ check_declog() {
 		block "declog order" "entries are newest-first; the first entry ($first_date) is older than the next ($second_date). Move the new entry directly below the intro"
 	fi
 	[ -n "$long_fields" ] &&
-		nudge "declog: $long_fields run past two sentences or three lines in the newest entry. AGENTS.md asks for at most two sentences per field; trim unless each one changes a maintainer's mind."
+		nudge "declog length" "declog: $long_fields run past two sentences or three lines in the newest entry. AGENTS.md asks for at most two sentences per field; trim unless each one changes a maintainer's mind."
 	return 0
 }
 

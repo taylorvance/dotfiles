@@ -15,6 +15,9 @@ setup() {
 
     # No work config unless a test writes one
     export AGENT_HOOKS_CONF="$TEST_DIR/hooks.conf"
+
+    # Log lands in the sandbox, never in the real state dir
+    export AGENT_HOOKS_LOG="$TEST_DIR/state/agent-hooks/log"
 }
 
 teardown() {
@@ -465,4 +468,77 @@ EOF
     [[ "$output" == *"apply_patch"* ]]
     run jq -r '.hooks.PostToolUse[0].hooks[0].command' "$json"
     [ "$output" = "~/.agents/hooks/bin/agent-hook" ]
+}
+
+# ============================================================================
+# LOG - every deny/block/nudge leaves one line; allowed calls leave nothing
+# ============================================================================
+
+@test "log: a deny appends timestamp, decision, rule, tool, repo" {
+    git init -q "$TEST_DIR/myrepo"
+    run_bash "git checkout main" "$TEST_DIR/myrepo"
+    assert_denied "git checkout"
+
+    [ -f "$AGENT_HOOKS_LOG" ]
+    [ "$(wc -l < "$AGENT_HOOKS_LOG" | tr -d ' ')" -eq 1 ]
+    local line tab
+    tab=$(printf '\t')
+    line=$(cat "$AGENT_HOOKS_LOG")
+    [[ "$line" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z${tab}deny${tab}git\ checkout${tab}Bash${tab}myrepo$ ]]
+}
+
+@test "log: outside a repo the repo column is a dash" {
+    run_bash "git -C /tmp status"
+    assert_denied "git -C"
+    [ "$(cut -f5 "$AGENT_HOOKS_LOG")" = "-" ]
+}
+
+@test "log: an allowed call writes nothing" {
+    run_bash "git status"
+    assert_allowed
+    [ ! -e "$AGENT_HOOKS_LOG" ]
+}
+
+@test "log: a declog nudge is logged with its label" {
+    local f
+    f=$(write_declog <<'EOF'
+# Decision log
+
+## 2026-09-21 Entry
+
+- Status: accepted
+- Consequences: First sentence. Second sentence. Third sentence that
+  wraps onto a new line. Fourth!
+EOF
+)
+    run_edit "$f"
+    [[ "$output" == *'additionalContext'* ]]
+    [ "$(cut -f2,3 "$AGENT_HOOKS_LOG")" = "$(printf 'nudge\tdeclog length')" ]
+}
+
+@test "log: an unwritable log does not change the decision" {
+    export AGENT_HOOKS_LOG="$TEST_DIR/readonly/log"
+    mkdir -p "$TEST_DIR/readonly"
+    chmod 500 "$TEST_DIR/readonly"
+    run_bash "git checkout main"
+    chmod 700 "$TEST_DIR/readonly"
+    assert_denied "git checkout"
+    [ ! -e "$AGENT_HOOKS_LOG" ]
+}
+
+@test "-s: empty log says so" {
+    run "$HOOK" -s
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No log at"* ]]
+}
+
+@test "-s: counts by decision and rule, most frequent first" {
+    run_bash "git checkout main"
+    run_bash "git checkout dev"
+    run_bash "git -C /tmp status"
+    run "$HOOK" --stats
+    [ "$status" -eq 0 ]
+    [[ "${lines[0]}" == "Since "*", 3 lines" ]]
+    [[ "${lines[1]}" =~ ^\ *2\ \ deny\ +git\ checkout$ ]]
+    [[ "${lines[2]}" =~ ^\ *1\ \ deny\ +git\ -C$ ]]
 }
