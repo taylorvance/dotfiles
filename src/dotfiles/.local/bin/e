@@ -23,7 +23,12 @@ FILTER OPTIONS (can combine multiple):
 
 MODIFIERS:
     -i, --interactive        Use fzf to select files (implies -a if no file set)
+                             Tab marks, ctrl-a marks all, Enter opens the marked
+                             files; previews with bat when installed
     -h, --help               Show this help message
+
+ORDER: Files from a file set or filter open most recently modified first
+    (-r already does). Named files and piped lists keep the order given.
 
 COMPOSITION: All filters AND together. For example:
     e -m -g TODO             Modified files containing "TODO"
@@ -131,8 +136,29 @@ prefix_git_root() {
 	fi
 }
 
+# Newest first by filesystem mtime; ties (same second) fall back to path
+# order so the result is stable. Tab-separated so paths with spaces survive.
+sort_by_mtime() {
+	local stat_cmd f mtime
+	if [[ "$OSTYPE" == "darwin"* ]]; then
+		stat_cmd="stat -f %m"
+	else
+		stat_cmd="stat -c %Y"
+	fi
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		if mtime=$($stat_cmd -- "$f" 2>/dev/null); then
+			printf '%s\t%s\n' "$mtime" "$f"
+		else
+			# Unreadable or missing (e.g. a file:line entry): keep it, sort last
+			printf '0\t%s\n' "$f"
+		fi
+	done <<< "$1" | sort -t "$(printf '\t')" -k1,1nr -k2,2 | cut -f2-
+}
+
 # Parse arguments
 file_set=""
+computed_set=false  # true when the list came from a file set or filter, not from args or stdin
 grep_pattern=""
 name_pattern=""
 diff_ref=""
@@ -335,6 +361,7 @@ fi
 case "$file_set" in
 	modified)
 		check_git_repo
+		computed_set=true
 		# Plumbing instead of porcelain parsing: porcelain status codes are
 		# positional and quote special filenames. --diff-filter=d excludes
 		# deleted files; staged + unstaged are unioned and deduped.
@@ -357,6 +384,7 @@ case "$file_set" in
 		;;
 	untracked)
 		check_git_repo
+		computed_set=true
 		file_list=$(git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard --full-name)
 		file_list=$(prefix_git_root "$file_list")
 		if [ -z "$file_list" ]; then
@@ -365,6 +393,7 @@ case "$file_set" in
 		;;
 	all)
 		check_git_repo
+		computed_set=true
 		file_list=$(git -C "$git_root" -c core.quotePath=false ls-files --full-name)
 		if [ "$include_untracked" = true ]; then
 			untracked=$(git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard --full-name)
@@ -376,47 +405,30 @@ case "$file_set" in
 		fi
 		;;
 	recent)
-		# Get N most recently modified files by filesystem modification time
-		# Detect OS for stat format (macOS vs Linux)
-		if [[ "$OSTYPE" == "darwin"* ]]; then
-			stat_cmd="stat -f %m"
-		else
-			stat_cmd="stat -c %Y"
-		fi
-
+		# The N most recently modified files: tracked (plus untracked with -u)
+		# in a repo, everything under . otherwise. Tracked-but-deleted files
+		# have no mtime and are dropped.
 		if [ "$is_git_repo" = true ]; then
-			# In git repo, consider tracked files (plus untracked with -u)
-			# Use stat to get mtime, sort by it, take top N
-			# Need to run stat from git root since git ls-files returns paths relative to root
-			file_list=$(cd "$git_root" && {
-				git -C "$git_root" -c core.quotePath=false ls-files
+			file_list=$({
+				git -C "$git_root" -c core.quotePath=false ls-files --full-name
 				if [ "$include_untracked" = true ]; then
-					git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard
+					git -C "$git_root" -c core.quotePath=false ls-files --others --exclude-standard --full-name
 				fi
-			} | while IFS= read -r f; do
-				if [ -f "$f" ]; then
-					mtime=$($stat_cmd "$f" 2>/dev/null) && echo "$mtime $f"
-				fi
-			done | sort -rn | head -n "$recent_count" | cut -d' ' -f2-)
+			})
 			file_list=$(prefix_git_root "$file_list")
 		else
-			# Outside git repo, find all files and sort by mtime
-			if [[ "$OSTYPE" == "darwin"* ]]; then
-				# macOS: use stat
-				file_list=$(find . -type f | while IFS= read -r f; do
-					mtime=$($stat_cmd "$f" 2>/dev/null) && echo "$mtime $f"
-				done | sort -rn | head -n "$recent_count" | cut -d' ' -f2- | sed 's|^\./||')
-			else
-				# Linux: find -printf is faster
-				file_list=$(find . -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n "$recent_count" | cut -d' ' -f2- | sed 's|^\./||')
-			fi
+			file_list=$(find . -type f 2>/dev/null | sed 's|^\./||' || true)
 		fi
+		file_list=$(sort_by_mtime "$file_list" | while IFS= read -r f; do
+			[ -f "$f" ] && printf '%s\n' "$f"
+		done | head -n "$recent_count")
 		if [ -z "$file_list" ]; then
 			die "No files found"
 		fi
 		;;
 	diff)
 		check_git_repo
+		computed_set=true
 		if [ -z "$diff_ref" ]; then
 			diff_ref=$(get_default_branch)
 		fi
@@ -434,6 +446,7 @@ case "$file_set" in
 			file_list="$stdin_files"
 		elif [ -n "$grep_pattern" ] || [ -n "$name_pattern" ] || [ "$use_fzf" = true ]; then
 			# Have filters or interactive mode - default to all tracked files (or all files if not in git repo)
+			computed_set=true
 			if [ "$is_git_repo" = true ]; then
 				file_list=$(git -C "$git_root" -c core.quotePath=false ls-files --full-name)
 				file_list=$(prefix_git_root "$file_list")
@@ -493,12 +506,28 @@ if [ -n "$grep_pattern" ] && [ -n "$file_list" ]; then
 	fi
 fi
 
+# Computed sets open newest first. Named files and piped lists keep their
+# order: a grep pipeline's order is the user's, and -r has already sorted.
+if [ "$computed_set" = true ] && [ -n "$file_list" ]; then
+	file_list=$(sort_by_mtime "$file_list")
+fi
+
 # Use fzf for interactive selection if requested
 if [ "$use_fzf" = true ]; then
 	if ! command -v fzf >/dev/null 2>&1; then
 		die "fzf is not installed"
 	fi
-	file_list=$(echo "$file_list" | fzf --multi)
+	# Preview strips a :line[:col[:text]] suffix so grep-style entries preview too.
+	# Single quotes are deliberate: fzf's preview shell expands $f, not this script.
+	# shellcheck disable=SC2016
+	if command -v bat >/dev/null 2>&1; then
+		preview='f={}; f=${f%%:[0-9]*}; bat --color=always --style=numbers --line-range=:200 -- "$f"'
+	else
+		preview='f={}; f=${f%%:[0-9]*}; head -n 200 "$f"'
+	fi
+	file_list=$(echo "$file_list" | fzf --multi \
+		--bind 'ctrl-a:select-all,ctrl-d:deselect-all' \
+		--preview "$preview")
 	if [ -z "$file_list" ]; then
 		echo "No files selected"
 		exit 0

@@ -1363,3 +1363,129 @@ EOF
     [[ "$output" == *"inner.txt"* ]]
     [[ "$output" == *"outer.txt"* ]]
 }
+
+# ============================================================================
+# ORDERING - computed sets open newest first, explicit lists keep their order
+# ============================================================================
+
+@test "e -a: newest file opens first" {
+    echo "old" > zzz-old.txt
+    echo "new" > aaa-new.txt
+    git add .
+    git commit -q -m "initial"
+    # Alphabetical order would put aaa-new first anyway, so pin mtimes the
+    # other way round to prove the sort is by time: zzz-old is the newer file
+    touch -t 202001010000 aaa-new.txt
+    touch -t 202001020000 zzz-old.txt
+
+    run_e -a
+
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "zzz-old.txt" ]
+    [ "${lines[1]}" = "aaa-new.txt" ]
+}
+
+@test "e -n PATTERN: filtered matches open newest first" {
+    echo "a" > b-test.txt
+    echo "b" > a-test.txt
+    echo "c" > other.txt
+    git add .
+    git commit -q -m "initial"
+    touch -t 202001010000 a-test.txt
+    touch -t 202001020000 b-test.txt
+
+    run_e -n test
+
+    [ "$status" -eq 0 ]
+    [ "${#lines[@]}" -eq 2 ]
+    [ "${lines[0]}" = "b-test.txt" ]
+    [ "${lines[1]}" = "a-test.txt" ]
+}
+
+@test "e -a: same-second ties keep path order" {
+    echo "1" > b.txt
+    echo "2" > a.txt
+    git add .
+    git commit -q -m "initial"
+    touch -t 202001010000 a.txt b.txt
+
+    run_e -a
+
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "a.txt" ]
+    [ "${lines[1]}" = "b.txt" ]
+}
+
+@test "e file2 file1: named files keep argument order" {
+    echo "1" > file1.txt
+    echo "2" > file2.txt
+    touch -t 202001010000 file2.txt
+    touch -t 202001020000 file1.txt
+
+    run_e file2.txt file1.txt
+
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "file2.txt" ]
+    [ "${lines[1]}" = "file1.txt" ]
+}
+
+@test "piped input: keeps the order given" {
+    echo "1" > file1.txt
+    echo "2" > file2.txt
+    touch -t 202001010000 file2.txt
+    touch -t 202001020000 file1.txt
+
+    cd "$TEST_REPO"
+    run bash -c 'printf "file2.txt\nfile1.txt\n" | '"$TEST_DIR/e"
+
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "file2.txt" ]
+    [ "${lines[1]}" = "file1.txt" ]
+}
+
+@test "e -r: still returns the newest N" {
+    echo "1" > a.txt
+    echo "2" > b.txt
+    echo "3" > c.txt
+    git add .
+    git commit -q -m "initial"
+    touch -t 202001010000 a.txt
+    touch -t 202001030000 b.txt
+    touch -t 202001020000 c.txt
+
+    run_e -r 2
+
+    [ "$status" -eq 0 ]
+    [ "${#lines[@]}" -eq 2 ]
+    [ "${lines[0]}" = "b.txt" ]
+    [ "${lines[1]}" = "c.txt" ]
+}
+
+# ============================================================================
+# FZF INVOCATION - select-all binding and preview
+# ============================================================================
+
+@test "e -i: fzf gets a select-all binding and a preview" {
+    # Mock fzf that records its arguments and selects everything
+    cat > "$TEST_DIR/fzf" <<'EOF2'
+#!/bin/bash
+printf '%s\n' "$@" > "$TEST_DIR/fzf-argv"
+cat
+EOF2
+    chmod +x "$TEST_DIR/fzf"
+    export PATH="$TEST_DIR:$PATH"
+
+    echo "1" > file1.txt
+    git add .
+    git commit -q -m "initial"
+
+    run_e -i
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"file1.txt"* ]]
+    grep -q -- '--multi' "$TEST_DIR/fzf-argv"
+    grep -q 'ctrl-a:select-all' "$TEST_DIR/fzf-argv"
+    grep -q -- '--preview' "$TEST_DIR/fzf-argv"
+    # Preview must survive a file:line entry (grep-style piped input)
+    grep -q 'f=\${f%%:\[0-9\]\*}' "$TEST_DIR/fzf-argv"
+}
