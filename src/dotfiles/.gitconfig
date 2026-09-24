@@ -13,6 +13,8 @@
 	dio = diff @{u}  # vs upstream: unpushed + uncommitted changes
 	# vs merge-base with origin/<default>: only this branch's changes (PR-style)
 	dim = "!b=$(git default) && git diff \"$(git merge-base \"origin/$b\" HEAD)\""
+	# vs HEAD's pre-amend self; git errors if HEAD wasn't created by an amend
+	dia = "!n=$(git log -g --format='%H %gs' HEAD | grep -n -m1 \"^$(git rev-parse HEAD) commit (amend): \" | cut -d: -f1); git diff \"HEAD@{$n}\" HEAD"
 	l = log --graph --abbrev-commit --pretty='%C(auto)%h%d %s %Cgreen(%cr)%Creset %C(bold blue)<%an>%Creset'
 	g = grep --break --heading --line-number
 	cfg = config --list

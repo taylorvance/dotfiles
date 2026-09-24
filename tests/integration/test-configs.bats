@@ -131,6 +131,65 @@ teardown() {
     [ -f "$excludes_path" ] || [ -L "$excludes_path" ]
 }
 
+# Scratch repo using the deployed .gitconfig (HOME=$TEST_HOME). Its
+# useConfigOnly leaves no email, so supply one via the environment.
+dia_repo() {
+    export GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_EMAIL=test@example.com
+    git init -q "$TEST_DIR/repo"
+    cd "$TEST_DIR/repo"
+    echo base > f
+    git add f
+    git commit -q -m base
+    echo one > f
+    git commit -q -am one
+}
+
+@test "git: dia shows what the last amend of HEAD changed" {
+    skip_if_not_installed git
+    dia_repo
+    echo two > f
+    git commit -q -a --amend --no-edit
+
+    run git dia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"-one"* ]]
+    [[ "$output" == *"+two"* ]]
+}
+
+@test "git: dia still finds the amend after HEAD moves away and back" {
+    skip_if_not_installed git
+    dia_repo
+    echo two > f
+    git commit -q -a --amend --no-edit
+    # HEAD@{1} is now the base commit, so a naive HEAD@{1} diff would show base
+    git switch -q -c other HEAD~1
+    git switch -q -
+
+    run git dia
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"-one"* ]]
+    [[ "$output" == *"+two"* ]]
+    [[ "$output" != *"base"* ]]
+}
+
+@test "git: dia is empty for a message-only amend" {
+    skip_if_not_installed git
+    dia_repo
+    git commit -q --amend -m reworded
+
+    run git dia
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "git: dia fails when HEAD was not created by an amend" {
+    skip_if_not_installed git
+    dia_repo
+
+    run git dia
+    [ "$status" -ne 0 ]
+}
+
 # ============================================================================
 # TMUX CONFIGURATION TESTS
 # ============================================================================
