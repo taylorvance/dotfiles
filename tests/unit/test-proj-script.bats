@@ -20,7 +20,8 @@ setup() {
     export MOCK_TMUX_CALLS="$TEST_DIR/mock_tmux_calls"
     # Sessions visible to has-session but NOT list-sessions (simulates resurrection in-progress)
     export MOCK_TMUX_HAS_ONLY_SESSIONS="$TEST_DIR/mock_has_only_sessions"
-    touch "$MOCK_TMUX_SESSIONS" "$MOCK_TMUX_CALLS" "$MOCK_TMUX_HAS_ONLY_SESSIONS"
+    export MOCK_TMUX_ACTIVITY="$TEST_DIR/mock_activity"
+    touch "$MOCK_TMUX_SESSIONS" "$MOCK_TMUX_CALLS" "$MOCK_TMUX_HAS_ONLY_SESSIONS" "$MOCK_TMUX_ACTIVITY"
 
     # Create mock tmux
     cat > "$TEST_DIR/tmux" <<'EOF'
@@ -73,7 +74,21 @@ case "$subcommand" in
         ;;
     list-sessions)
         [ -s "$MOCK_TMUX_SESSIONS" ] || exit 1
-        cat "$MOCK_TMUX_SESSIONS"
+        case "$*" in
+            *session_activity*)
+                # Recency format "last_attached<TAB>activity<TAB>name", fed
+                # by MOCK_TMUX_ACTIVITY lines "name last_attached activity";
+                # unlisted sessions were never attached (0) and never active
+                while IFS= read -r s; do
+                    rec=$(awk -v s="$s" '$1 == s { print $2 "\t" $3 }' "$MOCK_TMUX_ACTIVITY")
+                    [ -n "$rec" ] || rec=$(printf '0\t0')
+                    printf '%s\t%s\n' "$rec" "$s"
+                done < "$MOCK_TMUX_SESSIONS"
+                ;;
+            *)
+                cat "$MOCK_TMUX_SESSIONS"
+                ;;
+        esac
         ;;
     display-message)
         echo "${MOCK_CURRENT_SESSION:-test_current}"
@@ -94,10 +109,11 @@ esac
 EOF
     chmod +x "$TEST_DIR/tmux"
 
-    # Create mock fzf (returns first line of input)
+    # Create mock fzf (returns first line of input, records what was offered)
     cat > "$TEST_DIR/fzf" <<'EOF'
 #!/bin/bash
-head -1
+cat > "$TEST_DIR/fzf_offered"
+head -1 "$TEST_DIR/fzf_offered"
 EOF
     chmod +x "$TEST_DIR/fzf"
 
@@ -586,6 +602,99 @@ EOF
 
     [ "$status" -eq 1 ]
     [[ "$output" == *"already exists"* ]]
+}
+
+# ============================================================================
+# RECENCY TESTS
+# Pickers rank sessions most recent first: live activity for
+# sessions attached since the server started, then tmux-resurrect's save
+# history for sessions restored but not visited since, then by name.
+# ============================================================================
+
+# Record a tmux-resurrect save at timestamp $1 whose state line names the
+# active client's session ($2) and the one it came from ($3)
+add_save() {
+    export MOCK_RESURRECT_DIR="$TEST_DIR/resurrect"
+    mkdir -p "$MOCK_RESURRECT_DIR"
+    touch "$MOCK_RESURRECT_DIR/last"
+    printf 'pane\tignored\nstate\t%s\t%s\n' "$2" "${3:-}" > "$MOCK_RESURRECT_DIR/tmux_resurrect_$1.txt"
+}
+
+@test "proj: picker offers sessions most recently used first" {
+    unset TMUX
+    printf '%s\n' alpha beta gamma >> "$MOCK_TMUX_SESSIONS"
+    printf '%s\n' "alpha 100 100" "beta 100 300" "gamma 200 200" >> "$MOCK_TMUX_ACTIVITY"
+
+    run run_proj
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$TEST_DIR/fzf_offered")" = "$(printf '%s\n' beta gamma alpha)" ]
+    grep -qx "tmux attach-session -t beta" "$MOCK_TMUX_CALLS"
+}
+
+@test "proj: restored sessions not visited since rank by save history, then by name" {
+    unset TMUX
+    printf '%s\n' live old newer unsaved newest >> "$MOCK_TMUX_SESSIONS"
+    # Only "live" was attached since the restore; the rest share one activity
+    printf '%s\n' "live 500 500" "old 0 400" "newer 0 400" "unsaved 0 400" "newest 0 400" >> "$MOCK_TMUX_ACTIVITY"
+    add_save 20260930T090000 gone
+    add_save 20261001T090000 old
+    add_save 20261002T090000 newest newer
+
+    run run_proj
+
+    [ "$status" -eq 0 ]
+    # "gone" is in the history but no longer exists, so it is not offered
+    [ "$(cat "$TEST_DIR/fzf_offered")" = "$(printf '%s\n' live newest newer old unsaved)" ]
+}
+
+@test "proj: in tmux, picker keeps the current session in recency order" {
+    export TMUX=mock_socket
+    export MOCK_CURRENT_SESSION=here
+    printf '%s\n' here there >> "$MOCK_TMUX_SESSIONS"
+    printf '%s\n' "here 300 300" "there 100 100" >> "$MOCK_TMUX_ACTIVITY"
+
+    run run_proj
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$TEST_DIR/fzf_offered")" = "$(printf '%s\n' here there)" ]
+}
+
+@test "proj NAME: multiple matches are offered most recent first" {
+    unset TMUX
+    printf '%s\n' dotfiles dotnet >> "$MOCK_TMUX_SESSIONS"
+    printf '%s\n' "dotfiles 100 100" "dotnet 100 200" >> "$MOCK_TMUX_ACTIVITY"
+
+    run run_proj dot
+
+    [ "$status" -eq 0 ]
+    [ "$(cat "$TEST_DIR/fzf_offered")" = "$(printf '%s\n' dotnet dotfiles)" ]
+}
+
+@test "proj: dead server - restores first, then offers the session saved last first" {
+    unset TMUX
+    enable_mock_restore
+    export MOCK_RESTORE_ADDS="alpha beta gamma"
+    add_save 20261002T090000 beta alpha
+
+    run run_proj
+
+    [ "$status" -eq 0 ]
+    grep -q "restore" "$MOCK_RESTORE_CALLS"
+    [ "$(cat "$TEST_DIR/fzf_offered")" = "$(printf '%s\n' beta alpha gamma)" ]
+    grep -qx "tmux attach-session -t beta" "$MOCK_TMUX_CALLS"
+}
+
+@test "proj: -c and -k are mutually exclusive" {
+    run run_proj -k -c
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"mutually exclusive"* ]]
+
+    run run_proj -c foo -k
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"mutually exclusive"* ]]
 }
 
 # ============================================================================

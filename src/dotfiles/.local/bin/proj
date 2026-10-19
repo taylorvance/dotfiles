@@ -12,7 +12,7 @@ Usage: proj [OPTIONS] [NAME]
 Tmux session manager.
 
 USAGE:
-    proj                 fzf picker of existing sessions → attach
+    proj                 fzf picker of existing sessions, most recent first → attach
     proj NAME            attach to session by name (fzf on multiple matches,
                          error if none match)
     proj -c [NAME]       create session from cwd (name defaults to basename \$PWD)
@@ -24,7 +24,7 @@ OPTIONS:
     -h, --help           Show this help message
 
 EXAMPLES:
-    proj                 Pick from existing sessions
+    proj                 Pick from existing sessions (Enter = most recent)
     proj dotfiles        Attach to "dotfiles" session
     proj dot             Attach if unambiguous, fzf if multiple matches,
                          error if none match
@@ -36,6 +36,10 @@ EXAMPLES:
 NOTES:
     If the tmux server is down or empty (e.g. after a reboot), proj first
     restores saved sessions via tmux-resurrect, then proceeds as usual.
+
+    "Most recent" means you last typed in or switched to the session. tmux
+    forgets that on reboot, so sessions not visited since the restore rank
+    by tmux-resurrect's save history instead, then by name.
 
 EOF
 }
@@ -55,6 +59,50 @@ session_exists() {
 
 list_sessions() {
 	tmux list-sessions -F '#{session_name}' 2>/dev/null
+}
+
+# resurrect registers its save dir as a server option; unset, it uses the XDG
+# location, or the legacy one when only that holds saves
+resurrect_dir() {
+	local save_dir
+	save_dir=$(tmux show-option -gqv '@resurrect-dir' 2>/dev/null) || true
+	[ -n "$save_dir" ] || save_dir="${XDG_DATA_HOME:-$HOME/.local/share}/tmux/resurrect"
+	save_dir="${save_dir/#\~/$HOME}"
+	[ -e "$save_dir/last" ] || save_dir="$HOME/.tmux/resurrect"
+	printf '%s\n' "$save_dir"
+}
+
+# Session names from tmux-resurrect's saves, newest save first, repeats kept.
+# Each save records the session the active client was on, then the one it
+# came from, so the sequence traces where you were before the last reboot.
+resurrect_history() {
+	set -- "$(resurrect_dir)"/tmux_resurrect_*.txt
+	[ -e "$1" ] || return 0
+	# Save names embed a sortable timestamp, so reversing them is newest first
+	awk -F '\t' '$1 == "state" { print FILENAME "\t" $2 "\t" $3 }' "$@" |
+		sort -r |
+		awk -F '\t' '{ print $2; if ($3 != "") print $3 }'
+}
+
+# Session names, most recently used first. tmux stamps a session's activity
+# on each keypress or switch, but only in memory: a restore leaves every
+# session with the same activity and no attach time. So sessions attached
+# since the server started rank by activity, the rest by resurrect's save
+# history (no proj-owned state file to keep in sync), and any left by name.
+# Inside tmux the current session stays in its recency slot, usually first.
+sessions_by_recency() {
+	local tab
+	tab=$(printf '\t')
+	{
+		resurrect_history | sed "s/^/h$tab/"
+		tmux list-sessions -F "#{session_last_attached}$tab#{session_activity}$tab#{session_name}" 2>/dev/null |
+			sed "s/^/s$tab/"
+	} | awk -F '\t' '
+		$1 == "h" { if (!($2 in rank)) rank[$2] = ++n; next }
+		$2 + 0 > 0 { print 1 "\t" $3 "\t" $4; next }
+		$4 in rank { print 2 "\t-" rank[$4] "\t" $4; next }
+		{ print 3 "\t0\t" $4 }
+	' | sort -t "$tab" -k1,1n -k2,2nr -k3 | cut -f3-
 }
 
 attach_session() {
@@ -82,14 +130,11 @@ maybe_restore() {
 	# restore.sh needs a running server; a throwaway session provides one
 	tmux new-session -d -s "__proj_restore__" 2>/dev/null || true
 
-	# resurrect registers its script path and save dir as server options
+	# resurrect registers its script path as a server option
 	local script save_dir
 	script=$(tmux show-option -gqv '@resurrect-restore-script-path' 2>/dev/null) || true
 	[ -n "$script" ] || script="$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
-	save_dir=$(tmux show-option -gqv '@resurrect-dir' 2>/dev/null) || true
-	[ -n "$save_dir" ] || save_dir="${XDG_DATA_HOME:-$HOME/.local/share}/tmux/resurrect"
-	save_dir="${save_dir/#\~/$HOME}"
-	[ -e "$save_dir/last" ] || save_dir="$HOME/.tmux/resurrect"
+	save_dir=$(resurrect_dir)
 
 	if [ -e "$save_dir/last" ]; then
 		if [ -x "$script" ]; then
@@ -161,7 +206,7 @@ do_kill() {
 find_matching_sessions() {
 	local query="$1"
 	local sessions
-	sessions=$(list_sessions 2>/dev/null) || return 0
+	sessions=$(sessions_by_recency)
 	[ -z "$sessions" ] && return 0
 
 	# Exact match first. -F throughout: a session name is a literal, so a query
@@ -184,7 +229,7 @@ do_attach() {
 			die "Specify a session name or install fzf for interactive selection"
 		fi
 		local sessions
-		sessions=$(list_sessions) || die "No tmux sessions running"
+		sessions=$(sessions_by_recency)
 		[ -z "$sessions" ] && die "No tmux sessions running"
 		local selected
 		selected=$(echo "$sessions" | fzf --height=40% --reverse --prompt="Attach to session: ") || exit 0
@@ -225,9 +270,16 @@ do_attach() {
 	fi
 }
 
+# One mode per run; a second mode flag would otherwise silently win or lose
+set_mode() {
+	if [ -n "$mode" ] && [ "$mode" != "$1" ]; then
+		die "Options -c and -k are mutually exclusive"
+	fi
+	mode="$1"
+}
+
 main() {
-	local create_mode=false
-	local kill_mode=false
+	local mode=""
 	local name=""
 
 	while [ $# -gt 0 ]; do
@@ -237,7 +289,7 @@ main() {
 				exit 0
 				;;
 			-c|--create)
-				create_mode=true
+				set_mode create
 				shift
 				if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
 					name="$1"
@@ -245,7 +297,7 @@ main() {
 				fi
 				;;
 			-k|--kill)
-				kill_mode=true
+				set_mode kill
 				shift
 				if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
 					name="$1"
@@ -271,13 +323,11 @@ main() {
 
 	maybe_restore
 
-	if [ "$create_mode" = true ]; then
-		do_create "$name"
-	elif [ "$kill_mode" = true ]; then
-		do_kill "$name"
-	else
-		do_attach "$name"
-	fi
+	case "$mode" in
+		create) do_create "$name" ;;
+		kill) do_kill "$name" ;;
+		*) do_attach "$name" ;;
+	esac
 }
 
 main "$@"
