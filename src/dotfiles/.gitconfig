@@ -7,6 +7,19 @@
 [alias]
 	# inspect
 	st = status
+	# branch summary vs origin/<default>; fetches last, so only the final "behind" line waits on it
+	stm = "!b=$(git default) && m=$(git merge-base \"origin/$b\" HEAD) \
+		&& s=$(git diff --shortstat \"$m\") \
+		&& echo \"$(git rev-list --count \"origin/$b..HEAD\") ahead of origin/$b:${s:- no changes}\" \
+		&& git --no-pager l HEAD --not \"$m^@\" \
+		&& u=$(git rev-parse --abbrev-ref @{u} 2>/dev/null || :) \
+		&& git status -s$([ \"$u\" = \"origin/$b\" ] || echo b) \
+		&& f= && { git fetch -q origin \"$b\" || f=' (fetch failed; as of last fetch)'; } \
+		&& k=$(git rev-list --count \"HEAD..origin/$b\") \
+		&& if [ \"$k\" -eq 0 ]; then echo \"up to date with origin/$b$f\"; \
+		else r= && z= && if [ -t 1 ]; then r='\\033[31m' z='\\033[0m'; fi \
+			&& printf \"$r%s behind origin/%s$z%s\\n\" \"$k\" \"$b\" \"$f\"; fi \
+		&& [ -z \"$f\" ]"
 	di = diff
 	dip = diff HEAD~1
 	dis = diff --staged
