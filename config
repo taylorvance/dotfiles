@@ -24,6 +24,7 @@
 .agents/AGENTS.md
 .agents/hooks
 .agents/skills/devhost
+.agents/skills/eli5
 .agents/skills/implement
 .agents/skills/review
 .agents/skills/terse
@@ -32,6 +33,7 @@
 .claude/commands/address-pr-feedback.md
 .claude/scripts/pr-feedback.mjs
 .claude/skills/agent-hooks
+.claude/skills/eli5
 .claude/skills/implement
 .claude/skills/review
 .claude/skills/terse

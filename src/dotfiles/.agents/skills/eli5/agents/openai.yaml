@@ -1,0 +1,4 @@
+interface:
+  display_name: "ELI5"
+  short_description: "Re-explain the last reply shorter and in plain English"
+  default_prompt: "Use $eli5 to re-explain your last reply shorter and in plain English."
