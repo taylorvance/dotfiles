@@ -40,7 +40,7 @@ rule that has not fired in ninety days is retired from the hook and kept only as
   hook-enforced); never switch my checkout. Copy only ignored environment files required for
   validation, preserve their permissions, and ensure they remain untracked.
 - Number PR items without the `#` sign (hook-enforced; GitHub auto-links `#N`).
-- Do not request PR reviewers (`--reviewer`) unless asked.
+- Do not request PR reviewers (`--reviewer`) unless asked or local guidance sets defaults for the repo.
 
 ## declog
 
