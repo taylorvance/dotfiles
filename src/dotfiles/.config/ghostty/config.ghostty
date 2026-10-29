@@ -1,7 +1,7 @@
 # Ghostty configuration
 # See: ghostty +show-config --default --docs
 
-# Same font as the iTerm2 profile
+# Nerd Font for terminal icons: brew install --cask font-hack-nerd-font
 font-family = "Hack Nerd Font Mono"
 font-size = 12
 
@@ -15,12 +15,17 @@ confirm-close-surface = false
 
 maximize = true
 
-# Copy selected text to the system clipboard, as iTerm2 does
+# Copy selected text to the system clipboard
 copy-on-select = clipboard
 
 # Shift+Enter inserts a newline in Claude Code. Inside tmux it otherwise
 # arrives as plain Enter and submits the prompt.
 keybind = shift+enter=text:\n
+
+# Ctrl+` drops down a terminal from any app (global: needs Accessibility
+# permission, and takes the key from every app). It runs plain zsh outside
+# tmux, so Ghostty's search and prompt jumps work there.
+keybind = global:ctrl+grave_accent=toggle_quick_terminal
 
 # Install Ghostty's terminfo on SSH hosts so TERM=xterm-ghostty works there,
 # falling back to xterm-256color if that fails. Unlisted features keep defaults.
