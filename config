@@ -1,4 +1,5 @@
 .config/bat/config
+.config/ghostty/config.ghostty
 .config/git/ignore
 .config/mise/config.toml
 .config/nvim/README.md

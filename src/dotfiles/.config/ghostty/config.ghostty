@@ -1,0 +1,27 @@
+# Ghostty configuration
+# See: ghostty +show-config --default --docs
+
+# Same font as the iTerm2 profile
+font-family = "Hack Nerd Font Mono"
+font-size = 12
+
+# Matches nvim (tokyonight) and bat (tokyonight_moon)
+theme = TokyoNight Moon
+
+cursor-style-blink = false
+
+# Close tabs and windows without a prompt
+confirm-close-surface = false
+
+maximize = true
+
+# Copy selected text to the system clipboard, as iTerm2 does
+copy-on-select = clipboard
+
+# Shift+Enter inserts a newline in Claude Code. Inside tmux it otherwise
+# arrives as plain Enter and submits the prompt.
+keybind = shift+enter=text:\n
+
+# Install Ghostty's terminfo on SSH hosts so TERM=xterm-ghostty works there,
+# falling back to xterm-256color if that fails. Unlisted features keep defaults.
+shell-integration-features = ssh-env,ssh-terminfo

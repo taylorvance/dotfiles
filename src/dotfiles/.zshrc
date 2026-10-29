@@ -59,6 +59,15 @@ bindkey "^[[3~" delete-char
 bindkey -M viins 'jk' vi-cmd-mode
 bindkey -M viins 'kj' vi-cmd-mode
 
+# Option+Left/Right jump words; the terminal sends Esc b / Esc f, which would
+# otherwise drop to NORMAL mode
+bindkey -M viins '^[b' backward-word
+bindkey -M viins '^[f' forward-word
+
+# Shift+Enter adds a line instead of running the command, as in Claude Code
+# (Ghostty sends it as Ctrl-J)
+bindkey -M viins '^J' self-insert
+
 # Terminal history search
 bindkey -M viins '^r' history-incremental-search-backward
 bindkey -M vicmd '^r' history-incremental-search-backward
