@@ -367,6 +367,9 @@ return {
 					},
 				},
 			},
+			-- Inline images in markdown and image buffers (Kitty graphics; in tmux
+			-- this relies on allow-passthrough in .tmux.conf)
+			image = { enabled = true },
 		},
 	},
 	{ 'folke/tokyonight.nvim', lazy = false, priority = 1000 }, -- colorschemes should be loaded first
