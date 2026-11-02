@@ -11,6 +11,11 @@ confirm-close-surface = false
 
 maximize = true
 
+# New windows and tabs start in ~. Inheriting is useless under tmux: Ghostty
+# only sees the folder tmux was attached from, never the active pane's.
+window-inherit-working-directory = false
+tab-inherit-working-directory = false
+
 # Copy selected text to the system clipboard
 copy-on-select = clipboard
 
