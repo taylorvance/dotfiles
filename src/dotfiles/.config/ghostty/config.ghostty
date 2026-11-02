@@ -2,6 +2,8 @@
 # See: ghostty +show-config --default --docs
 
 font-size = 12
+# No ligatures: show != -> => etc. as the characters typed
+font-feature = -calt, -liga, -dlig
 
 # Matches nvim (tokyonight) and bat (tokyonight_moon)
 theme = TokyoNight Moon
