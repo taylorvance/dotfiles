@@ -5,36 +5,30 @@
 # Script wrappers (need parent shell to modify state)
 # -----------------------------------------------------------------------------
 
-# tmp - wrapper to handle cd and editor invocation
+# tmp - cd into the workspace the script prints, then open any files it lists
+# (stdout: workspace path on line 1, one file per later line; see `tmp -h`)
 tmp() {
-	local output
-	output=$($HOME/.local/bin/tmp "$@")
-	local exit_code=$?
+	local output dir file
+	local files=()
+	output=$("$HOME/.local/bin/tmp" "$@") || return
+	[ -n "$output" ] || return 0  # -d, or an aborted prompt
 
-	if [ $exit_code -eq 0 ]; then
-		# Extract the cd command and eval it
-		local cd_cmd=$(echo "$output" | grep '^cd ' | tail -n 1)
-		if [ -n "$cd_cmd" ]; then
-			eval "$cd_cmd"
+	{
+		IFS= read -r dir
+		while IFS= read -r file; do
+			files+=("$file")
+		done
+	} <<<"$output"
 
-			# Open any requested files in the editor (one EDITOR_CMD line each)
-			local editor_files=() editor_line
-			while IFS= read -r editor_line; do
-				editor_files+=("${editor_line#EDITOR_CMD:}")
-			done < <(echo "$output" | grep '^EDITOR_CMD:')
-			if [ ${#editor_files[@]} -gt 0 ]; then
-				${EDITOR:-nvim} "${editor_files[@]}"
-			fi
+	# Anything that isn't a workspace path (e.g. -h) is just shown
+	if [ ! -d "$dir" ]; then
+		printf '%s\n' "$output"
+		return 0
+	fi
 
-			# Show any other output (excluding cd and EDITOR_CMD)
-			echo "$output" | grep -v '^cd ' | grep -v '^EDITOR_CMD:'
-		else
-			# No cd command, just show output (like -d flag)
-			echo "$output"
-		fi
-	else
-		echo "$output"
-		return $exit_code
+	cd "$dir" || return
+	if [ ${#files[@]} -gt 0 ]; then
+		${EDITOR:-nvim} "${files[@]}"
 	fi
 }
 

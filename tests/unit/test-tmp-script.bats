@@ -40,7 +40,14 @@ run_tmp() {
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Created temporary workspace"* ]]
-    [[ "$output" == *"cd \"$TMP_BASE/"* ]]
+}
+
+@test "tmp: stdout is only the workspace path; messages go to stderr" {
+    stdout=$(run_tmp 2>/dev/null)
+
+    [ "$(echo "$stdout" | wc -l | tr -d ' ')" -eq 1 ]
+    [[ "$stdout" == "$TMP_BASE/"* ]]
+    [ -d "$stdout" ]
 }
 
 @test "tmp: workspace directory exists after creation" {
@@ -73,7 +80,7 @@ run_tmp() {
     run run_tmp -r
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"cd \"$TMP_BASE/"* ]]
+    [[ "$output" == "$TMP_BASE/"* ]]
 }
 
 @test "tmp -r: fails when no workspaces exist" {
@@ -83,14 +90,11 @@ run_tmp() {
     [[ "$output" == *"No temporary workspaces found"* ]]
 }
 
-@test "tmp -r: cd command is valid" {
+@test "tmp -r: prints an existing directory" {
     run_tmp > /dev/null
-    output=$(run_tmp -r)
+    dir=$(run_tmp -r)
 
-    # Extract cd command and verify it's a valid path
-    cd_path=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
-
-    [ -d "$cd_path" ]
+    [ -d "$dir" ]
 }
 
 # ============================================================================
@@ -143,16 +147,16 @@ run_tmp() {
     run_tmp > /dev/null
 
     # Select first one (most recent)
-    run bash -c "echo '1' | $TEST_DIR/tmp -l"
+    dir=$(echo '1' | "$TEST_DIR/tmp" -l 2>/dev/null)
 
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"cd \"$TMP_BASE/"* ]]
+    [[ "$dir" == "$TMP_BASE/"* ]]
+    [ -d "$dir" ]
 }
 
 @test "tmp -l: listing includes a contents preview" {
     # Workspace with a couple of files
     output=$(run_tmp)
-    dir=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
+    dir=$(echo "$output" | head -1)
     touch "$dir/test.py" "$dir/data.csv"
 
     run bash -c "echo '' | $TEST_DIR/tmp -l"
@@ -166,7 +170,7 @@ run_tmp() {
     # One empty workspace, one with 5 files
     run_tmp > /dev/null
     output=$(run_tmp)
-    dir=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
+    dir=$(echo "$output" | head -1)
     touch "$dir/a" "$dir/b" "$dir/c" "$dir/d" "$dir/e"
 
     run bash -c "echo '' | $TEST_DIR/tmp -l"
@@ -190,38 +194,29 @@ run_tmp() {
 # FILENAME ARGUMENT TESTS
 # ============================================================================
 
-@test "tmp FILE: outputs cd and EDITOR_CMD with the filename" {
-    run run_tmp custom.py
+@test "tmp FILE: prints the workspace, then the filename" {
+    stdout=$(run_tmp custom.py 2>/dev/null)
 
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Created temporary workspace"* ]]
-    echo "$output" | grep -q '^cd '
-    echo "$output" | grep -q '^EDITOR_CMD:custom\.py$'
+    [ -d "$(echo "$stdout" | sed -n 1p)" ]
+    [ "$(echo "$stdout" | sed -n 2p)" = "custom.py" ]
+    [ "$(echo "$stdout" | wc -l | tr -d ' ')" -eq 2 ]
 }
 
-@test "tmp FILE...: outputs one EDITOR_CMD line per filename" {
-    run run_tmp notes.md test.py
+@test "tmp FILE...: prints one line per filename, in order" {
+    stdout=$(run_tmp notes.md test.py 2>/dev/null)
 
-    [ "$status" -eq 0 ]
-    echo "$output" | grep -q '^EDITOR_CMD:notes\.md$'
-    echo "$output" | grep -q '^EDITOR_CMD:test\.py$'
-    [ "$(echo "$output" | grep -c '^EDITOR_CMD:')" -eq 2 ]
-}
-
-@test "tmp: no filenames means no EDITOR_CMD lines" {
-    run run_tmp
-
-    [ "$status" -eq 0 ]
-    ! echo "$output" | grep -q '^EDITOR_CMD:'
+    [ "$(echo "$stdout" | sed -n 2p)" = "notes.md" ]
+    [ "$(echo "$stdout" | sed -n 3p)" = "test.py" ]
+    [ "$(echo "$stdout" | wc -l | tr -d ' ')" -eq 3 ]
 }
 
 @test "tmp sub/file: creates parent directories inside the workspace" {
-    output=$(run_tmp sub/dir/file.txt)
+    stdout=$(run_tmp sub/dir/file.txt 2>/dev/null)
 
-    dir=$(echo "$output" | grep '^cd ' | sed 's/cd "\(.*\)"/\1/')
+    dir=$(echo "$stdout" | sed -n 1p)
 
     [ -d "$dir/sub/dir" ]
-    echo "$output" | grep -q '^EDITOR_CMD:sub/dir/file\.txt$'
+    [ "$(echo "$stdout" | sed -n 2p)" = "sub/dir/file.txt" ]
 }
 
 @test "tmp -e: is no longer a valid option" {
@@ -388,17 +383,6 @@ run_tmp() {
 # INTEGRATION TESTS
 # ============================================================================
 
-@test "tmp: output is eval-friendly" {
-    output=$(run_tmp)
-
-    # Should contain a valid cd command that can be eval'd
-    [[ "$output" == *'cd "'* ]]
-
-    # Extract and verify cd command
-    cd_cmd=$(echo "$output" | grep '^cd ' | tail -1)
-    [ -n "$cd_cmd" ]
-}
-
 @test "tmp: same-second runs get a numbered suffix" {
     # Freeze date so every run computes an identical timestamp. Real `date`
     # can't be forced into one second, so this is what actually guarantees the
@@ -407,9 +391,9 @@ run_tmp() {
     printf '#!/bin/sh\necho "20260101-000000"\n' > "$TEST_DIR/bin/date"
     chmod +x "$TEST_DIR/bin/date"
 
-    dir1=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | sed -n 's/^cd "\(.*\)"$/\1/p')
-    dir2=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | sed -n 's/^cd "\(.*\)"$/\1/p')
-    dir3=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | sed -n 's/^cd "\(.*\)"$/\1/p')
+    dir1=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | head -1)
+    dir2=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | head -1)
+    dir3=$(PATH="$TEST_DIR/bin:$PATH" run_tmp | head -1)
 
     [ "$(basename "$dir1")" = "20260101-000000" ]
     [ "$(basename "$dir2")" = "20260101-000000-2" ]
@@ -455,8 +439,8 @@ run_tmp() {
 # SHELL WRAPPER (functions.zsh tmp())
 # ============================================================================
 
-# The wrapper evals the script's "cd" line and handles EDITOR_CMD. These
-# tests source functions.zsh in bash (it is bash-compatible, like the gw
+# The wrapper cds to the script's first stdout line and opens the rest in
+# $EDITOR. These tests source functions.zsh in bash (it is bash-compatible, like the gw
 # tests) with HOME pointed at an isolated dir containing the patched script.
 
 setup_wrapper() {
@@ -474,13 +458,24 @@ setup_wrapper() {
     [[ "$PWD" == "$TMP_BASE/"* ]]
 }
 
-@test "tmp wrapper: passes info output through, consumes the cd line" {
+@test "tmp wrapper: shows messages, consumes the path" {
     setup_wrapper
 
-    output=$(tmp)
+    stdout=$(tmp 2>/dev/null)
+    combined=$(tmp 2>&1)
 
-    [[ "$output" == *"Created temporary workspace"* ]]
-    [[ "$output" != *'cd "'* ]]
+    [ -z "$stdout" ]
+    [[ "$combined" == *"Created temporary workspace"* ]]
+}
+
+@test "tmp wrapper: -h shows help without changing directory" {
+    setup_wrapper
+    before=$PWD
+
+    output=$(tmp -h)
+
+    [[ "$output" == *"Usage: tmp"* ]]
+    [ "$PWD" = "$before" ]
 }
 
 @test "tmp wrapper: opens editor with the filename" {

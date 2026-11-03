@@ -16,6 +16,9 @@ Options:
 
 FILE arguments are opened in \$EDITOR inside the new workspace.
 
+Output: stdout carries only the workspace path, then any FILE names, one per
+line; messages go to stderr. The zsh tmp() wrapper reads that to cd and edit.
+
 Examples:
   tmp               Create new temp dir and cd to it
   tmp test.py       Create temp dir, cd to it, and open test.py in \$EDITOR
@@ -112,7 +115,7 @@ if [ "$DELETE" = true ]; then
   echo "Temp workspaces:" >&2
   list_workspaces
 
-  # Prompt for deletion (read -p writes to stderr, keeping stdout eval-clean)
+  # Prompt for deletion (read -p writes to stderr, so stdout stays path-only)
   if ! read -rp "Enter numbers to delete (space-separated), 'a' for all, or Enter to cancel: " choice; then
     # EOF rather than an answer: abort instead of acting on a blank reply
     echo >&2
@@ -170,7 +173,7 @@ if [ "$RECENT" = true ]; then
       break
     done < <(ls -t "$TMP_BASE")
     if [ -n "$LATEST_DIR" ]; then
-      echo "cd \"$TMP_BASE/$LATEST_DIR\""
+      echo "$TMP_BASE/$LATEST_DIR"
     else
       echo "No temporary workspaces found" >&2
       exit 1
@@ -188,7 +191,7 @@ if [ "$SELECT" = true ]; then
     echo "Existing temp workspaces:" >&2
     list_workspaces
 
-    # Prompt for selection (read -p writes to stderr, keeping stdout eval-clean)
+    # Prompt for selection (read -p writes to stderr, so stdout stays path-only)
     if ! read -rp "Select number (or press Enter to create new): " choice; then
       # EOF rather than an answer: abort instead of falling through to create
       echo >&2
@@ -203,7 +206,7 @@ if [ "$SELECT" = true ]; then
     elif [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#dirs[@]}" ]; then
       # Valid selection
       selected_dir="${dirs[$((choice-1))]}"
-      echo "cd \"$TMP_BASE/$selected_dir\""
+      echo "$TMP_BASE/$selected_dir"
       exit 0
     else
       echo "Invalid selection" >&2
@@ -230,15 +233,14 @@ while ! mkdir "$TMP_DIR" 2>/dev/null; do
   SUFFIX=$((SUFFIX + 1))
 done
 
-echo "Created temporary workspace: $TMP_DIR"
+echo "Created temporary workspace: $TMP_DIR" >&2
 
-# Output the cd command for the parent shell to eval
-echo "cd \"$TMP_DIR\""
-
-# Emit one EDITOR_CMD line per filename for the wrapper to open in $EDITOR
+# stdout line 1 is the workspace; each later line is a file for the wrapper
+# to open in $EDITOR once it has cd'd there
+echo "$TMP_DIR"
 for filename in "$@"; do
   case "$filename" in
     */*) mkdir -p "$TMP_DIR/$(dirname "$filename")" ;;
   esac
-  echo "EDITOR_CMD:$filename"
+  echo "$filename"
 done
