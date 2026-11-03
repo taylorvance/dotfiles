@@ -163,7 +163,7 @@ run_tests() {
         all)
             echo -e "${YELLOW}Running all tests...${NC}"
             echo ""
-            bats tests/unit/*.bats tests/integration/*.bats || exit_code=$?
+            bats --print-output-on-failure tests/unit/*.bats tests/integration/*.bats || exit_code=$?
             ;;
         *.bats)
             local file
@@ -175,7 +175,7 @@ run_tests() {
             done
             echo -e "${YELLOW}Running: $mode $*${NC}"
             echo ""
-            bats "$mode" "$@" || exit_code=$?
+            bats --print-output-on-failure "$mode" "$@" || exit_code=$?
             ;;
         *)
             echo -e "${RED}✗${NC} Unknown mode: $mode"

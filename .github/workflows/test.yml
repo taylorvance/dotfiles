@@ -64,7 +64,9 @@ jobs:
           set -o pipefail
           # The fresh-setup, idempotency and conflicts tests copy the whole
           # repo per test, hence the timeout.
-          bats tests/unit/*.bats tests/integration/*.bats 2>&1 | tee /tmp/bats.log
+          # Native failures can't be reproduced locally, so the log has to
+          # carry what the failing command printed.
+          bats --print-output-on-failure tests/unit/*.bats tests/integration/*.bats 2>&1 | tee /tmp/bats.log
       - name: Summarize to the run page
         if: always()
         run: |
@@ -84,7 +86,8 @@ jobs:
               echo "<details><summary>Failures with context</summary>"
               echo
               echo '```'
-              grep -E -A3 '^not ok ' /tmp/bats.log || true
+              # Each failure plus its whole "#" block, output included
+              awk '/^not ok /{p=1; print; next} p && /^#/{print; next} {p=0}' /tmp/bats.log
               echo '```'
               echo
               echo "</details>"
