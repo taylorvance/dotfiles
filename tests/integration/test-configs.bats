@@ -326,11 +326,30 @@ stm_repo() {
 @test "nvim: can parse init.vim" {
     skip_if_not_installed nvim
 
-    # Check for syntax errors (this will try to load, may fail on missing plugins)
-    run nvim --headless -u "$TEST_HOME/.config/nvim/init.vim" +qall 2>&1
+    # Offline: a real lazy.nvim would clone every plugin from GitHub on each
+    # run (hundreds of MB). This stub stands in at the path the bootstrap in
+    # config/lazy.lua checks, and its setup() only requires the spec modules,
+    # so Lua syntax errors in them still fail. The empty colorscheme stands in
+    # for the tokyonight plugin that init.vim selects.
+    local stub="$TEST_HOME/.local/share/nvim/lazy/lazy.nvim"
+    mkdir -p "$stub/lua/lazy" "$stub/colors"
+    cat > "$stub/lua/lazy/init.lua" <<'EOF'
+return {
+	setup = function(opts)
+		for _, spec in ipairs(opts.spec) do
+			if spec.import then require(spec.import) end
+		end
+	end,
+}
+EOF
+    touch "$stub/colors/tokyonight.vim"
 
-    # Should exit (may have plugin errors, but should parse)
-    [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+    # nvim exits 0 even when init.vim errors, so the output is the signal
+    run env XDG_DATA_HOME="$TEST_HOME/.local/share" \
+        nvim --headless -u "$TEST_HOME/.config/nvim/init.vim" +qall 2>&1
+
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"Error"* ]]
 }
 
 @test "nvim: lua config directory exists if referenced" {
