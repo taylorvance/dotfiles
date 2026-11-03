@@ -50,7 +50,7 @@ bindkey "^[[B" down-line-or-beginning-search
 bindkey -M vicmd k up-line-or-beginning-search
 bindkey -M vicmd j down-line-or-beginning-search
 
-# Fix for undeletable text - https://github.com/denysdovhan/spaceship-prompt/issues/91
+# Backspace past where INSERT mode began (vi mode's default stops there)
 bindkey "^?" backward-delete-char
 # Enable forward delete - https://stackoverflow.com/a/41885766/1718474
 bindkey "^[[3~" delete-char
@@ -67,10 +67,6 @@ bindkey -M viins '^[f' forward-word
 # Shift+Enter adds a line instead of running the command, as in Claude Code
 # (Ghostty sends it as Ctrl-J)
 bindkey -M viins '^J' self-insert
-
-# Terminal history search
-bindkey -M viins '^r' history-incremental-search-backward
-bindkey -M vicmd '^r' history-incremental-search-backward
 
 # Starship prompt (config in ~/.config/starship.toml)
 if command -v starship >/dev/null 2>&1; then
@@ -96,21 +92,19 @@ source $HOME/.zsh/functions.zsh
 alias python='python3'
 # Global alias: `git dip SS` prints only the diff summary line (files/insertions/deletions)
 alias -g SS='--shortstat'
-#poetry completions zsh > ~/.zfunc/_poetry
-#fpath+=~/.zfunc
 
 # Use nvim as default editor
 export EDITOR=nvim
 export VISUAL=nvim
 
 
-# These lines were added by serverless framework setup (I opted for tab completion).
-# tabtab source for packages
-# uninstall by removing these lines
-[[ -f ~/.config/tabtab/__tabtab.zsh ]] && . ~/.config/tabtab/__tabtab.zsh || true
-
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export FZF_DEFAULT_OPTS='--multi'
+# fzf's Ctrl-T pastes a fuzzy-picked path into the command line. Alt-C is off
+# (empty command): fcd does that job. atuin, loaded later, keeps Ctrl-R.
+if command -v fzf >/dev/null 2>&1; then
+	export FZF_ALT_C_COMMAND=''
+	source <(fzf --zsh)
+fi
 
 
 # Runtime versions (node, ...) via mise — global defaults in
@@ -161,8 +155,13 @@ fi
 
 # atuin - magical shell history
 if command -v atuin >/dev/null 2>&1; then
+	# Ctrl-r opens atuin search; up-arrow keeps prefix search (bound above)
 	eval "$(atuin init zsh --disable-up-arrow)"
-	# Note: Use Ctrl-r for atuin search, up-arrow still does prefix search
+	# atuin binds vi normal mode's search to /, leaving fzf's Ctrl-r there
+	bindkey -M vicmd '^r' atuin-search
+else
+	bindkey -M viins '^r' history-incremental-search-backward
+	bindkey -M vicmd '^r' history-incremental-search-backward
 fi
 
 
