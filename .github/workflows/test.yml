@@ -62,7 +62,8 @@ jobs:
           # pipefail is not on by default in a run: block, and without it the
           # step would take tee's exit status and report a red suite as green.
           set -o pipefail
-          # Each integration test copies the whole 18M repo, hence the timeout.
+          # The fresh-setup, idempotency and conflicts tests copy the whole
+          # repo per test, hence the timeout.
           bats tests/unit/*.bats tests/integration/*.bats 2>&1 | tee /tmp/bats.log
       - name: Summarize to the run page
         if: always()

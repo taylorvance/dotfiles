@@ -65,6 +65,13 @@ that candidate list so a test can assert what was *offered*, and can build a
 PATH with `fzf` genuinely absent. A test file that uses it should declare
 `# @covers tests/helpers/fzf.bash` so helper changes re-run it.
 
+`helpers/dotfiles-home.bash` backs the config integration tests: its
+`install_dotfiles_home` (called from `setup_file`) installs the real dotfiles
+into an isolated `$HOME` once per file, and tests keep scratch work in
+`$BATS_TEST_TMPDIR`. Config tests are split per tool (`test-<tool>-config.bats`)
+so each `@covers` stays narrow; `test-configs.bats` holds only the checks that
+span the whole deployed tree.
+
 ## Development Workflow
 
 ### Adding New Tests
