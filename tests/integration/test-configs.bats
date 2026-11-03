@@ -190,6 +190,83 @@ dia_repo() {
     [ "$status" -ne 0 ]
 }
 
+# Clone of a scratch bare remote whose default branch is main, using the
+# deployed .gitconfig (stm relies on its `default` and `l` aliases)
+stm_repo() {
+    export GIT_AUTHOR_NAME=Test GIT_COMMITTER_NAME=Test
+    export GIT_AUTHOR_EMAIL=test@example.com GIT_COMMITTER_EMAIL=test@example.com
+    git init -q --bare -b main "$TEST_DIR/remote.git"
+    git clone -q "$TEST_DIR/remote.git" "$TEST_DIR/work" 2>/dev/null
+    cd "$TEST_DIR/work"
+    git switch -q -c main
+    echo base > f
+    git add f
+    git commit -q -m base
+    git push -q -u origin main
+    git remote set-head origin main
+}
+
+@test "git: stm reports an up-to-date branch with no changes" {
+    skip_if_not_installed git
+    stm_repo
+
+    run git stm
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"0 ahead of origin/main: no changes"* ]]
+    [[ "$output" == *"up to date with origin/main"* ]]
+}
+
+@test "git: stm counts and lists commits ahead" {
+    skip_if_not_installed git
+    stm_repo
+    git switch -q -c feature
+    echo more >> f
+    git commit -q -am "feature work"
+
+    run git stm
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"1 ahead of origin/main: 1 file changed"* ]]
+    [[ "$output" == *"feature work"* ]]
+}
+
+@test "git: stm reports commits behind after fetching" {
+    skip_if_not_installed git
+    stm_repo
+    git switch -q -c feature
+    git clone -q "$TEST_DIR/remote.git" "$TEST_DIR/other"
+    (
+        cd "$TEST_DIR/other"
+        echo upstream > g
+        git add g
+        git commit -q -m upstream
+        git push -q origin main
+    )
+
+    run git stm
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"1 behind origin/main"* ]]
+}
+
+@test "git: stm shows the branch line when upstream is not origin/<default>" {
+    skip_if_not_installed git
+    stm_repo
+    git switch -q -c feature
+
+    run git stm
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"## feature"* ]]
+}
+
+@test "git: stm fails when the fetch fails" {
+    skip_if_not_installed git
+    stm_repo
+    git remote set-url origin "$TEST_DIR/missing.git"
+
+    run git stm
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"(fetch failed; as of last fetch)"* ]]
+}
+
 # ============================================================================
 # TMUX CONFIGURATION TESTS
 # ============================================================================
