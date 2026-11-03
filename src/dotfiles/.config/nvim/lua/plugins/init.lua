@@ -144,8 +144,8 @@ return {
 	},
 	'jeetsukumaran/vim-indentwise',
 	{
-		'nvim-lualine/lualine.nvim', --.TODO: show Lazy status updates https://youtu.be/6pAG3BHurdM?si=GWEB_1be31_UZHZM&t=2465
-		dependencies = { 'nvim-tree/nvim-web-devicons', 'nvim-lua/lsp-status.nvim' },
+		'nvim-lualine/lualine.nvim',
+		dependencies = { 'nvim-tree/nvim-web-devicons' },
 		opts = {
 			options = {
 				theme = 'tokyonight',
@@ -199,7 +199,7 @@ return {
 		},
 	},
 	{
-		'williamboman/mason.nvim', --.TODO: review josean https://www.youtube.com/watch?v=6pAG3BHurdM&t=3647s
+		'williamboman/mason.nvim',
 		dependencies = { 'williamboman/mason-lspconfig.nvim', 'neovim/nvim-lspconfig' },
 		config = function()
 			-- Set up Mason (LSP installer).
@@ -251,43 +251,18 @@ return {
 				},
 			})
 
-			local function pyright_python_settings(root_dir)
-				root_dir = root_dir or vim.fn.getcwd()
-				local venv_python = vim.fs.joinpath(root_dir, '.venv', 'bin', 'python')
-				return {
-					venvPath = root_dir,
-					venv = '.venv',
-					pythonPath = vim.fn.filereadable(venv_python) == 1
-						and venv_python
-						or vim.fn.exepath('python3'),
-				}
-			end
-
-			local function pyright_root_dir(config)
-				if config then
-					local root_dir = config.root_dir
-					if not root_dir and config.root_uri then
-						root_dir = vim.uri_to_fname(config.root_uri)
-					end
-					if not root_dir and config.workspace_folders and config.workspace_folders[1] then
-						root_dir = vim.uri_to_fname(config.workspace_folders[1].uri)
-					end
-					if root_dir then
-						return root_dir
-					end
-				end
-				return vim.fn.getcwd()
-			end
-
+			-- pyright ignores a project's .venv unless told; point it there when
+			-- one exists (otherwise it uses the python on PATH). Settings are
+			-- pulled by the server, so update them and announce the change.
 			vim.lsp.config('pyright', {
-				before_init = function(_, config)
-					config.settings = vim.tbl_deep_extend('force', config.settings or {}, {
-						python = pyright_python_settings(pyright_root_dir(config)),
-					})
-				end,
 				on_init = function(client)
+					local root = client.root_dir or vim.fn.getcwd()
+					local venv_python = vim.fs.joinpath(root, '.venv', 'bin', 'python')
+					if vim.fn.executable(venv_python) == 0 then
+						return
+					end
 					client.settings = vim.tbl_deep_extend('force', client.settings or {}, {
-						python = pyright_python_settings(pyright_root_dir(client.config)),
+						python = { pythonPath = venv_python },
 					})
 					client:notify('workspace/didChangeConfiguration', { settings = nil })
 				end,

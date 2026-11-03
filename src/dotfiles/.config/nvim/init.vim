@@ -13,13 +13,25 @@ augroup vimrc
 	autocmd!
 augroup END
 
-" auto-cd to dotfiles repo when editing symlinked dotfiles
-autocmd vimrc BufEnter *
-	\ let resolved = resolve(expand('%:p')) |
-	\ if resolved =~# $HOME . '/dotfiles/src/dotfiles/' |
-	\   silent! lcd ~/dotfiles |
-	\   let b:git_dir = $HOME . '/dotfiles/.git' |
-	\ endif
+" open a symlinked file (e.g. a deployed dotfile) under its real path, so git
+" tools (fugitive, gitsigns) see the repo it lives in. :edit can't do this
+" (nvim reuses the buffer, since it is the same file), so rename the buffer
+" and re-read it; the re-read fires this again, and stops once paths match.
+function! s:FollowSymlink() abort
+	let l:path = expand('<afile>:p')
+	let l:real = resolve(l:path)
+	if l:real ==# l:path || &buftype !=# ''
+		return
+	endif
+	execute 'keepalt file' fnameescape(l:real)
+	edit!
+	" :file leaves an unlisted buffer holding the old name
+	let l:stale = bufnr('^' . l:path . '$')
+	if l:stale > 0 && l:stale != bufnr('%')
+		execute 'silent! bwipeout' l:stale
+	endif
+endfunction
+autocmd vimrc BufReadPost * nested call s:FollowSymlink()
 
 " load plugins with lua/config/lazy.lua and lua/config/plugins/*.lua
 lua require("config.lazy")
@@ -37,10 +49,8 @@ set undofile                " persistent undo history
 
 " tabs are 4 columns wide, each indentation level is one tab
 set tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
-" better indenting for react
-"autocmd FileType javascriptreact,typescriptreact setlocal tabstop=2 softtabstop=2 shiftwidth=2 expandtab
 " use spaces for C# (dotnet)
-autocmd vimrc FileType cs setlocal tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+autocmd vimrc FileType cs setlocal expandtab
 
 
 " }}}
@@ -56,9 +66,6 @@ nnoremap <silent> <space><space> <cmd>nohlsearch<cr>
 " n always goes forward, N always goes backward
 nnoremap <expr> n (v:searchforward ? 'n' : 'N')
 nnoremap <expr> N (v:searchforward ? 'N' : 'n')
-
-" search by plain text (very nomagic: only / has special meaning)
-"nnoremap / /\V
 
 " find files (smart: git files in repo, all files otherwise)
 nnoremap <c-t> <cmd>lua Snacks.picker.smart()<cr>
@@ -107,8 +114,8 @@ noremap <tab> %
 
 " list open buffers, sorted by most recently used
 nnoremap gb <cmd>lua Snacks.picker.buffers()<cr>
-" list recently opened files
-nnoremap gf <cmd>lua Snacks.picker.recent()<cr>
+" list recently opened files ("find recent"; gf stays vim's open-file-under-cursor)
+nnoremap <leader>fr <cmd>lua Snacks.picker.recent()<cr>
 " list files in git status
 nnoremap gs <cmd>lua Snacks.picker.git_status()<cr>
 " jumplist (recently visited locations)
@@ -153,8 +160,9 @@ nnoremap > >>
 vnoremap < <gv
 vnoremap > >gv
 
-" maintain clipboard after pasting over something in visual mode
-xnoremap p "_dP
+" pasting over a selection keeps what you copied (built-in visual P does this;
+" "_dP did too but pasted one char early when the selection ended the line)
+xnoremap p P
 
 " highlight last-pasted text
 nnoremap <leader>v V`]
@@ -179,17 +187,14 @@ command! -nargs=1 DupFile execute 'saveas' expand('%:h') . '/' . <q-args>
 
 " << LSP >> {{{
 
-" go to references
-nnoremap gr <cmd>lua Snacks.picker.lsp_references()<cr>
-" go to definition
+" nvim's built-in LSP keys (gra code action, grn rename, grr/gri/grt below);
+" these swap three of them to Snacks pickers. The old gr/gi/gt/ca maps
+" shadowed the built-ins and vim's own gi (resume insert) and gt (next tab).
+nnoremap grr <cmd>lua Snacks.picker.lsp_references()<cr>
+nnoremap gri <cmd>lua Snacks.picker.lsp_implementations()<cr>
+nnoremap grt <cmd>lua Snacks.picker.lsp_type_definitions()<cr>
+" go to definition (no built-in LSP key; vim's gd is a local-declaration guess)
 nnoremap gd <cmd>lua Snacks.picker.lsp_definitions()<cr>
-" go to type definition
-nnoremap gt <cmd>lua Snacks.picker.lsp_type_definitions()<cr>
-" go to implementations
-nnoremap gi <cmd>lua Snacks.picker.lsp_implementations()<cr>
-
-" code actions
-nnoremap ca <cmd>lua vim.lsp.buf.code_action()<cr>
 
 " Trouble diagnostics
 nnoremap <leader>xx <cmd>Trouble diagnostics open focus=true<cr>
