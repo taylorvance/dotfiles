@@ -117,7 +117,7 @@ Core tools are nvim, git, tmux, zsh, curl/wget, unzip, and build tools where nee
 - **`clean`** - Remove common dependency/cache directories
 - **`envsync`** - Compare `.env` files against their sample counterparts
 - **`git-prune-branches`** - Remove stale local git branches
-- **`git-prune-worktrees`** - Remove synced git worktrees
+- **`git-prune-worktrees`** - Remove worktrees that hold none of your work
 - **`sysinfo`** - Quick system information summary
 
 Each script documents itself — run it with `-h` for full usage.
