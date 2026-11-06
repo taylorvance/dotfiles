@@ -36,9 +36,12 @@ rule that has not fired in ninety days is retired from the hook and kept only as
 - Post PR review feedback with `gh pr review`, never `gh pr comment` (hook-enforced). The review
   flag carries the verdict, so the posted body states none of its own. Non-blocking nits ride in
   the approving review rather than downgrading it to `--comment`.
-- Review other people's PRs in a git worktree at `~/dev/worktrees/<repo>/<slug>` (path and slug
-  hook-enforced); never switch my checkout. Copy only ignored environment files required for
-  validation, preserve their permissions, and ensure they remain untracked.
+- Review other people's PRs in a detached git worktree at `~/dev/worktrees/<repo>/<slug>` (path
+  and slug hook-enforced) so file reads see the PR's code; never switch my checkout. Create it with
+  `git fetch origin pull/<N>/head` then `git worktree add --detach <path> FETCH_HEAD`. Install,
+  build, or copy environment files only when the review runs code; copy only the ignored ones it
+  needs, preserve their permissions, and keep them untracked. Remove the worktree
+  (`git worktree remove --force`) before handing over the report, unless I ask to keep it.
 - Number PR items without the `#` sign (hook-enforced; GitHub auto-links `#N`).
 - Do not request PR reviewers (`--reviewer`) unless asked or local guidance sets defaults for the repo.
 

@@ -17,7 +17,7 @@ sibling directory): it is the output contract, and its `findings.md` defines the
 - `git diff <default>...HEAD --name-only` for changed files, `git log <default>..HEAD --oneline`
   for commit context. Empty diff → say so and stop.
 - If the invocation names a PR number or another branch, review that instead: in a worktree,
-  never by switching the checkout.
+  never by switching the checkout. The global PR rules cover creating and removing it.
 - If it supplies a diff directly, or points at uncommitted work, review that and skip the branch
   machinery entirely.
 
@@ -164,7 +164,7 @@ Report `comment` instead.
 
 ## Constraints
 
-- Read-only: never modify files.
+- Read-only: never modify files. Removing the review worktree is cleanup, not an edit.
 - Specialist agents report to you in full; admission and compression are both yours. Findings
   drop at step 4, for failing an admission test. Never drop one at write-up time to hit a length
   budget, and never drop a caveat or a failing check at all.
